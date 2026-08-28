@@ -50,6 +50,7 @@ export const ReplicatedBuilding = schema({
   attackDamage: "uint16",
   attackIntervalTicks: "uint16",
   attackCooldownTicks: "uint16",
+  weaponFacing: "float32",
   attackTargetId: "string",
   productionQueue: [ReplicatedTrainingItem],
   rallyX: "int32",
@@ -129,6 +130,7 @@ export class SchemaReplication {
       target.attackDamage = building.weapon?.damage ?? 0;
       target.attackIntervalTicks = building.weapon?.intervalTicks ?? 0;
       target.attackCooldownTicks = building.weapon?.cooldownTicks ?? 0;
+      target.weaponFacing = building.weapon?.facing ?? 0;
       target.attackTargetId = building.weapon?.targetId ?? "";
       const queue = building.productionQueue ?? [];
       while (target.productionQueue.length > queue.length) target.productionQueue.pop();

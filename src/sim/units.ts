@@ -1,5 +1,6 @@
 import { UNIT_DEFINITIONS, type UnitKind } from "./unitDefinitions";
 import { behemothImpactDelayTicks, behemothVolleySeed } from "../behemothAttack";
+import { directProjectileImpactDelayTicks } from "../directProjectile";
 import { RecastNavigation } from "./navigation";
 import { POSITION_SCALE, SIMULATION_TICK_SECONDS } from "./simulationConstants";
 import {
@@ -21,7 +22,7 @@ import {
 export { POSITION_SCALE, SIMULATION_TICK_SECONDS } from "./simulationConstants";
 export const UNIT_SEPARATION_GAP = 0.3 * POSITION_SCALE;
 export const ATTACK_SEPARATION_GAP = 0.15 * POSITION_SCALE;
-const ATTACK_FACING_TOLERANCE = Math.PI / 30;
+export const ATTACK_FACING_TOLERANCE = Math.PI / 30;
 const TURN_RESPONSIVENESS: Record<UnitKind, number> = {
   ghostrunner: 14,
   "scout-drone": 18,
@@ -42,6 +43,7 @@ export interface BuildingWeaponState {
   damage: number;
   intervalTicks: number;
   cooldownTicks: number;
+  facing: number;
   targetId?: string;
 }
 
@@ -191,8 +193,16 @@ export type SimulationEvent =
     type: "weapon-fired";
     tick: number;
     attackerId: string;
-    attack: "direct" | "ground";
-    targetId?: string;
+    attack: "direct";
+    targetId: string;
+    target: SimPoint;
+    impactTick: number;
+  }
+  | {
+    type: "weapon-fired";
+    tick: number;
+    attackerId: string;
+    attack: "ground";
     target: SimPoint;
   }
   | {
@@ -249,6 +259,13 @@ interface PendingGroundImpact {
   attackerId: string;
   target: SimPoint;
   radius: number;
+  damage: number;
+}
+interface PendingDirectImpact {
+  impactTick: number;
+  attackerId: string;
+  targetId: string;
+  target: "unit" | "building";
   damage: number;
 }
 type RangedFormation = { angle: number; columns: number; size: number };
@@ -792,6 +809,7 @@ export class LocalUnitSimulation implements GameSimulation {
     stagnantTicks: number;
   }>();
   private readonly attackWaitingUntil = new Map<string, number>();
+  private readonly pendingDirectImpacts: PendingDirectImpact[] = [];
   private readonly pendingGroundImpacts: PendingGroundImpact[] = [];
   private events: SimulationEvent[] = [];
   private acceptedCommands: AcceptedCommand[] = [];
@@ -858,7 +876,9 @@ export class LocalUnitSimulation implements GameSimulation {
         damage: weapon.damage,
         intervalTicks: Math.round(weapon.intervalSeconds / SIMULATION_TICK_SECONDS),
         cooldownTicks: 0,
+        facing: building.rotation - Math.PI / 2,
       };
+      building.weapon.facing ??= building.rotation - Math.PI / 2;
     }
     if (building.kind === "command-center") {
       building.productionQueue ??= [];
@@ -1182,6 +1202,7 @@ export class LocalUnitSimulation implements GameSimulation {
   step() {
     if (this.result) return;
     this.tick += 1;
+    this.resolveDirectImpacts();
     this.resolveGroundImpacts();
     this.stepProduction();
     this.stepBuildingWeapons();
@@ -1252,6 +1273,7 @@ export class LocalUnitSimulation implements GameSimulation {
       tick: this.tick,
       units: [...this.units.values()].sort(compareIds),
       buildings: [...this.buildings.values()].sort(compareIds),
+      pendingDirectImpacts: this.pendingDirectImpacts,
       pendingGroundImpacts: this.pendingGroundImpacts,
       buildingSequence: this.buildingSequence,
       productionSequence: this.productionSequence,
@@ -1299,16 +1321,19 @@ export class LocalUnitSimulation implements GameSimulation {
     for (const building of this.buildings.values()) {
       if (building.weapon) building.weapon.targetId = undefined;
     }
+    this.pendingDirectImpacts.length = 0;
     this.pendingGroundImpacts.length = 0;
   }
 
   private stepBuildingWeapons() {
     for (const building of [...this.buildings.values()].sort(compareIds)) {
       const weapon = building.weapon;
+      const weaponDefinition = BUILDING_DEFINITIONS[building.kind]?.weapon;
       if (weapon?.cooldownTicks && weapon.cooldownTicks > 0) {
         weapon.cooldownTicks -= 1;
       }
-      if (building.lifecycle !== "active" || building.health <= 0 || !weapon) {
+      if (building.lifecycle !== "active" || building.health <= 0
+        || !weapon || !weaponDefinition) {
         if (weapon) weapon.targetId = undefined;
         continue;
       }
@@ -1319,7 +1344,28 @@ export class LocalUnitSimulation implements GameSimulation {
         (unit) => distance(building.position, unit.position) <= weapon.range + unit.radius,
       );
       weapon.targetId = target?.id;
-      if (!target || weapon.cooldownTicks) continue;
+      if (!target) continue;
+      const desiredFacing = Math.atan2(
+        target.position.x - building.position.x,
+        target.position.z - building.position.z,
+      );
+      const difference = Math.atan2(
+        Math.sin(desiredFacing - weapon.facing),
+        Math.cos(desiredFacing - weapon.facing),
+      );
+      const turnRatio = 1 - Math.exp(
+        -SIMULATION_TICK_SECONDS * weaponDefinition.turnResponsiveness,
+      );
+      const remainingTurn = difference * (1 - turnRatio);
+      weapon.facing = Math.atan2(
+        Math.sin(weapon.facing + difference * turnRatio),
+        Math.cos(weapon.facing + difference * turnRatio),
+      );
+      if (weapon.cooldownTicks || Math.abs(remainingTurn) > ATTACK_FACING_TOLERANCE) continue;
+      const impactTick = this.tick + directProjectileImpactDelayTicks(
+        distance(building.position, target.position) / POSITION_SCALE,
+        SIMULATION_TICK_SECONDS,
+      );
       this.events.push({
         type: "weapon-fired",
         tick: this.tick,
@@ -1327,8 +1373,15 @@ export class LocalUnitSimulation implements GameSimulation {
         attack: "direct",
         targetId: target.id,
         target: { ...target.position },
+        impactTick,
       });
-      this.damageUnit(building, target, weapon.damage);
+      this.pendingDirectImpacts.push({
+        impactTick,
+        attackerId: building.id,
+        targetId: target.id,
+        target: "unit",
+        damage: weapon.damage,
+      });
       weapon.cooldownTicks = weapon.intervalTicks;
     }
   }
@@ -1676,6 +1729,13 @@ export class LocalUnitSimulation implements GameSimulation {
     }
     if (attacker.attackCooldownTicks > 0 || !this.isFacingTarget(attacker)) return;
     if (!attacker.attackDamage) return;
+    const projectile = Boolean(attacker.attackRange);
+    const impactTick = projectile
+      ? this.tick + directProjectileImpactDelayTicks(
+          distance(attacker.position, target.position) / POSITION_SCALE,
+          SIMULATION_TICK_SECONDS,
+        )
+      : this.tick;
     this.events.push({
       type: "weapon-fired",
       tick: this.tick,
@@ -1683,10 +1743,38 @@ export class LocalUnitSimulation implements GameSimulation {
       attack: "direct",
       targetId: target.id,
       target: { ...target.position },
+      impactTick,
     });
-    if (isUnitTarget(target)) this.damageUnit(attacker, target, attacker.attackDamage);
+    if (projectile) {
+      this.pendingDirectImpacts.push({
+        impactTick,
+        attackerId: attacker.id,
+        targetId: target.id,
+        target: isUnitTarget(target) ? "unit" : "building",
+        damage: attacker.attackDamage,
+      });
+    } else if (isUnitTarget(target)) this.damageUnit(attacker, target, attacker.attackDamage);
     else this.damageBuilding(attacker, target, attacker.attackDamage);
     attacker.attackCooldownTicks = attacker.attackIntervalTicks ?? 10;
+  }
+
+  private resolveDirectImpacts() {
+    for (let index = 0; index < this.pendingDirectImpacts.length;) {
+      const impact = this.pendingDirectImpacts[index]!;
+      if (impact.impactTick > this.tick) {
+        index += 1;
+        continue;
+      }
+      this.pendingDirectImpacts.splice(index, 1);
+      const attacker = { id: impact.attackerId };
+      if (impact.target === "unit") {
+        const target = this.units.get(impact.targetId);
+        if (target?.health) this.damageUnit(attacker, target, impact.damage);
+      } else {
+        const target = this.buildings.get(impact.targetId);
+        if (target?.health) this.damageBuilding(attacker, target, impact.damage);
+      }
+    }
   }
 
   private stepAttackGround(attacker: UnitState) {

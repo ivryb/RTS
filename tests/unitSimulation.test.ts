@@ -1638,7 +1638,7 @@ describe("unit simulation", () => {
     const hornet = unitAt("hornet-1", -(16 - 0.15), 0, true, 1_309);
     hornet.attackRange = 14 * POSITION_SCALE;
     hornet.attackDamage = 60;
-    hornet.attackIntervalTicks = 2;
+    hornet.attackIntervalTicks = 8;
     const simulation = new LocalUnitSimulation([hornet], [building]);
 
     expect(simulation.dispatch("player-1", {
@@ -1647,7 +1647,7 @@ describe("unit simulation", () => {
       targetId: building.id,
     }).accepted).toBe(true);
     simulation.step();
-    expect(simulation.buildingSnapshot()[0]?.health).toBe(40);
+    expect(simulation.buildingSnapshot()[0]?.health).toBe(100);
     expect(simulation.drainEvents()).toEqual([
       {
         type: "weapon-fired",
@@ -1656,21 +1656,20 @@ describe("unit simulation", () => {
         attack: "direct",
         targetId: building.id,
         target: building.position,
-      },
-      {
-        type: "damage",
-        tick: 1,
-        attackerId: hornet.id,
-        targetId: building.id,
-        target: "building",
-        amount: 60,
-        health: 40,
+        impactTick: 5,
       },
     ]);
 
-    simulation.step();
-    expect(simulation.drainEvents()).toEqual([]);
-    simulation.step();
+    for (let tick = 0; tick < 4; tick += 1) simulation.step();
+    expect(simulation.buildingSnapshot()[0]?.health).toBe(40);
+    expect(simulation.drainEvents()).toEqual([expect.objectContaining({
+      type: "damage",
+      tick: 5,
+      targetId: building.id,
+      health: 40,
+    })]);
+
+    for (let tick = 0; tick < 8; tick += 1) simulation.step();
     expect(simulation.buildingSnapshot()).toEqual([]);
     expect(simulation.drainEvents().map((event) => event.type))
       .toEqual(["weapon-fired", "damage", "building-died"]);
@@ -1704,11 +1703,12 @@ describe("unit simulation", () => {
       targetId: enemyCenter.id,
     }).accepted).toBe(true);
     simulation.step();
+    simulation.step();
 
     expect(simulation.matchResult).toEqual({
       winnerId: "player-1",
       defeatedPlayerIds: ["player-2"],
-      resolvedTick: 1,
+      resolvedTick: 2,
     });
     expect(simulation.dispatch("player-1", {
       type: "move",
@@ -1717,7 +1717,7 @@ describe("unit simulation", () => {
     }).accepted).toBe(false);
     const frozenHash = simulation.stateHash();
     simulation.step();
-    expect(simulation.currentTick).toBe(1);
+    expect(simulation.currentTick).toBe(2);
     expect(simulation.stateHash()).toBe(frozenHash);
   });
 
@@ -1757,11 +1757,12 @@ describe("unit simulation", () => {
       targetId: replacementSite.id,
     });
     simulation.step();
+    simulation.step();
 
     expect(simulation.matchResult).toEqual({
       winnerId: "player-2",
       defeatedPlayerIds: ["player-1"],
-      resolvedTick: 2,
+      resolvedTick: 3,
     });
     expect(simulation.snapshot().find(({ id }) => id === defender.id)?.health).toBeGreaterThan(0);
   });
@@ -1794,14 +1795,15 @@ describe("unit simulation", () => {
       targetId: playerCenter.id,
     });
     simulation.step();
+    simulation.step();
 
     expect(simulation.matchResult).toEqual({
       defeatedPlayerIds: ["player-1", "player-2"],
-      resolvedTick: 1,
+      resolvedTick: 2,
     });
   });
 
-  test("active Turrets automatically fire at the nearest enemy in range", () => {
+  test("active Turrets turn before firing at the nearest enemy", () => {
     const turret: BuildingState = {
       id: "enemy-turret",
       kind: "turret",
@@ -1819,28 +1821,68 @@ describe("unit simulation", () => {
     const farther = unitAt("ghostrunner-farther", 9, 0);
     const simulation = new LocalUnitSimulation([farther, nearest], [turret]);
 
-    simulation.step();
+    const aimingEvents: ReturnType<typeof simulation.drainEvents> = [];
+    for (let tick = 0; tick < 20 && !aimingEvents.some((event) =>
+      event.type === "damage"); tick += 1) {
+      simulation.step();
+      aimingEvents.push(...simulation.drainEvents());
+    }
 
     expect(simulation.snapshot().find((unit) => unit.id === nearest.id)?.health).toBe(115);
     expect(simulation.snapshot().find((unit) => unit.id === farther.id)?.health).toBe(140);
-    expect(simulation.drainEvents()).toEqual([
-      expect.objectContaining({
-        type: "weapon-fired",
-        attackerId: turret.id,
-        targetId: nearest.id,
-      }),
-      expect.objectContaining({
-        type: "damage",
-        attackerId: turret.id,
-        targetId: nearest.id,
-        amount: 25,
-      }),
-    ]);
+    expect(aimingEvents).toContainEqual(expect.objectContaining({
+      type: "weapon-fired",
+      attackerId: turret.id,
+      targetId: nearest.id,
+    }));
 
-    for (let tick = 0; tick < 9; tick += 1) simulation.step();
-    expect(simulation.snapshot().find((unit) => unit.id === nearest.id)?.health).toBe(115);
+    expect(aimingEvents).toContainEqual(expect.objectContaining({
+      type: "damage",
+      attackerId: turret.id,
+      targetId: nearest.id,
+      amount: 25,
+    }));
+  });
+
+  test("applies Turret damage when its projectile reaches the target", () => {
+    const turret: BuildingState = {
+      id: "enemy-turret",
+      kind: "turret",
+      lifecycle: "active",
+      constructionProgress: 1,
+      ownerId: "player-2",
+      position: toSimPoint(0, 0),
+      rotation: 0,
+      radius: 1_800,
+      attackRadius: 1_500,
+      health: 900,
+      maxHealth: 900,
+    };
+    const target = unitAt("ghostrunner-target", -6, 0);
+    target.health = 25;
+    const simulation = new LocalUnitSimulation([target], [turret]);
+
     simulation.step();
-    expect(simulation.snapshot().find((unit) => unit.id === nearest.id)?.health).toBe(90);
+
+    expect(simulation.snapshot()[0]?.health).toBe(25);
+    expect(simulation.drainEvents()).toEqual([expect.objectContaining({
+      type: "weapon-fired",
+      tick: 1,
+      attackerId: turret.id,
+      targetId: target.id,
+      impactTick: 3,
+    })]);
+
+    simulation.step();
+    expect(simulation.snapshot()[0]?.health).toBe(25);
+    expect(simulation.drainEvents()).toEqual([]);
+
+    simulation.step();
+    expect(simulation.snapshot()[0]?.health).toBe(0);
+    expect(simulation.drainEvents().map((event) => event.type)).toEqual([
+      "damage",
+      "unit-died",
+    ]);
   });
 
   test("Turrets break equal-distance target ties by stable entity identity", () => {
@@ -1863,9 +1905,7 @@ describe("unit simulation", () => {
 
     simulation.step();
 
-    expect(simulation.drainEvents()[0]).toMatchObject({
-      type: "weapon-fired",
-      attackerId: turret.id,
+    expect(simulation.buildingSnapshot()[0]?.weapon).toMatchObject({
       targetId: alpha.id,
     });
   });
@@ -1883,7 +1923,7 @@ describe("unit simulation", () => {
     const intruder = unitAt("ghostrunner-intruder", 10, 0);
     const simulation = new LocalUnitSimulation([intruder, guard]);
 
-    simulation.step();
+    for (let tick = 0; tick < 4; tick += 1) simulation.step();
 
     expect(simulation.snapshot().find((unit) => unit.id === intruder.id)?.health).toBe(110);
     expect(simulation.snapshot().find((unit) => unit.id === guard.id)).toMatchObject({
@@ -1936,13 +1976,15 @@ describe("unit simulation", () => {
     expect(simulation.buildingSnapshot()[0]).toMatchObject({
       lifecycle: "active",
       weapon: {
-        range: 12_000,
+        range: 18_000,
         damage: 25,
-        intervalTicks: 10,
+        intervalTicks: 6,
       },
     });
 
-    simulation.step();
+    for (let tick = 0; tick < 10
+      && simulation.snapshot().find((unit) => unit.id === enemy.id)?.health === 140;
+      tick += 1) simulation.step();
     expect(simulation.snapshot().find((unit) => unit.id === enemy.id)?.health).toBe(115);
   });
 
@@ -1971,7 +2013,7 @@ describe("unit simulation", () => {
     simulation.step();
 
     expect(simulation.drainEvents().map((event) => event.type))
-      .toEqual(["weapon-fired", "damage"]);
+      .toEqual(["weapon-fired"]);
   });
 
   test("resolves direct damage against enemy units", () => {
@@ -1989,6 +2031,7 @@ describe("unit simulation", () => {
       targetId: target.id,
     }).accepted).toBe(true);
     simulation.step();
+    for (let tick = 0; tick < 4; tick += 1) simulation.step();
 
     expect(simulation.snapshot().find((unit) => unit.id === target.id)?.health).toBe(110);
     expect(simulation.drainEvents().map((event) => [event.type, "target" in event && event.target]))

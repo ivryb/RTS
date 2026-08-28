@@ -25,7 +25,7 @@ export { terrainPathExists } from "./terrainWalkability";
 
 export interface GeneratedMap extends TerrainSurface {
   seed: number;
-  startingLocations: readonly [MapPoint, MapPoint];
+  startingLocations: readonly MapPoint[];
   palms: PalmSpawn[];
   placement: PlacementGrid;
   mountainMask: Float32Array;
@@ -66,12 +66,11 @@ export const createTerrainIndices = (segments: number) => {
 };
 
 /** Generates the shared graph terrain used by both gameplay and its preview. */
-export const generateMap = (seed: number): GeneratedMap => {
-  const layout = generateTerrainLayout(seed, 2);
-  const firstBase = layout.startingLocations[0];
-  const secondBase = layout.startingLocations[1];
-  if (!firstBase || !secondBase) throw new Error("Two-player terrain must contain two bases");
-  const startingLocations = [firstBase, secondBase] as const;
+export const generateMap = (seed: number, playerCount = 2): GeneratedMap => {
+  const layout = generateTerrainLayout(seed, playerCount);
+  if (layout.startingLocations.length < 2) {
+    throw new Error("Gameplay terrain must contain at least two bases");
+  }
   const surface = { size: layout.size, segments: layout.segments, heights: layout.heights };
   const placement = createPlacementGrid(layout.size, Math.round(layout.size / 2));
   for (let z = 0; z < placement.resolution; z += 1) {
@@ -85,7 +84,7 @@ export const generateMap = (seed: number): GeneratedMap => {
   }
   return {
     seed,
-    startingLocations,
+    startingLocations: layout.startingLocations,
     ...surface,
     palms: [],
     placement,

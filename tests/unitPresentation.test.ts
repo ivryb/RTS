@@ -302,9 +302,9 @@ describe("unit presentation timing", () => {
       builderId: scout.id,
       position: { x: 3 * POSITION_SCALE, z: 0 },
       weapon: {
-        range: 12 * POSITION_SCALE,
+        range: 18 * POSITION_SCALE,
         damage: 25,
-        intervalTicks: 10,
+        intervalTicks: 6,
         cooldownTicks: 0,
       },
     });
@@ -616,15 +616,16 @@ describe("unit presentation timing", () => {
     expect(modelMaterialDisposed).toBe(true);
   });
 
-  test("shows a selected Turret range and presents its authoritative shot", async () => {
+  test("shows its range, aims, then fires a synchronized heavy Turret projectile", async () => {
     const intruder = unit("ghostrunner");
     const turret = activeBuilding("enemy-turret", "turret", {
-      position: { x: 8 * POSITION_SCALE, z: 0 },
+      position: { x: 4 * POSITION_SCALE, z: 0 },
       weapon: {
-        range: 12 * POSITION_SCALE,
+        range: 18 * POSITION_SCALE,
         damage: 25,
-        intervalTicks: 10,
+        intervalTicks: 6,
         cooldownTicks: 10,
+        facing: -Math.PI / 2,
         targetId: intruder.id,
       },
     });
@@ -640,6 +641,9 @@ describe("unit presentation timing", () => {
         const root = new THREE.Group();
         root.name = "turret model";
         root.add(new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2)));
+        const head = new THREE.Group();
+        head.name = "TurretHead";
+        root.add(head);
         return root;
       },
     );
@@ -650,6 +654,8 @@ describe("unit presentation timing", () => {
     ], options);
     await Promise.resolve();
 
+    const head = world.getObjectByName("TurretHead")!;
+    expect(head.getObjectByName("Turret muzzle")?.position.toArray()).toEqual([-0.52, 0.17, 0]);
     system.select([turret.id]);
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(true);
 
@@ -660,20 +666,151 @@ describe("unit presentation timing", () => {
       attack: "direct",
       targetId: intruder.id,
       target: { ...intruder.position },
+      impactTick: 5,
     }]));
+    for (let frameIndex = 0; frameIndex < 60
+      && !world.getObjectByName("Turret projectile"); frameIndex += 1) {
+      system.update(1 / 60);
+    }
+
+    const projectile = world.getObjectByName("Turret projectile")!;
+    expect(projectile).toBeDefined();
+    expect(projectile.scale.toArray()).toEqual([1.6, 1.25, 1.6]);
+    expect(Math.abs(Math.atan2(
+      Math.sin(-Math.PI / 4 - head.rotation.y),
+      Math.cos(-Math.PI / 4 - head.rotation.y),
+    ))).toBeLessThanOrEqual(THREE.MathUtils.degToRad(6));
+    session.frames.push(frame(3, intruder, turret));
     system.update(0);
+    const position = projectile.position.clone();
+    system.update(0.04);
+    expect(world.getObjectByName("Turret projectile")).toBeDefined();
+    expect(projectile.position.equals(position)).toBe(false);
+    session.frames.push(frame(5, intruder, turret));
+    system.update(0);
+    expect(world.getObjectByName("Turret projectile")).toBeDefined();
+    session.frames.push(frame(6, intruder, turret));
+    system.update(0);
+    expect(world.getObjectByName("Turret projectile")).toBeUndefined();
+  });
+
+  test("presents a Turret shot when its model loads before the worker adds weapon state", () => {
+    const intruder = unit("ghostrunner");
+    intruder.position = toSimPoint(0, 8);
+    const turret = activeBuilding("enemy-turret", "turret", {
+      position: toSimPoint(0, 0),
+      rotation: 0,
+    });
+    const session = new TestSession(frame(1, intruder, turret));
+    const world = new THREE.Group();
+    const system = new UnitSystem(
+      world,
+      map,
+      [],
+      [],
+      session,
+      () => {
+        const root = new THREE.Group();
+        const head = new THREE.Group();
+        head.name = "TurretHead";
+        root.add(head);
+        return root;
+      },
+    );
+    const armedTurret = structuredClone(turret);
+    armedTurret.weapon = {
+      range: 18 * POSITION_SCALE,
+      damage: 25,
+      intervalTicks: 6,
+      cooldownTicks: 10,
+      facing: 0,
+      targetId: intruder.id,
+    };
+    expect(world.getObjectByName("Turret muzzle")).toBeDefined();
+
+    session.frames.push(frame(2, intruder, armedTurret, [{
+      type: "weapon-fired",
+      tick: 1,
+      attackerId: turret.id,
+      attack: "direct",
+      targetId: intruder.id,
+      target: { ...intruder.position },
+      impactTick: 3,
+    }]));
+    for (let frameIndex = 0; frameIndex < 60
+      && !world.getObjectByName("Turret projectile"); frameIndex += 1) {
+      system.update(1 / 60);
+    }
 
     expect(world.getObjectByName("Turret projectile")).toBeDefined();
+    system.dispose();
+  });
+
+  test("does not replay an expired Turret shot after firing and impact frames coalesce", () => {
+    const intruder = unit("ghostrunner");
+    const turret = activeBuilding("enemy-turret", "turret", {
+      position: toSimPoint(0, 0),
+      rotation: 0,
+    });
+    const session = new TestSession(frame(1, intruder, turret));
+    const world = new THREE.Group();
+    const system = new UnitSystem(world, map, [spawn(intruder)], [], session);
+    const intruderRoot = new THREE.Group();
+    system.attachGhostrunner(intruder.id, intruderRoot, [
+      new THREE.AnimationClip("Idle", 1, []),
+      new THREE.AnimationClip("Female_Throwing_Stance_Charge_inplace", 1, []),
+      new THREE.AnimationClip("Attack", 1, []),
+      new THREE.AnimationClip("Dead", 1, []),
+    ], options);
+    const turretRoot = new THREE.Group();
+    const head = new THREE.Group();
+    head.name = "TurretHead";
+    turretRoot.add(head);
+    system.attachBuilding(turret.id, turretRoot);
+    const dead = { ...structuredClone(intruder), health: 0 };
+
+    session.frames.push(frame(5, dead, turret, [
+      {
+        type: "weapon-fired",
+        tick: 1,
+        attackerId: turret.id,
+        attack: "direct",
+        targetId: intruder.id,
+        target: { ...intruder.position },
+        impactTick: 4,
+      },
+      {
+        type: "damage",
+        tick: 4,
+        attackerId: turret.id,
+        targetId: intruder.id,
+        target: "unit",
+        amount: intruder.health,
+        health: 0,
+      },
+      {
+        type: "unit-died",
+        tick: 4,
+        id: intruder.id,
+        attackerId: turret.id,
+      },
+    ]));
+    system.update(0.1);
+
+    expect(world.getObjectByName("Turret projectile")).toBeUndefined();
+    expect(intruderRoot.visible).toBe(true);
+    system.dispose();
   });
 
   test("sweeps an idle Turret head and aims it at its current target", async () => {
     const target = unit("ghostrunner");
     target.position = { x: 0, z: 10 * POSITION_SCALE };
     const weapon = {
-      range: 12 * POSITION_SCALE,
+      range: 18 * POSITION_SCALE,
       damage: 25,
-      intervalTicks: 10,
+      intervalTicks: 6,
       cooldownTicks: 0,
+      facing: -Math.PI / 2,
     };
     const turret = activeBuilding("enemy-turret", "turret", {
       position: { x: 0, z: 0 },
@@ -705,9 +842,58 @@ describe("unit presentation timing", () => {
     const attackingTurret = structuredClone(turret);
     attackingTurret.weapon = { ...weapon, targetId: target.id };
     session.frames.push(frame(2, target, attackingTurret));
+    const rotationBeforeAiming = head.rotation.y;
     system.update(0);
 
-    expect(head.rotation.y).toBeCloseTo(Math.PI / 4, 5);
+    expect(head.rotation.y).toBe(rotationBeforeAiming);
+    for (let step = 0; step < 20; step += 1) system.update(0.05);
+    expect(head.rotation.y).toBeCloseTo(Math.PI / 4, 2);
+  });
+
+  test("animates Turret aim every render frame between simulation ticks", async () => {
+    const target = unit("ghostrunner");
+    target.position = toSimPoint(0, 10);
+    const turret = activeBuilding("enemy-turret", "turret", {
+      position: toSimPoint(0, 0),
+      rotation: 0,
+      weapon: {
+        range: 18 * POSITION_SCALE,
+        damage: 25,
+        intervalTicks: 6,
+        cooldownTicks: 0,
+        facing: -Math.PI / 2,
+        targetId: target.id,
+      },
+    });
+    const session = new TestSession(frame(1, target, turret));
+    const world = new THREE.Group();
+    const system = new UnitSystem(
+      world,
+      map,
+      [],
+      [],
+      session,
+      () => {
+        const root = new THREE.Group();
+        const head = new THREE.Group();
+        head.name = "TurretHead";
+        root.add(head);
+        return root;
+      },
+    );
+    await Promise.resolve();
+
+    const head = world.getObjectByName("TurretHead")!;
+    const angles = [head.rotation.y];
+    for (let frameIndex = 0; frameIndex < 5; frameIndex += 1) {
+      system.update(1 / 60);
+      angles.push(head.rotation.y);
+    }
+
+    for (let index = 1; index < angles.length; index += 1) {
+      expect(angles[index]).toBeGreaterThan(angles[index - 1]!);
+    }
+    system.dispose();
   });
 
   test("falls back to a selectable building presentation when model loading fails", async () => {
@@ -915,6 +1101,7 @@ describe("unit presentation timing", () => {
       attack: "direct",
       targetId: building.id,
       target: building.position,
+      impactTick: 4,
     }]));
 
     system.update(0);
@@ -951,6 +1138,7 @@ describe("unit presentation timing", () => {
       attack: "direct",
       targetId: building.id,
       target: building.position,
+      impactTick: 4,
     }]));
     system.update(0);
 

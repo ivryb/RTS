@@ -62,9 +62,9 @@ Current training times are 8 seconds for a Scout Drone, 12 for a Ghostrunner, 20
 | Building | Role | Health | Construction | Weapon |
 | --- | --- | ---: | ---: | --- |
 | Command Center | Produces every current unit and anchors defeat | 2,500 | 60 seconds | None |
-| Turret | Simple defensive structure | 900 | 10 seconds | 25 damage every second, range 12 |
+| Turret | Simple defensive structure | 900 | 10 seconds | 25 damage every 0.6 seconds, range 18 |
 
-A Scout Drone creates a vulnerable construction site and travels to its edge. Construction pauses if the assigned drone moves, stops, or dies. Any friendly Scout Drone can resume the site. A completed Turret automatically attacks the nearest hostile unit in range.
+A Scout Drone creates a vulnerable construction site and travels to its edge. Construction pauses if the assigned drone moves, stops, or dies. Any friendly Scout Drone can resume the site. A completed Turret automatically attacks the nearest hostile unit in range. Direct-fire projectile damage resolves on the deterministic impact tick, when the rendered projectile reaches its target. Turret projectiles use the Hornet's glow treatment at a heavier scale.
 
 This is ground construction. Buildings do not arrive from orbit in the current game.
 
@@ -89,7 +89,7 @@ The current map is not assembled from random hill blobs. It starts from a seeded
 6. The generator validates two routes between player bases, connected walkable regions, reachable mesa access, and physically blocked mountains.
 7. Rendering and Recast navigation consume the same height field and mountain mask.
 
-The current match uses a 240 by 240 world-unit map for two players. The generator supports two to six starts, but the game encounter remains 1v1. Each start has a flat construction area. Validation uses the largest current ground-unit clearance and the production slope limit.
+The current match uses a 396 by 396 world-unit, six-start terrain layout. The game encounter remains a local 1v1 proof and places the enemy on the nearest connected terrain node instead of another player start, bypassing the normal base separator for faster combat testing. Normal multiplayer starts keep their separator regions. Each start has a flat construction area. Validation uses the largest current ground-unit clearance and the production slope limit.
 
 Roads, water, Titanium Deposits, ruins, vegetation, and neutral sites are planned layers. They are not part of the current generator.
 

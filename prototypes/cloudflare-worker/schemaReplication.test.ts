@@ -63,6 +63,7 @@ test("standalone schema replication emits independent fog views and small deltas
       damage: 25,
       intervalTicks: 10,
       cooldownTicks: 4,
+      facing: Math.PI / 3,
       targetId: "two",
     },
   };
@@ -97,6 +98,7 @@ test("standalone schema replication emits independent fog views and small deltas
     attackCooldownTicks: 4,
     attackTargetId: "two",
   });
+  expect(playerOneState.buildings.get(turret.id)!.weaponFacing).toBeCloseTo(Math.PI / 3);
 
   units[0]!.position.x += 100;
   replication.sync(1, units, [commandCenter, turret]);

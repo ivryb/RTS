@@ -66,7 +66,7 @@ const validPlacement = (
 };
 
 const createProof = async () => {
-  const map = generateMap(77);
+  const map = generateMap(77, 6);
   const encounter = createCombatProofEncounter(map);
   const world = new THREE.Group();
   const system = new UnitSystem(
@@ -85,6 +85,73 @@ const createProof = async () => {
 beforeAll(() => initializeNavigation());
 
 describe("assembled combat proof", () => {
+  test("presents shots fired by an enemy Turret in the live simulation", async () => {
+    const map = generateMap(77, 6);
+    const encounter = createCombatProofEncounter(map);
+    const turret = encounter.buildings.find(({ id }) => id === "enemy-turret-left")!;
+    const ghostrunner = {
+      ...encounter.units.find(({ id }) => id === "ghostrunner-1")!,
+      x: turret.x + 4,
+      z: turret.z - 8,
+      health: 25,
+    };
+    const world = new THREE.Group();
+    const system = new UnitSystem(
+      world,
+      map,
+      [ghostrunner],
+      [turret],
+      undefined,
+      async () => {
+        const root = new THREE.Group();
+        const head = new THREE.Group();
+        head.name = "TurretHead";
+        root.add(head);
+        return root;
+      },
+      createUnitPresentation,
+    );
+    await settlePresentations(system);
+    expect(system.select([ghostrunner.id])).toBe(1);
+    expect(system.moveSelected(turret.x + 4, turret.z + 8)).toBe(true);
+
+    let fired = false;
+    for (let step = 0; step < 80 && !fired; step += 1) {
+      system.update(0.05);
+      fired = Boolean(world.getObjectByName("Turret projectile"));
+    }
+
+    expect(fired).toBe(true);
+    const targetRoot = world.getObjectByName(`${ghostrunner.id} model`)!;
+    expect(targetRoot.visible).toBe(true);
+    for (let step = 0; step < 20
+      && world.getObjectByName("Turret projectile"); step += 1) {
+      system.update(0.05);
+    }
+    expect(world.getObjectByName("Turret projectile")).toBeUndefined();
+    expect(targetRoot.visible).toBe(false);
+    system.dispose();
+  });
+
+  test("lets Ghostrunners leave the starting area before reaching nearby defenses", async () => {
+    const { encounter, system } = await createProof();
+    const distanceFromCenter = Math.hypot(encounter.focus.x, encounter.focus.z);
+    const destination = {
+      x: encounter.focus.x - encounter.focus.x / distanceFromCenter * 40,
+      z: encounter.focus.z - encounter.focus.z / distanceFromCenter * 40,
+    };
+
+    expect(system.select(["ghostrunner-2"])).toBe(1);
+    expect(system.moveSelected(destination.x, destination.z)).toBe(true);
+    await advance(system, 4.5);
+
+    const [ghostrunner] = system.selectedUnits();
+    expect(ghostrunner?.moving).toBe(false);
+    expect(Math.hypot(ghostrunner!.x - destination.x, ghostrunner!.z - destination.z))
+      .toBeLessThan(1);
+    system.dispose();
+  });
+
   test("supports production, construction, siege victory, and a clean reset", async () => {
     const { encounter, system } = await createProof();
     const playerStart = encounter.focus;
@@ -120,7 +187,8 @@ describe("assembled combat proof", () => {
       lifecycle: "active",
     });
     expect(system.trainSelected("behemoth")).toBe(true);
-    await advance(system, 36);
+    expect(system.trainSelected("behemoth")).toBe(true);
+    await advance(system, 71);
     system.select(["local-player-building-2"]);
     const expansionQueue = system.selectedBuildings()[0]?.productionQueue ?? [];
     expect(expansionQueue).toEqual([]);
@@ -137,6 +205,7 @@ describe("assembled combat proof", () => {
     const siegeAttackers = [
       "local-player-behemoth-4",
       "local-player-behemoth-5",
+      "local-player-behemoth-6",
     ];
     expect(system.select(siegeAttackers)).toBe(siegeAttackers.length);
     expect(system.attackGroundSelected(enemyCenter.x, enemyCenter.z)).toBe(true);

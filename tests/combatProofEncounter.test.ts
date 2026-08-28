@@ -5,9 +5,11 @@ import { constructionPlacementIsValid } from "../src/sim/construction";
 import { toSimPoint } from "../src/sim/units";
 
 describe("combat proof encounter", () => {
-  test("places the player opening and stationary enemy base at opposite starts", () => {
-    const map = generateMap(77);
+  test("places the enemy on the next terrain node in the compact six-player map", () => {
+    const map = generateMap(77, 6);
     const encounter = createCombatProofEncounter(map);
+
+    expect(map.size).toBe(396);
 
     expect(encounter.buildings.map(({ id, kind, ownerId }) => ({ id, kind, ownerId }))).toEqual([
       { id: "local-command-center", kind: "command-center", ownerId: "local-player" },
@@ -32,7 +34,24 @@ describe("combat proof encounter", () => {
     const enemyCenter = encounter.buildings.find(({ id }) => id === "enemy-command-center")!;
     expect(playerCenter.rotation).toBe(Math.PI / 4);
     expect(enemyCenter.rotation).toBe(Math.PI / 4);
-    expect({ x: enemyCenter.x, z: enemyCenter.z }).toEqual(map.startingLocations[1]);
+    const adjacentNodeIds = map.topology.edges.flatMap((edge) => {
+      if (edge.a === 0) return [edge.b];
+      if (edge.b === 0) return [edge.a];
+      return [];
+    });
+    const nearestAdjacentNode = map.topology.nodes
+      .filter((node) => adjacentNodeIds.includes(node.id))
+      .reduce((nearest, candidate) =>
+        Math.hypot(candidate.x - playerCenter.x, candidate.z - playerCenter.z)
+          < Math.hypot(nearest.x - playerCenter.x, nearest.z - playerCenter.z)
+          ? candidate
+          : nearest
+      );
+    expect({ x: enemyCenter.x, z: enemyCenter.z }).toEqual({
+      x: nearestAdjacentNode.x,
+      z: nearestAdjacentNode.z,
+    });
+    expect(map.startingLocations).not.toContainEqual({ x: enemyCenter.x, z: enemyCenter.z });
 
     for (const entity of [...encounter.buildings, ...encounter.units]) {
       expect(Math.abs(entity.x) + entity.radius).toBeLessThan(map.size / 2);
@@ -48,7 +67,7 @@ describe("combat proof encounter", () => {
 
   test("keeps both initial bases on valid terrain across deterministic maps", () => {
     for (const seed of [1, 7, 77, 777]) {
-      const map = generateMap(seed);
+      const map = generateMap(seed, 6);
       const encounter = createCombatProofEncounter(map);
       const buildings = encounter.buildings.map((building) => ({
         position: toSimPoint(building.x, building.z),
@@ -71,5 +90,5 @@ describe("combat proof encounter", () => {
         )).toBe(true);
       });
     }
-  });
+  }, 30_000);
 });

@@ -129,7 +129,7 @@ const loadMap = (seed: number) => {
     remove: (current) => scene.remove(current),
     dispose: disposeWorld,
     create: (nextSeed) => {
-      const map = generateMap(nextSeed);
+      const map = generateMap(nextSeed, 6);
       return { map, world: createWorld(map) };
     },
     add: (next) => scene.add(next),
@@ -141,6 +141,7 @@ const loadMap = (seed: number) => {
   });
   const { map } = loaded;
   world = loaded.world;
+  mapCamera.setMapSize(map.size);
   updateGroundStyle();
   mapCamera.focus(world.userData.focus);
   updateSunFocus();

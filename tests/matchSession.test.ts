@@ -120,13 +120,13 @@ describe("match sessions", () => {
     const session = new LocalMatchSession("player-1", simulation);
 
     session.submit({ type: "attack", unitIds: [attacker.id], targetId: enemyCenter.id });
-    session.advance(0.1);
+    session.advance(0.2);
 
     const resolvedFrame = session.readFrame(0)!;
     expect(resolvedFrame.matchResult).toEqual({
       winnerId: "player-1",
       defeatedPlayerIds: ["player-2"],
-      resolvedTick: 1,
+      resolvedTick: 2,
     });
     session.advance(1);
     expect(session.readFrame(resolvedFrame.version)).toBeUndefined();

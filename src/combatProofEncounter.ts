@@ -62,7 +62,25 @@ const unitAt = (
 /** Deterministic local proof: a small player opening faces one fortified, non-producing base. */
 export const createCombatProofEncounter = (map: GeneratedMap): CombatProofEncounter => {
   const player = map.startingLocations[0]!;
-  const enemy = map.startingLocations[1]!;
+  const playerNode = map.topology.nodes.find((node) => node.player === 1);
+  if (!playerNode) throw new Error("Combat proof terrain is missing the player start node");
+  const adjacentNodeIds = new Set(map.topology.edges.flatMap((edge) => {
+    if (edge.a === playerNode.id) return [edge.b];
+    if (edge.b === playerNode.id) return [edge.a];
+    return [];
+  }));
+  // This local proof skips the multiplayer base separator and puts the enemy
+  // on the next terrain node so testing does not require crossing half the map.
+  const enemyCandidates = map.topology.nodes.filter((node) => adjacentNodeIds.has(node.id));
+  const firstEnemyCandidate = enemyCandidates[0];
+  if (!firstEnemyCandidate) throw new Error("Combat proof terrain has no adjacent enemy node");
+  const enemyNode = enemyCandidates.slice(1).reduce((nearest, candidate) =>
+    Math.hypot(candidate.x - player.x, candidate.z - player.z)
+      < Math.hypot(nearest.x - player.x, nearest.z - player.z)
+      ? candidate
+      : nearest,
+  firstEnemyCandidate);
+  const enemy = { x: enemyNode.x, z: enemyNode.z };
   const deltaX = enemy.x - player.x;
   const deltaZ = enemy.z - player.z;
   const length = Math.hypot(deltaX, deltaZ) || 1;

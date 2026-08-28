@@ -17,7 +17,7 @@ export class MapCamera {
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly mapSize: number,
+    private mapSize: number,
   ) {
     this.camera.zoom = DEFAULT_ZOOM;
     this.camera.near = 0.1;
@@ -43,8 +43,15 @@ export class MapCamera {
 
   focus(point: { x: number; z: number }) {
     this.target.set(point.x, 0, point.z);
+    this.clampTarget();
     this.camera.zoom = DEFAULT_ZOOM;
     this.camera.updateProjectionMatrix();
+    this.updatePosition();
+  }
+
+  setMapSize(mapSize: number) {
+    this.mapSize = mapSize;
+    this.clampTarget();
     this.updatePosition();
   }
 
@@ -117,7 +124,7 @@ export class MapCamera {
   }
 
   private clampTarget() {
-    const limit = this.mapSize * 0.43;
+    const limit = this.mapSize / 2;
     this.target.x = THREE.MathUtils.clamp(this.target.x, -limit, limit);
     this.target.z = THREE.MathUtils.clamp(this.target.z, -limit, limit);
   }

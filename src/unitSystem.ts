@@ -16,6 +16,7 @@ import {
 import { UI_ATTACK_COLOR, UI_SELECTION_COLOR } from "./uiColors";
 import {
   BUILDING_DEFINITIONS,
+  TURRET_TURN_RESPONSIVENESS,
   constructionPlacementIsValid,
 } from "./sim/construction";
 import {
@@ -23,6 +24,7 @@ import {
   defaultRallyPoint,
 } from "./sim/production";
 import {
+  ATTACK_FACING_TOLERANCE,
   POSITION_SCALE,
   SIMULATION_TICK_SECONDS,
   toSimPoint,
@@ -39,12 +41,13 @@ const BEHEMOTH_TRACK_SCROLL_SCALE = 0.75;
 const MAX_TERRAIN_TILT = THREE.MathUtils.degToRad(20);
 const TERRAIN_TILT_RESPONSIVENESS = 10;
 const SELECTION_RING_ELEVATION = 0.045;
-const ATTACK_FACING_TOLERANCE = THREE.MathUtils.degToRad(6);
 const TURRET_IDLE_SWEEP_ANGLE = THREE.MathUtils.degToRad(32);
 const TURRET_IDLE_SWEEP_SPEED = 0.55;
 const TURRET_IDLE_TURN_RESPONSIVENESS = 4.5;
 // The authored TurretHead mesh points its barrel down the local -X axis.
 const TURRET_HEAD_FORWARD_YAW = Math.PI / 2;
+// Center of the barrel-tip vertices in assets/models/turret.glb, slightly extended past the mesh.
+const TURRET_MUZZLE_OFFSET = { x: -0.52, y: 0.17, z: 0 } as const;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const terrainNormal = new THREE.Vector3();
 const localTerrainNormal = new THREE.Vector3();
@@ -230,6 +233,7 @@ interface PendingDirectShot {
   targetId: string;
   targetX: number;
   targetZ: number;
+  impactTick: number;
 }
 
 interface PendingGroundShot {
@@ -269,8 +273,11 @@ const toFrame = (unit: UnitState): UnitFrame => ({
 
 interface LaserProjectile {
   mesh: THREE.Mesh;
-  velocity: THREE.Vector3;
-  remaining: number;
+  start: THREE.Vector3;
+  end: THREE.Vector3;
+  launchTick: number;
+  impactTick: number;
+  targetId?: string;
 }
 
 interface MuzzleFlash {
@@ -744,6 +751,7 @@ export class UnitSystem {
   );
   private readonly laserStart = new THREE.Vector3();
   private readonly laserEnd = new THREE.Vector3();
+  private readonly laserDirection = new THREE.Vector3();
   private readonly turretOrigin = new THREE.Vector3();
   private readonly turretTarget = new THREE.Vector3();
   private readonly targetBounds = new THREE.Box3();
@@ -824,6 +832,7 @@ export class UnitSystem {
         size: map.size,
         segments: map.segments,
         heights: map.heights,
+        mountainMask: map.mountainMask,
         placement: map.placement,
       },
       commandCenterPlayers.length > 1
@@ -1051,25 +1060,38 @@ export class UnitSystem {
       height,
       offset: { x: 0, y: height / 2, z: 0 },
     });
-    const rangeIndicator = building.weapon
-      ? createRangeIndicator(0, building.weapon.range / POSITION_SCALE)
+    const weaponDefinition = BUILDING_DEFINITIONS[building.kind].weapon;
+    const weaponRange = building.weapon?.range
+      ?? (weaponDefinition ? weaponDefinition.range * POSITION_SCALE : undefined);
+    const rangeIndicator = weaponRange
+      ? createRangeIndicator(0, weaponRange / POSITION_SCALE)
       : undefined;
     if (rangeIndicator) rangeIndicator.name = "Turret attack range";
-    const muzzle = building.weapon ? new THREE.Object3D() : undefined;
+    const turretHead = building.kind === "turret"
+      ? root.getObjectByName("TurretHead")
+      : undefined;
+    // The worker's initial frame can arrive before it initializes weapon state.
+    const muzzle = weaponDefinition ? new THREE.Object3D() : undefined;
     if (muzzle) {
       muzzle.name = "Turret muzzle";
-      muzzle.position.y = height * 0.72;
+      if (turretHead) {
+        muzzle.position.set(
+          TURRET_MUZZLE_OFFSET.x,
+          TURRET_MUZZLE_OFFSET.y,
+          TURRET_MUZZLE_OFFSET.z,
+        );
+        turretHead.add(muzzle);
+      } else {
+        muzzle.position.y = height * 0.72;
+      }
     }
     root.add(
       selectionRing,
       healthBar.root,
       selectionHitbox,
       ...(rangeIndicator ? [rangeIndicator] : []),
-      ...(muzzle ? [muzzle] : []),
+      ...(muzzle && !turretHead ? [muzzle] : []),
     );
-    const turretHead = building.kind === "turret"
-      ? root.getObjectByName("TurretHead")
-      : undefined;
     root.userData.selectionCenterY = height / 2;
     this.buildingById.set(id, {
       root,
@@ -1089,6 +1111,7 @@ export class UnitSystem {
     });
     this.selectables.push(root);
     this.renderBuilding(root, building);
+    this.updateTurretHead(id, this.buildingById.get(id)!, 0);
     this.refreshEntityOverlays(id);
   }
 
@@ -1397,7 +1420,7 @@ export class UnitSystem {
       this.presentUnitDeath(id);
     }
     this.updateCombinedRangeGeometry();
-    this.updateLaserProjectiles(deltaSeconds);
+    this.updateLaserProjectiles();
     this.updateMuzzleFlashes(deltaSeconds);
     this.behemothBarrage.update(deltaSeconds);
 
@@ -1721,24 +1744,23 @@ export class UnitSystem {
   private presentEvent(event: SimulationEvent) {
     if (event.type === "weapon-fired") {
       this.markRecentCombat(event.attackerId, event.tick);
-      if (event.targetId) this.markRecentCombat(event.targetId, event.tick);
+      if (event.attack === "direct") this.markRecentCombat(event.targetId, event.tick);
     }
     if (event.type === "damage") {
       this.markRecentCombat(event.attackerId, event.tick);
       this.markRecentCombat(event.targetId, event.tick);
     }
-    if (event.type === "weapon-fired" && event.attack === "direct" && event.targetId
+    if (event.type === "weapon-fired" && event.attack === "direct"
       && (this.current.get(event.attackerId)?.kind === "hornet"
         || this.presentations.get(event.attackerId)?.laser
         || this.currentBuildings.get(event.attackerId)?.kind === "turret")) {
+      if (event.impactTick <= this.frameTick) return;
       this.pendingDirectShots.set(event.attackerId, {
         targetId: event.targetId,
         targetX: event.target.x / POSITION_SCALE,
         targetZ: event.target.z / POSITION_SCALE,
+        impactTick: event.impactTick,
       });
-      if (this.currentBuildings.get(event.attackerId)?.kind === "turret") {
-        this.fireBuildingLaser(event.attackerId);
-      }
     }
     if (event.type === "weapon-fired" && event.attack === "ground"
       && (this.current.get(event.attackerId)?.kind === "behemoth"
@@ -1916,7 +1938,6 @@ export class UnitSystem {
           root.rotation.y,
         );
       }
-      this.fireBuildingLaser(building.id);
     }
     const attackableIndex = this.attackables.indexOf(root);
     const attackable = root.visible && building.ownerId !== LOCAL_PLAYER_ID;
@@ -1924,7 +1945,7 @@ export class UnitSystem {
     if (!attackable && attackableIndex >= 0) this.attackables.splice(attackableIndex, 1);
   }
 
-  /** Keeps the articulated turret head scanning while idle and locked to its live target. */
+  /** Animates every render frame; the simulation independently gates the authoritative shot. */
   private updateTurretHead(
     id: string,
     presentation: BuildingPresentation,
@@ -1932,12 +1953,21 @@ export class UnitSystem {
   ) {
     const turret = presentation.turretHead;
     const building = this.currentBuildings.get(id);
-    if (!turret || !building || building.lifecycle !== "active" || building.health <= 0) return;
+    if (!building || building.lifecycle !== "active" || building.health <= 0) return;
+    if (!turret) {
+      this.fireBuildingLaser(id);
+      return;
+    }
 
-    const targetId = building.weapon?.targetId;
+    let pendingShot = this.pendingDirectShots.get(id);
+    if (pendingShot && pendingShot.impactTick <= this.frameTick) {
+      this.pendingDirectShots.delete(id);
+      pendingShot = undefined;
+    }
+    const targetId = pendingShot?.targetId ?? building.weapon?.targetId;
     const unitTarget = targetId ? this.current.get(targetId) : undefined;
-    const targetX = unitTarget?.x;
-    const targetZ = unitTarget?.z;
+    const targetX = pendingShot?.targetX ?? unitTarget?.x;
+    const targetZ = pendingShot?.targetZ ?? unitTarget?.z;
     if (targetX !== undefined && targetZ !== undefined && turret.object.parent) {
       turret.object.getWorldPosition(this.turretOrigin);
       this.turretTarget.set(targetX, this.turretOrigin.y, targetZ);
@@ -1950,10 +1980,37 @@ export class UnitSystem {
         Math.sin(desired - turret.object.rotation.y),
         Math.cos(desired - turret.object.rotation.y),
       );
-      turret.object.rotation.y += difference;
+      turret.object.rotation.y += difference
+        * (1 - Math.exp(-deltaSeconds * TURRET_TURN_RESPONSIVENESS));
+      const remainingTurn = Math.atan2(
+        Math.sin(desired - turret.object.rotation.y),
+        Math.cos(desired - turret.object.rotation.y),
+      );
+      if (pendingShot && Math.abs(remainingTurn) <= ATTACK_FACING_TOLERANCE) {
+        this.fireBuildingLaser(id);
+      }
       return;
     }
 
+    const weaponFacing = building.weapon?.facing;
+    if (weaponFacing !== undefined && building.weapon?.targetId) {
+      const desired = weaponFacing - building.rotation + TURRET_HEAD_FORWARD_YAW;
+      const difference = Math.atan2(
+        Math.sin(desired - turret.object.rotation.y),
+        Math.cos(desired - turret.object.rotation.y),
+      );
+      turret.object.rotation.y += difference
+        * (1 - Math.exp(-deltaSeconds * TURRET_TURN_RESPONSIVENESS));
+      return;
+    }
+
+    this.updateIdleTurretSweep(turret, deltaSeconds);
+  }
+
+  private updateIdleTurretSweep(
+    turret: NonNullable<BuildingPresentation["turretHead"]>,
+    deltaSeconds: number,
+  ) {
     turret.elapsed += deltaSeconds;
     const desired = turret.idleRotation
       + Math.sin(turret.elapsed * TURRET_IDLE_SWEEP_SPEED) * TURRET_IDLE_SWEEP_ANGLE;
@@ -2130,7 +2187,11 @@ export class UnitSystem {
 
     const x = THREE.MathUtils.lerp(previous.x, current.x, alpha);
     const z = THREE.MathUtils.lerp(previous.z, current.z, alpha);
-    const pendingDirectShot = this.pendingDirectShots.get(id);
+    let pendingDirectShot = this.pendingDirectShots.get(id);
+    if (pendingDirectShot && pendingDirectShot.impactTick <= this.frameTick) {
+      this.pendingDirectShots.delete(id);
+      pendingDirectShot = undefined;
+    }
     const pendingGroundShot = this.pendingGroundShots.get(id);
     const pendingShot = pendingDirectShot ?? pendingGroundShot;
     const turningToAttack = current.attacking || pendingShot !== undefined;
@@ -2280,7 +2341,7 @@ export class UnitSystem {
       presentation.state = state;
     }
     if (pendingDirectShot && facingTarget
-      && this.fireLaser(presentation, pendingDirectShot.targetId)) {
+      && this.fireLaser(presentation, pendingDirectShot)) {
       this.pendingDirectShots.delete(id);
     }
     if (pendingGroundShot && facingTarget && presentation.barrage) {
@@ -2304,45 +2365,76 @@ export class UnitSystem {
     }
   }
 
-  private fireLaser(presentation: UnitPresentation, targetId?: string) {
+  private fireLaser(presentation: UnitPresentation, shot: PendingDirectShot) {
     if (!presentation.laser) return false;
-    return this.fireLaserFrom(presentation.laser.muzzle, targetId, "Hornet projectile");
+    return this.fireLaserFrom(
+      presentation.laser.muzzle,
+      shot.targetId,
+      "Hornet projectile",
+      { x: shot.targetX, z: shot.targetZ },
+      shot.impactTick,
+    );
   }
 
   private fireBuildingLaser(id: string) {
     const shot = this.pendingDirectShots.get(id);
     const muzzle = this.buildingById.get(id)?.muzzle;
-    if (!shot || !muzzle || !this.fireLaserFrom(muzzle, shot.targetId, "Turret projectile")) {
+    if (!shot || !muzzle || !this.fireLaserFrom(
+      muzzle,
+      shot.targetId,
+      "Turret projectile",
+      { x: shot.targetX, z: shot.targetZ },
+      shot.impactTick,
+      { radius: 1.6, length: 1.25 },
+    )) {
       return false;
     }
     this.pendingDirectShots.delete(id);
     return true;
   }
 
-  private fireLaserFrom(muzzle: THREE.Object3D, targetId: string | undefined, name: string) {
+  private fireLaserFrom(
+    muzzle: THREE.Object3D,
+    targetId: string | undefined,
+    name: string,
+    fixedTarget: { x: number; z: number },
+    impactTick: number,
+    scale = { radius: 1, length: 1 },
+  ) {
     const target = targetId
       ? this.buildingById.get(targetId)?.root ?? this.presentations.get(targetId)?.root
       : undefined;
-    if (!target) return false;
 
     const start = muzzle.getWorldPosition(this.laserStart);
     this.flashMuzzle(start);
-    const end = this.targetBounds.setFromObject(target).getCenter(this.laserEnd);
-    const distance = start.distanceTo(end);
-    const projectile = this.laserPool.pop() ?? (() => {
+    const end = target
+      ? this.targetBounds.setFromObject(target).getCenter(this.laserEnd)
+      : this.laserEnd.copy(start);
+    end.set(fixedTarget.x, end.y, fixedTarget.z);
+    const projectile: LaserProjectile = this.laserPool.pop() ?? (() => {
       const mesh = new THREE.Mesh(this.laserGeometry, this.laserMaterial);
       mesh.name = name;
-      return { mesh, velocity: new THREE.Vector3(), remaining: 0 };
+      return {
+        mesh,
+        start: new THREE.Vector3(),
+        end: new THREE.Vector3(),
+        launchTick: 0,
+        impactTick: 0,
+      };
     })();
-    const { mesh, velocity } = projectile;
+    const { mesh } = projectile;
     mesh.name = name;
-    velocity.copy(end).sub(start).normalize();
+    mesh.scale.set(scale.radius, scale.length, scale.radius);
     mesh.position.copy(start);
-    mesh.quaternion.setFromUnitVectors(WORLD_UP, velocity);
-    velocity.multiplyScalar(45);
+    this.laserDirection.copy(end).sub(start).normalize();
+    mesh.quaternion.setFromUnitVectors(WORLD_UP, this.laserDirection);
     mesh.renderOrder = 3;
     this.world.add(mesh);
-    projectile.remaining = distance / velocity.length();
+    projectile.start.copy(start);
+    projectile.end.copy(end);
+    projectile.launchTick = this.frameTick;
+    projectile.impactTick = impactTick;
+    projectile.targetId = targetId;
     this.laserProjectiles.push(projectile);
     return true;
   }
@@ -2374,14 +2466,29 @@ export class UnitSystem {
     this.muzzleFlashes.push(flash);
   }
 
-  private updateLaserProjectiles(deltaSeconds: number) {
+  private updateLaserProjectiles() {
+    const presentationTick = this.frameTick
+      + Math.min(1, this.interpolationAge / SIMULATION_TICK_SECONDS);
     for (let index = this.laserProjectiles.length - 1; index >= 0; index -= 1) {
       const projectile = this.laserProjectiles[index];
-      const step = Math.min(deltaSeconds, projectile.remaining);
-      projectile.mesh.position.addScaledVector(projectile.velocity, step);
-      projectile.remaining -= deltaSeconds;
-      if (projectile.remaining > 0) continue;
+      const target = projectile.targetId
+        ? this.buildingById.get(projectile.targetId)?.root
+          ?? this.presentations.get(projectile.targetId)?.root
+        : undefined;
+      if (target) this.targetBounds.setFromObject(target).getCenter(projectile.end);
+      const durationTicks = Math.max(1, projectile.impactTick - projectile.launchTick);
+      const progress = Math.max(0, Math.min(
+        1,
+        (presentationTick - projectile.launchTick) / durationTicks,
+      ));
+      projectile.mesh.position.lerpVectors(projectile.start, projectile.end, progress);
+      if (progress < 1) {
+        this.laserDirection.copy(projectile.end).sub(projectile.mesh.position).normalize();
+        projectile.mesh.quaternion.setFromUnitVectors(WORLD_UP, this.laserDirection);
+      }
+      if (progress < 1) continue;
       projectile.mesh.removeFromParent();
+      projectile.targetId = undefined;
       this.laserProjectiles.splice(index, 1);
       this.laserPool.push(projectile);
     }

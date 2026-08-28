@@ -3,6 +3,8 @@ import { CellFlag, intersects, type PlacementGrid } from "../placement";
 import type { BuildingKind, BuildingState, SimPoint, UnitState } from "./units";
 import { POSITION_SCALE, SIMULATION_TICK_SECONDS } from "./simulationConstants";
 
+export const TURRET_TURN_RESPONSIVENESS = 8;
+
 export interface BuildingDefinition {
   maxHealth: number;
   radius: number;
@@ -12,6 +14,7 @@ export interface BuildingDefinition {
     range: number;
     damage: number;
     intervalSeconds: number;
+    turnResponsiveness: number;
   };
 }
 
@@ -28,9 +31,10 @@ export const BUILDING_DEFINITIONS: Record<BuildingKind, BuildingDefinition> = {
     attackRadius: 1.5,
     constructionSeconds: 10,
     weapon: {
-      range: 12,
+      range: 18,
       damage: 25,
-      intervalSeconds: 1,
+      intervalSeconds: 0.6,
+      turnResponsiveness: TURRET_TURN_RESPONSIVENESS,
     },
   },
 };
