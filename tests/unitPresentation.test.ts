@@ -655,6 +655,7 @@ describe("unit presentation timing", () => {
     await Promise.resolve();
 
     const head = world.getObjectByName("TurretHead")!;
+    expect(head.rotation.y).toBeCloseTo(-Math.PI / 4, 5);
     expect(head.getObjectByName("Turret muzzle")?.position.toArray()).toEqual([-0.52, 0.17, 0]);
     system.select([turret.id]);
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(true);
@@ -668,14 +669,13 @@ describe("unit presentation timing", () => {
       target: { ...intruder.position },
       impactTick: 5,
     }]));
-    for (let frameIndex = 0; frameIndex < 60
-      && !world.getObjectByName("Turret projectile"); frameIndex += 1) {
-      system.update(1 / 60);
-    }
+    system.update(0);
 
     const projectile = world.getObjectByName("Turret projectile")!;
     expect(projectile).toBeDefined();
-    expect(projectile.scale.toArray()).toEqual([1.6, 1.25, 1.6]);
+    // Keep the successful Hornet silhouette: a thin core that reads as a streak,
+    // with extra turret weight coming from length instead of cylinder thickness.
+    expect(projectile.scale.toArray()).toEqual([1, 1.35, 1]);
     expect(Math.abs(Math.atan2(
       Math.sin(-Math.PI / 4 - head.rotation.y),
       Math.cos(-Math.PI / 4 - head.rotation.y),
@@ -742,6 +742,65 @@ describe("unit presentation timing", () => {
       system.update(1 / 60);
     }
 
+    expect(world.getObjectByName("Turret projectile")).toBeDefined();
+    system.dispose();
+  });
+
+  test("does not compress a late Turret shot into the next firing interval", async () => {
+    const intruder = unit("ghostrunner");
+    intruder.position = toSimPoint(0, 8);
+    const turret = activeBuilding("enemy-turret", "turret", {
+      position: toSimPoint(0, 0),
+      rotation: 0,
+      weapon: {
+        range: 18 * POSITION_SCALE,
+        damage: 25,
+        intervalTicks: 6,
+        cooldownTicks: 6,
+        facing: 0,
+        targetId: intruder.id,
+      },
+    });
+    let resolveModel!: (root: THREE.Group) => void;
+    const model = new Promise<THREE.Group>((resolve) => {
+      resolveModel = resolve;
+    });
+    const session = new TestSession(frame(1, intruder, turret));
+    const world = new THREE.Group();
+    const system = new UnitSystem(world, map, [], [], session, () => model);
+
+    session.frames.push(frame(2, intruder, turret, [{
+      type: "weapon-fired",
+      tick: 1,
+      attackerId: turret.id,
+      attack: "direct",
+      targetId: intruder.id,
+      target: { ...intruder.position },
+      impactTick: 5,
+    }]));
+    system.update(0);
+    session.frames.push(frame(3, intruder, turret));
+    system.update(0);
+
+    const root = new THREE.Group();
+    const head = new THREE.Group();
+    head.name = "TurretHead";
+    root.add(head);
+    resolveModel(root);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(world.getObjectByName("Turret projectile")).toBeUndefined();
+    session.frames.push(frame(8, intruder, turret, [{
+      type: "weapon-fired",
+      tick: 7,
+      attackerId: turret.id,
+      attack: "direct",
+      targetId: intruder.id,
+      target: { ...intruder.position },
+      impactTick: 11,
+    }]));
+    system.update(0);
     expect(world.getObjectByName("Turret projectile")).toBeDefined();
     system.dispose();
   });

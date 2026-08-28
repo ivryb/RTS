@@ -233,6 +233,7 @@ interface PendingDirectShot {
   targetId: string;
   targetX: number;
   targetZ: number;
+  launchTick: number;
   impactTick: number;
 }
 
@@ -284,6 +285,7 @@ interface MuzzleFlash {
   sprite: THREE.Sprite;
   light: THREE.PointLight;
   remaining: number;
+  scale: number;
 }
 
 const createGlowTexture = () => {
@@ -1070,6 +1072,13 @@ export class UnitSystem {
     const turretHead = building.kind === "turret"
       ? root.getObjectByName("TurretHead")
       : undefined;
+    const turretIdleRotation = turretHead?.rotation.y ?? 0;
+    // A model may finish loading after the simulation has already aimed and fired.
+    // Start at the replicated facing so presentation does not delay shot one into shot two.
+    if (turretHead && building.weapon?.targetId && building.weapon.facing !== undefined) {
+      turretHead.rotation.y = building.weapon.facing
+        - building.rotation + TURRET_HEAD_FORWARD_YAW;
+    }
     // The worker's initial frame can arrive before it initializes weapon state.
     const muzzle = weaponDefinition ? new THREE.Object3D() : undefined;
     if (muzzle) {
@@ -1104,7 +1113,7 @@ export class UnitSystem {
       ...(turretHead ? {
         turretHead: {
           object: turretHead,
-          idleRotation: turretHead.rotation.y,
+          idleRotation: turretIdleRotation,
           elapsed: 0,
         },
       } : {}),
@@ -1759,6 +1768,7 @@ export class UnitSystem {
         targetId: event.targetId,
         targetX: event.target.x / POSITION_SCALE,
         targetZ: event.target.z / POSITION_SCALE,
+        launchTick: event.tick,
         impactTick: event.impactTick,
       });
     }
@@ -2372,6 +2382,7 @@ export class UnitSystem {
       shot.targetId,
       "Hornet projectile",
       { x: shot.targetX, z: shot.targetZ },
+      shot.launchTick,
       shot.impactTick,
     );
   }
@@ -2379,13 +2390,22 @@ export class UnitSystem {
   private fireBuildingLaser(id: string) {
     const shot = this.pendingDirectShots.get(id);
     const muzzle = this.buildingById.get(id)?.muzzle;
-    if (!shot || !muzzle || !this.fireLaserFrom(
+    if (!shot || !muzzle) return false;
+    // Replaying a delayed launch shortens the visible gap before the next
+    // authoritative shot and looks like a startup double-fire.
+    if (shot.launchTick < this.frameTick) {
+      this.pendingDirectShots.delete(id);
+      return false;
+    }
+    if (!this.fireLaserFrom(
       muzzle,
       shot.targetId,
       "Turret projectile",
       { x: shot.targetX, z: shot.targetZ },
+      shot.launchTick,
       shot.impactTick,
-      { radius: 1.6, length: 1.25 },
+      { radius: 1, length: 1.35 },
+      1.35,
     )) {
       return false;
     }
@@ -2398,15 +2418,17 @@ export class UnitSystem {
     targetId: string | undefined,
     name: string,
     fixedTarget: { x: number; z: number },
+    launchTick: number,
     impactTick: number,
     scale = { radius: 1, length: 1 },
+    muzzleScale = 1,
   ) {
     const target = targetId
       ? this.buildingById.get(targetId)?.root ?? this.presentations.get(targetId)?.root
       : undefined;
 
     const start = muzzle.getWorldPosition(this.laserStart);
-    this.flashMuzzle(start);
+    this.flashMuzzle(start, muzzleScale);
     const end = target
       ? this.targetBounds.setFromObject(target).getCenter(this.laserEnd)
       : this.laserEnd.copy(start);
@@ -2432,14 +2454,14 @@ export class UnitSystem {
     this.world.add(mesh);
     projectile.start.copy(start);
     projectile.end.copy(end);
-    projectile.launchTick = this.frameTick;
+    projectile.launchTick = launchTick;
     projectile.impactTick = impactTick;
     projectile.targetId = targetId;
     this.laserProjectiles.push(projectile);
     return true;
   }
 
-  private flashMuzzle(position: THREE.Vector3) {
+  private flashMuzzle(position: THREE.Vector3, scale: number) {
     const flash = this.muzzleFlashPool.pop() ?? (() => {
       const material = new THREE.SpriteMaterial({
         blending: THREE.AdditiveBlending,
@@ -2453,14 +2475,15 @@ export class UnitSystem {
       const sprite = new THREE.Sprite(material);
       const light = new THREE.PointLight(0xff4058, 3.5, 3.5, 2);
       sprite.add(light);
-      return { sprite, light, remaining: 0 };
+      return { sprite, light, remaining: 0, scale: 1 };
     })();
     const { sprite, light } = flash;
+    flash.scale = scale;
     sprite.position.copy(position);
-    sprite.scale.setScalar(0.55);
+    sprite.scale.setScalar(0.55 * scale);
     sprite.material.opacity = 0.95;
     sprite.renderOrder = 4;
-    light.intensity = 3.5;
+    light.intensity = 3.5 * scale;
     this.world.add(sprite);
     flash.remaining = 0.13;
     this.muzzleFlashes.push(flash);
@@ -2500,8 +2523,8 @@ export class UnitSystem {
       flash.remaining -= deltaSeconds;
       const strength = Math.max(0, flash.remaining / 0.13);
       flash.sprite.material.opacity = strength * 0.95;
-      flash.sprite.scale.setScalar(0.55 + (1 - strength) * 0.45);
-      flash.light.intensity = strength * 3.5;
+      flash.sprite.scale.setScalar((0.55 + (1 - strength) * 0.45) * flash.scale);
+      flash.light.intensity = strength * 3.5 * flash.scale;
       if (flash.remaining > 0) continue;
       flash.sprite.removeFromParent();
       this.muzzleFlashes.splice(index, 1);
