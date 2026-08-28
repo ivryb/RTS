@@ -1,0 +1,9 @@
+export const NAVIGATION_CELL_SIZE = 0.5;
+export const NAVIGATION_CELL_HEIGHT = 0.1;
+export const MAXIMUM_WALKABLE_SLOPE = 40;
+export const NAVIGATION_CLEARANCE = 0.15;
+export const GROUND_NAVIGATION_RADII = [0.5, 1.6] as const;
+
+export const MAXIMUM_GROUND_CLEARANCE = Math.ceil(
+  Math.max(...GROUND_NAVIGATION_RADII) / NAVIGATION_CELL_SIZE,
+) * NAVIGATION_CELL_SIZE;

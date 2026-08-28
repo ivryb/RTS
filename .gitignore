@@ -1,0 +1,13 @@
+node_modules/
+.pnpm-store/
+dist/
+.DS_Store
+.env
+.env.*
+!.env.example
+tmp/
+test-results/
+playwright-report/
+.wrangler/
+meshy_output/
+art/workbench/

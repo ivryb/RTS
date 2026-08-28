@@ -1,0 +1,7 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "dune77-replication-probe",
+  "main": "worker.ts",
+  "compatibility_date": "2026-08-11",
+  "limits": { "cpu_ms": 30000 }
+}

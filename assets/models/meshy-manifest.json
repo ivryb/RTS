@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-08-10T12:21:59+08:00",
+  "assets": [
+    {
+      "slug": "scout-drone",
+      "name": "Dune77 Scout Drone",
+      "source_file": "assets/source/meshy/manual-exports/scout-drone-textured.glb",
+      "blend_file": "assets/source/meshy/scout-drone.blend",
+      "runtime_file": "assets/models/scout-drone.glb",
+      "size_bytes": 452500,
+      "face_count": 2562,
+      "vertex_count": 3183,
+      "source": "manual Meshy UI export optimized by tools/assets/prepare_scout_drone.py",
+      "processing": "original geometry preserved; unused emissive texture removed; used textures resized to 1024px WebP"
+    },
+    {
+      "slug": "hornet",
+      "name": "Dune77 Hornet",
+      "source_file": "assets/source/meshy/manual-exports/hornet-textured.glb",
+      "blend_file": "assets/source/meshy/hornet.blend",
+      "runtime_file": "assets/models/hornet.glb",
+      "size_bytes": 585772,
+      "face_count": 3921,
+      "vertex_count": 5762,
+      "unique_position_count": 2153,
+      "source": "lighter manual Meshy UI retexture optimized by tools/assets/prepare_hornet.py",
+      "processing": "triangle positions verified identical to the previous source; all four PBR/emissive maps preserved; used textures resized to 1024px WebP; bright ivory panels neutralized and slightly lifted to match the cleaner bone-white unit palette"
+    },
+    {
+      "slug": "ghostrunner",
+      "name": "Dune77 Ghostrunner",
+      "generated_at": "2026-08-10T12:21:59+08:00",
+      "source_file": "assets/source/meshy/manual-exports/ghostrunner-regenerated-merged-animations.glb",
+      "blend_file": "assets/source/meshy/ghostrunner-regenerated-merged-animations.blend",
+      "runtime_file": "assets/models/ghostrunner.glb",
+      "size_bytes": 1496992,
+      "face_count": 5217,
+      "vertex_count": 4978,
+      "source": "manual regenerated Meshy model with merged animations",
+      "animations": [
+        "Attack",
+        "Axe_Spin_Attack",
+        "Basic_Jump",
+        "Cautious_Crouch_Walk_Forward_inplace",
+        "Chest_Pound_Taunt",
+        "Dead",
+        "Double_Blade_Spin",
+        "Double_Combo_Attack",
+        "Female_Throwing_Stance_Charge_inplace",
+        "Gangnam_Groove",
+        "Idle_6",
+        "Indoor_Swing",
+        "Parkour_Vault_3",
+        "Proud_Strut",
+        "Running",
+        "Skill_03",
+        "Stand_Up8",
+        "Sword_Shout",
+        "Walking"
+      ],
+      "processing": "balanced warm-ivory 1024px WebP base color with a restrained 0.06 material lift to match the Command Center more closely; separate metallic-roughness map isolates the neutral sword blade while armor remains rough and non-metallic; skin and all 19 actions preserved; horizontal Hips motion rebased to the shared bind position while retaining relative lunges and movement"
+    },
+    {
+      "slug": "command-center",
+      "name": "Dune77 Orbital Bastion Command Center",
+      "runtime_file": "assets/models/command-center.glb",
+      "size_bytes": 9579832,
+      "face_count": 3827,
+      "source": "original manual Meshy UI export; the runtime GLB is the unchanged source artifact"
+    },
+    {
+      "slug": "turret",
+      "name": "Dune77 Turret",
+      "source_file": "assets/source/meshy/manual-exports/turret-textured.glb",
+      "runtime_file": "assets/models/turret.glb",
+      "size_bytes": 9002220,
+      "face_count": 3799,
+      "source": "manual Meshy UI export split by tools/assets/prepare_turret.py",
+      "nodes": ["TurretRoot", "TurretBase", "TurretHead", "TurretHeadMesh"]
+    },
+    {
+      "slug": "behemoth",
+      "name": "Dune77 Behemoth",
+      "source_file": "assets/source/meshy/manual-exports/behemoth-textured.glb",
+      "blend_file": "assets/source/meshy/behemoth.blend",
+      "runtime_file": "assets/models/behemoth.glb",
+      "size_bytes": 579980,
+      "face_count": 6588,
+      "source": "manual Meshy UI Smart Topology export split by tools/assets/prepare_behemoth.py",
+      "nodes": ["BehemothRoot", "BehemothBody", "TrackBeltXNegative", "TrackBeltXPositive"],
+      "processing": "full left and right tread loops separated from road wheels; dedicated looping UVs and slightly darkened scrolling tread material; body base color warmed in highlights and darkened in shadows; PBR maps resized to 1024px WebP"
+    }
+  ]
+}

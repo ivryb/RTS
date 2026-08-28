@@ -1,0 +1,37 @@
+{
+  "name": "dune77",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.12.2",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9",
+    "bun": ">=1.3"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "bun test tests/*.test.ts prototypes/*/*.test.ts",
+    "test:unit": "bun test tests/*.test.ts",
+    "benchmark:worker-stack": "bun prototypes/cloudflare-worker/benchmark.ts",
+    "probe:cloudflare": "bun prototypes/cloudflare-worker/run.ts",
+    "preview:capture": "playwright test --config tools/preview/playwright.config.ts --reporter=line",
+    "preview:capture:terrain": "pnpm preview:capture --grep terrain",
+    "preview:capture:terrain-topology": "playwright test --config prototypes/terrain-topology/playwright.config.ts --reporter=line",
+    "preview:capture:buildings": "pnpm preview:capture --grep buildings",
+    "preview:capture:units": "pnpm preview:capture --grep units"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^4.0.30",
+    "@recast-navigation/wasm": "^0.43.1",
+    "recast-navigation": "^0.43.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/three": "^0.185.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "wrangler": "^4.120.1"
+  }
+}

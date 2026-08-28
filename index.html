@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#c79b45" />
+    <title>Dune77 — Combat Proof</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="selection-box" class="selection-box" hidden></div>
+    <section id="match-outcome" class="match-outcome" aria-live="assertive" hidden>
+      <span>Combat proof complete</span>
+      <h1 id="match-outcome-title"></h1>
+      <p id="match-outcome-detail"></p>
+      <button id="restart-match" type="button">Restart encounter <kbd>R</kbd></button>
+    </section>
+    <aside class="view-status" aria-label="View status">
+      <span>Zoom</span>
+      <output id="zoom-level">1.00×</output>
+    </aside>
+    <aside class="hud">
+      <div>
+        <strong>Dune77</strong>
+        <span>Combat proof</span>
+        <small class="objective">
+          Train a Scout Drone. Build a Turret and another Command Center. Destroy the enemy
+          Command Center.
+        </small>
+      </div>
+      <button id="new-map" type="button">New map</button>
+      <div class="ground-controls">
+        <label>
+          Base
+          <select id="ground-texture"></select>
+        </label>
+        <label>
+          Patches
+          <select id="ground-secondary-texture"></select>
+        </label>
+        <label>
+          <input id="ground-smooth-borders" type="checkbox" />
+          Adaptive texture smoothing
+        </label>
+        <label>
+          Tint
+          <input id="ground-tint" type="color" />
+          <output id="ground-tint-value"></output>
+        </label>
+      </div>
+      <small id="seed"></small>
+    </aside>
+    <aside id="unit-panel" class="unit-panel" hidden>
+      <section class="action-grid" aria-label="Selection actions">
+        <button type="button" data-action="attack" aria-pressed="false">
+          <kbd>A</kbd><span>Attack</span>
+        </button>
+        <button type="button" data-action="attack-ground" aria-pressed="false">
+          <kbd>A</kbd><span>Attack ground</span>
+        </button>
+        <button type="button" data-action="move" aria-pressed="false">
+          <kbd>M</kbd><span>Move</span>
+        </button>
+        <button type="button" data-action="stop" aria-pressed="false">
+          <kbd>S</kbd><span>Stop</span>
+        </button>
+        <button type="button" data-action="build" aria-pressed="false">
+          <kbd>B</kbd><span>Build</span>
+        </button>
+        <button type="button" data-build-kind="turret" hidden>
+          <kbd>T</kbd><span>Turret</span>
+        </button>
+        <button type="button" data-build-kind="command-center" hidden>
+          <kbd>C</kbd><span>Command Center</span>
+        </button>
+        <button type="button" data-train-kind="scout-drone" hidden>
+          <small></small><span>Scout Drone</span>
+        </button>
+        <button type="button" data-train-kind="ghostrunner" hidden>
+          <small></small><span>Ghostrunner</span>
+        </button>
+        <button type="button" data-train-kind="hornet" hidden>
+          <small></small><span>Hornet</span>
+        </button>
+        <button type="button" data-train-kind="behemoth" hidden>
+          <small></small><span>Behemoth</span>
+        </button>
+        <button type="button" data-set-rally hidden>
+          <span>Set rally point</span>
+        </button>
+      </section>
+      <section class="selection-summary" aria-label="Selection">
+        <div id="unit-roster" class="unit-roster"></div>
+        <div id="production-queue" class="production-queue" hidden></div>
+        <p id="unit-status">Ready</p>
+      </section>
+    </aside>
+    <div class="help">
+      Left click / drag: select · Shift: add · Right click: move / attack ·
+      A: attack · B: build · M: move · S: stop · R: restart · Middle drag: pan · Wheel: zoom
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

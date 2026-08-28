@@ -1,0 +1,11 @@
+Model Information:
+* title: Walking Robotic Dog
+* source: https://sketchfab.com/3d-models/walking-robotic-dog-cb8157f40d39456d9f37865b4e6e7477
+* author: Creoplan (https://sketchfab.com/reececreoplan)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+Attribution:
+This work is based on "Walking Robotic Dog" by Creoplan, licensed under CC BY 4.0.
