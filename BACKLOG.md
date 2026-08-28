@@ -5,4 +5,4 @@
 - [ ] Add fog of war after the combat proof: unit vision, explored terrain, hidden enemy units, and a decided last-known-building policy.
 - [ ] Add a health-bar visibility setting with contextual, always-visible, and damaged-only options. The combat proof defaults to contextual visibility.
 - [ ] Reconsider orbital building deployment after Scout Drone construction and the resource economy have been tested.
-- [ ] Evaluate the local Poly Haven rock packages in `art/workbench/unused/rocky_textures_polyhaven`, keep the current cliff texture as the default, and test one lighter sand-adjacent cliff plus one darker rock variation.
+- [ ] Evaluate additional CC0 Poly Haven rock textures, keep the current cliff texture as the default, and test one lighter sand-adjacent cliff plus one darker rock variation.

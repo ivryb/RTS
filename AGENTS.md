@@ -1,9 +1,9 @@
 # Dune77
 
-We are developing a fast, browser-based RTS set in a sun-scorched cyberpunk wasteland. Working name — Dune77. Players establish an orbital-supported base, generate energy, mine metal, deploy buildings from space, and fight over roads, water, resources, and the ruins of abandoned cities.
+We are developing a fast, browser-based RTS set in a sun-scorched futuristic wasteland. Working name: Dune77. Players use Scout Drones to build bases, produce units, and fight over terrain and resources.
 
-We are inspired by the combat mechanics of *Age of Empires II: Definitive Edition* and the atmosphere of *Warhammer 40,000: Dawn of War*, *Dune franchise*, and *Cyberpunk 2077*.
-Basically, we are creating an easier-to-play, browser-based AoE reskin set in a futuristic cyberpunk world. 
+We are inspired by the combat mechanics of *Age of Empires II: Definitive Edition* and the atmosphere of *Warhammer 40,000: Dawn of War*, the *Dune* franchise, and *Cyberpunk 2077*.
+The goal is an approachable browser RTS with familiar strategic depth and its own futuristic wasteland setting.
 See `draft.md` for descriptions of all the discussed units, buildings, and mechanics.
 
 ### Tech
@@ -43,6 +43,9 @@ On this Mac, never launch `/Applications/Blender.app/Contents/MacOS/Blender` ins
 
 ## Agent skills
 
-- Issue tracking and Wayfinding operations: `docs/agents/issue-tracker.md`
-- Triage label conventions: `docs/agents/triage-labels.md`
-- Domain glossary and ADR locations: `docs/agents/domain.md`
+- Old or pre-public Git history: read `OLD_HISTORY.md` when the local file exists; it is intentionally untracked
+- Architecture and repository boundaries: `docs/architecture.md`
+- Asset organization and licensing: `docs/assets.md`
+- Terrain generation: `docs/terrain_generation.md`
+- Domain language: `CONTEXT.md`
+- Game design: `draft.md`
