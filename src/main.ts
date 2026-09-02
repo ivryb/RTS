@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { DEFAULT_ZOOM, MapCamera } from "./camera";
 import { replaceCombatProofWorld } from "./combatProofRuntime";
-import { generateMap, MAP_SIZE } from "./map";
+import { generateMap, MAP_SIZE, sampleHeight, type GeneratedMap } from "./map";
 import {
   applyGroundStyle,
   BASE_GROUND_TEXTURES,
@@ -93,6 +93,7 @@ const unitInput = new UnitInput(
   selectionBox
 );
 let world: THREE.Group | undefined;
+let activeMap: GeneratedMap | undefined;
 let currentSeed =
   Number(new URLSearchParams(location.search).get("seed")) || 77;
 let visibleOutcome: MatchOutcome | undefined;
@@ -141,6 +142,7 @@ const loadMap = (seed: number) => {
   });
   const { map } = loaded;
   world = loaded.world;
+  activeMap = map;
   mapCamera.setMapSize(map.size);
   updateGroundStyle();
   mapCamera.focus(world.userData.focus);
@@ -190,7 +192,25 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
 });
 
+// Read-only diagnostics for verification tooling; inert without ?verify=1.
+// Checked before loadMap: it rewrites the URL and drops the verify param.
+const verifyEnabled = new URLSearchParams(location.search).has("verify");
 loadMap(currentSeed);
+
+if (verifyEnabled) {
+  (window as unknown as Record<string, unknown>).__dune77 = {
+    inspect: () => (world?.userData.unitSystem as UnitSystem | undefined)?.inspect() ?? null,
+    project: (x: number, z: number, y = 0) => {
+      const elevation = activeMap ? sampleHeight(activeMap, x, z) : 0;
+      const point = new THREE.Vector3(x, elevation + y, z).project(mapCamera.camera);
+      return {
+        x: Math.round((point.x * 0.5 + 0.5) * window.innerWidth),
+        y: Math.round((-point.y * 0.5 + 0.5) * window.innerHeight),
+        behind: point.z > 1,
+      };
+    },
+  };
+}
 
 let previousFrame = performance.now();
 renderer.setAnimationLoop((frame) => {

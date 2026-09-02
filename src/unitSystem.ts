@@ -1382,6 +1382,32 @@ export class UnitSystem {
     return this.result.winnerId === LOCAL_PLAYER_ID ? "victory" : "defeat";
   }
 
+  /** Read-only diagnostics snapshot for verification tooling; gameplay never reads it. */
+  inspect() {
+    return {
+      tick: this.frameTick,
+      outcome: this.matchOutcome,
+      units: [...this.current].map(([id, frame]) => ({ id, ...frame })),
+      buildings: [...this.currentBuildings.values()].map((building) => ({
+        id: building.id,
+        kind: building.kind,
+        ownerId: building.ownerId,
+        lifecycle: building.lifecycle,
+        x: building.position.x / POSITION_SCALE,
+        z: building.position.z / POSITION_SCALE,
+        health: building.health,
+        maxHealth: building.maxHealth,
+        productionQueue: building.productionQueue
+          ? [...building.productionQueue]
+          : undefined,
+      })),
+      selected: {
+        unitIds: [...this.selectedIds].filter((id) => this.current.has(id)),
+        buildingIds: this.selectedBuildingFrames.map((building) => building.id),
+      },
+    };
+  }
+
   private buildSelectedGroups() {
     const groups = new Map<UnitKind, UnitFrame[]>();
     for (const unit of this.selectedUnitFrames) {
