@@ -25,11 +25,13 @@ Three.js owns presentation only. Projectiles, animations, health bars, selection
 
 ## Terrain
 
-`src/mapTopology.ts` creates the seeded gameplay graph. `src/graphTerrain.ts` assigns lowland, mesa, and blocked-mountain roles. `src/generatedTerrain.ts` validates the resulting height field and exposes the same result to rendering and navigation.
+`src/map.ts` requests Shifting Frontiers from `src/mapGenerators/`, then calls the pure `createTerrainEnvironment` pipeline for the approved New terrain. It returns the revised `MapLayout`, deterministic rock/plant placements and ground-cover fields. The main game and terrain hub share that result, `src/environmentProps.ts` for instanced models, and `src/terrainRendering/environmentMaterial.ts` for the scanned material. `src/terrain.ts` adds the game surface and skirt. Production code loads the six environment GLBs and nine textures from `assets/`, with no workbench or prototype dependency.
 
-`src/terrain.ts` builds the visible terrain. `src/sim/navigation.ts` builds Recast navigation from the terrain and living building obstacles. The simulation still owns unit movement, formations, collision resolution, attack positions, and combat.
+The final heightfield and obstacle mask feed rendering, Recast and construction placement. Mountains, substantial rubble and tree trunks block movement and building footprints; grass and low shrubs remain walkable. Grass beds follow the local ground normal while preserving their root spread.
 
-See [`terrain_generation.md`](terrain_generation.md) for the generation stages and invariants.
+`src/sim/navigation.ts` builds Recast navigation from the actual elevation mesh, excluding blocked-rock triangles, and updates building obstacles. All current units use this ground navigation, including Scout Drones and Hornets. Simulation still owns movement and combat.
+
+The local combat proof uses six-player terrain but places the enemy at the nearest expansion to the player for quick combat testing. It does not use the remote enemy player start. For terrain experiments, shared changes and validation, read [terrain generation](terrain_generation.md).
 
 ## Multiplayer direction
 
@@ -41,10 +43,9 @@ The planned backend is Cloudflare PartyServer with one Durable Object per match.
 
 - `tools/preview/` renders production terrain, buildings, units, and effects for visual checks.
 - `tools/assets/` prepares and inspects source assets used by the game.
+- `prototypes/terrain-playground/` is the terrain experiment hub, using `src/mapGenerators/` and `src/terrainRendering/`.
 - `prototypes/procedural-buildings/` showcases production buildings with their shared materials and archived references, using the production model loader.
-- `prototypes/terrain-topology/` inspects the production terrain generator in 2D and 3D.
 - `prototypes/cloudflare-worker/` tests the planned multiplayer environment.
 - `prototypes/robot-dog-rigging/` explores a reusable mechanical-quadruped rigging process.
-- `prototypes/terrain-props/` assembles local concept sheets and preview composites.
 
 Production code must not import from `prototypes/`. Prototype code may import production modules to test a proposed integration.

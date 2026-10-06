@@ -12,15 +12,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "bun test tests/*.test.ts prototypes/*/*.test.ts",
+    "test": "bun test tests/*.test.ts prototypes/*/*.test.ts tests/mapGenerators/*.test.ts",
     "test:unit": "bun test tests/*.test.ts",
     "benchmark:worker-stack": "bun prototypes/cloudflare-worker/benchmark.ts",
     "probe:cloudflare": "bun prototypes/cloudflare-worker/run.ts",
     "preview:capture": "playwright test --config tools/preview/playwright.config.ts --reporter=line",
-    "preview:capture:terrain": "pnpm preview:capture --grep terrain",
-    "preview:capture:terrain-topology": "playwright test --config prototypes/terrain-topology/playwright.config.ts --reporter=line",
-    "preview:capture:buildings": "pnpm preview:capture --grep buildings",
-    "preview:capture:units": "pnpm preview:capture --grep units"
+    "preview:capture:terrain": "bun run preview:capture --grep terrain",
+    "preview:capture:buildings": "bun run preview:capture --grep buildings",
+    "preview:capture:units": "bun run preview:capture --grep units",
+    "test:terrain": "bun test tests/mapGenerators/*.test.ts",
+    "preview:capture:terrain-hub": "bun prototypes/terrain-playground/capture-multiplayer.mjs",
+    "preview:capture:mountains": "bun prototypes/terrain-playground/capture-multiplayer.mjs --mountains"
   },
   "dependencies": {
     "@colyseus/schema": "^4.0.30",

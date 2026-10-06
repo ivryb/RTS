@@ -4,12 +4,16 @@ import type { GeneratedMap } from "./map";
 import { createTerrain } from "./terrain";
 import { createUnitModelFactory, loadBuildingModel } from "./modelAssets";
 import { UnitSystem } from "./unitSystem";
+import { createEnvironmentProps } from "./environmentProps";
 
 export const createWorld = (map: GeneratedMap) => {
   const world = new THREE.Group();
   const terrain = createTerrain(map);
   world.add(terrain);
   world.userData.terrain = terrain;
+  const environment = createEnvironmentProps(map.environment);
+  world.add(environment.group);
+  world.userData.environment = environment;
 
   const encounter = createCombatProofEncounter(map);
   const unitSystem = new UnitSystem(
@@ -33,6 +37,7 @@ export const updateWorld = (world: THREE.Group, deltaSeconds: number) => {
 
 export const disposeWorld = (world: THREE.Group) => {
   world.userData.disposed = true;
+  world.userData.environment?.dispose();
   (world.userData.unitSystem as UnitSystem | undefined)?.dispose();
   for (const mixer of world.userData.mixers ?? []) mixer.stopAllAction();
   const geometries = new Set<THREE.BufferGeometry>();

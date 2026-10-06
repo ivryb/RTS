@@ -1,0 +1,32 @@
+{
+  "asset": "Cliff Side",
+  "page": "https://polyhaven.com/a/cliff_side",
+  "license": "CC0-1.0",
+  "authors": {
+    "Dario Barresi": "Photography",
+    "James Ray Cock": "Photography",
+    "Jenelle van Heerden": "Processing"
+  },
+  "sourceWidthMeters": 1.8,
+  "processing": "Original 2K JPG source maps preserved byte-for-byte. Titanium generator projects and bakes these onto newly authored solids; geometry does not come from a scan.",
+  "files": [
+    {
+      "role": "color",
+      "source": "cliff_side_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_diff_2k.jpg",
+      "md5": "6d129836144e271b30071281241e237d"
+    },
+    {
+      "role": "normal",
+      "source": "cliff_side_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_nor_gl_2k.jpg",
+      "md5": "8209033c3ad15185977d91c92cf5866f"
+    },
+    {
+      "role": "roughness",
+      "source": "cliff_side_rough_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_rough_2k.jpg",
+      "md5": "44abb195b6c4c7b6da902e97e5bbbef2"
+    }
+  ]
+}

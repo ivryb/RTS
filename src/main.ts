@@ -97,6 +97,7 @@ let activeMap: GeneratedMap | undefined;
 let currentSeed =
   Number(new URLSearchParams(location.search).get("seed")) || 77;
 let visibleOutcome: MatchOutcome | undefined;
+let renderingReady = Promise.resolve();
 
 const updateSunFocus = () => {
   sun.target.position.copy(mapCamera.focusPoint);
@@ -143,11 +144,12 @@ const loadMap = (seed: number) => {
   const { map } = loaded;
   world = loaded.world;
   activeMap = map;
-  mapCamera.setMapSize(map.size);
+  mapCamera.setTerrain(map);
   updateGroundStyle();
   mapCamera.focus(world.userData.focus);
   updateSunFocus();
-  seedLabel.textContent = `Seed ${map.seed} · Dry terrain composition`;
+  renderingReady = world.userData.environment.ready;
+  seedLabel.textContent = `Seed ${map.seed} · Shifting Frontiers`;
   history.replaceState(null, "", `?seed=${map.seed}`);
 };
 
@@ -199,6 +201,7 @@ loadMap(currentSeed);
 
 if (verifyEnabled) {
   (window as unknown as Record<string, unknown>).__dune77 = {
+    ready: () => renderingReady,
     inspect: () => (world?.userData.unitSystem as UnitSystem | undefined)?.inspect() ?? null,
     project: (x: number, z: number, y = 0) => {
       const elevation = activeMap ? sampleHeight(activeMap, x, z) : 0;

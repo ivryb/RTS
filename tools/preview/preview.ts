@@ -6,6 +6,7 @@ import { findSceneCenter } from "./demoModels";
 import { generateMap, sampleHeight } from "../../src/map";
 import { demoAssets, loadDemoAsset } from "../../src/modelAssets";
 import { createTerrain } from "../../src/terrain";
+import { createEnvironmentProps } from "../../src/environmentProps";
 import "./preview.css";
 
 type PreviewScene = "terrain" | "buildings" | "units";
@@ -36,6 +37,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
 const scene = new THREE.Scene();
 scene.add(createTerrain(map));
+const environment = createEnvironmentProps(map.environment);
+scene.add(environment.group);
+await environment.ready;
 scene.add(new THREE.HemisphereLight(0xfff4e4, 0x8b765d, 1.25));
 const sun = new THREE.DirectionalLight(0xffedda, 2.65);
 sun.position.set(-38, 58, 24);

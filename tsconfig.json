@@ -3,10 +3,16 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
@@ -15,5 +21,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["src", "prototypes/procedural-buildings/**/*.ts"]
+  "include": [
+    "src",
+    "prototypes/terrain-playground/**/*.ts",
+    "prototypes/procedural-buildings/**/*.ts"
+  ]
 }

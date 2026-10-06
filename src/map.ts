@@ -1,5 +1,5 @@
-import { generateTerrainLayout } from "./generatedTerrain";
-import type { MapTopology } from "./mapTopology";
+import { generateMapLayout, type MapLayout, type PlayerCount, type Point as MapPoint } from "./mapGenerators";
+import { createTerrainEnvironment } from "./mapGenerators/environment";
 import { TERRAIN_HILL_THRESHOLD } from "./mapConstants";
 import type { TerrainSurface } from "./terrainWalkability";
 import {
@@ -9,10 +9,7 @@ import {
   type PlacementGrid,
 } from "./placement";
 
-export interface MapPoint {
-  x: number;
-  z: number;
-}
+export type { Point as MapPoint } from "./mapGenerators";
 
 export interface PalmSpawn extends MapPoint {
   rotation: number;
@@ -29,12 +26,12 @@ export interface GeneratedMap extends TerrainSurface {
   palms: PalmSpawn[];
   placement: PlacementGrid;
   mountainMask: Float32Array;
-  mountainFoundationMask: Float32Array;
-  topology: MapTopology;
+  layout: MapLayout;
+  environment: ReturnType<typeof createTerrainEnvironment>;
 }
 
-/** Alternating diagonals keep steep height-field faces from favoring one view direction. */
-export const createTerrainIndices = (segments: number) => {
+/** Match the rendering diagonal so navigation and sampled unit heights share the same surface. */
+export const createTerrainIndices = (segments: number, trianglePattern: TerrainSurface["trianglePattern"] = "alternating") => {
   const row = segments + 1;
   const indices = new Uint32Array(segments * segments * 6);
   let index = 0;
@@ -44,7 +41,7 @@ export const createTerrainIndices = (segments: number) => {
       const topRight = topLeft + 1;
       const bottomLeft = topLeft + row;
       const bottomRight = bottomLeft + 1;
-      if ((x + z) % 2 === 0) {
+      if (trianglePattern === "alternating" && (x + z) % 2 === 0) {
         indices[index] = topLeft;
         indices[index + 1] = bottomLeft;
         indices[index + 2] = bottomRight;
@@ -65,18 +62,29 @@ export const createTerrainIndices = (segments: number) => {
   return indices;
 };
 
-/** Generates the shared graph terrain used by both gameplay and its preview. */
-export const generateMap = (seed: number, playerCount = 2): GeneratedMap => {
-  const layout = generateTerrainLayout(seed, playerCount);
-  if (layout.startingLocations.length < 2) {
+/** Gameplay consumes the same Shifting Frontiers layout and surface as the terrain hub. */
+export const generateMap = (seed: number, playerCount: PlayerCount = 2): GeneratedMap => {
+  const environment = createTerrainEnvironment(generateMapLayout({ generator: "multiplayer", seed, players: playerCount }));
+  const { layout } = environment;
+  const startingLocations = layout.sites.filter(site => site.role === "base")
+    .sort((a, b) => a.player - b.player)
+    .map(({ x, z }) => ({ x, z }));
+  if (startingLocations.length < 2) {
     throw new Error("Gameplay terrain must contain at least two bases");
   }
-  const surface = { size: layout.size, segments: layout.segments, heights: layout.heights };
+  const surface = { size: layout.size, segments: layout.cells, heights: layout.heights, trianglePattern: "fixed" as const };
   const placement = createPlacementGrid(layout.size, Math.round(layout.size / 2));
   for (let z = 0; z < placement.resolution; z += 1) {
     for (let x = 0; x < placement.resolution; x += 1) {
       const worldX = ((x + 0.5) / placement.resolution - 0.5) * layout.size;
       const worldZ = ((z + 0.5) / placement.resolution - 0.5) * layout.size;
+      const gridX = Math.floor((worldX / layout.size + .5) * layout.cells);
+      const gridZ = Math.floor((worldZ / layout.size + .5) * layout.cells);
+      const row = layout.cells + 1;
+      const corner = gridZ * row + gridX;
+      if ([corner, corner + 1, corner + row, corner + row + 1].some(i => layout.blocked[i])) {
+        placement.flags[z * placement.resolution + x] |= CellFlag.Reserved;
+      }
       if (sampleHeight(surface, worldX, worldZ) > TERRAIN_HILL_THRESHOLD) {
         placement.flags[z * placement.resolution + x] |= CellFlag.Hill;
       }
@@ -84,13 +92,13 @@ export const generateMap = (seed: number, playerCount = 2): GeneratedMap => {
   }
   return {
     seed,
-    startingLocations: layout.startingLocations,
+    startingLocations,
     ...surface,
     palms: [],
     placement,
-    mountainMask: layout.mountainMask,
-    mountainFoundationMask: layout.mountainFoundationMask,
-    topology: layout.topology,
+    mountainMask: Float32Array.from(layout.blocked),
+    layout,
+    environment,
   };
 };
 
@@ -114,7 +122,7 @@ export const sampleHeight = (map: TerrainSurface, x: number, z: number) => {
     return top * (1 - localZ) + bottom * localZ;
   }
 
-  if ((x0 + z0) % 2 === 0) {
+  if (map.trianglePattern !== "fixed" && (x0 + z0) % 2 === 0) {
     return localZ >= localX
       ? topLeft * (1 - localZ) + bottomLeft * (localZ - localX) + bottomRight * localX
       : topLeft * (1 - localX) + bottomRight * localZ + topRight * (localX - localZ);

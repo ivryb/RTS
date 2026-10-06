@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dune77 · Terrain playground</title>
+</head>
+<body>
+  <main id="viewport"></main>
+  <header>
+    <a href="/prototypes/terrain-playground/">Dune77 / Terrain</a>
+    <div>
+      <label>Seed <input id="seed" type="number" value="77"></label>
+      <label>Players <select id="players"><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
+      <label>Quality <select id="quality"><option value="balanced">Balanced</option><option value="high">High</option></select></label>
+      <button id="regenerate">New map</button>
+      <label>Camera <select id="camera-mode"><option value="game">In-game</option><option value="inspect">Free</option></select></label>
+      <button id="camera">Reset view</button>
+      <output id="camera-zoom" aria-label="Zoom level"></output>
+      <button id="topdown" aria-pressed="false">Top down</button>
+      <button id="routes" aria-pressed="false">Routes</button>
+      <button id="walk" aria-pressed="false">Walkability</button>
+    </div>
+  </header>
+  <aside>
+    <h1 id="title"></h1>
+    <p id="description"></p>
+    <p id="status" aria-live="polite"></p>
+    <p id="route-key" hidden><span style="color:#9de4d8">Cyan: through the center</span><br><span style="color:#f7c96d">Gold: bypass the center</span></p>
+  </aside>
+  <footer>
+    <nav id="terrain-nav" aria-label="Terrain version"></nav>
+    <span id="camera-help"></span>
+  </footer>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,295 @@
+{
+  "sourceLibrary": "https://polyhaven.com/models",
+  "license": "CC0-1.0",
+  "reproduce": "python3 tools/assets/fetch_terrain_composite_vegetation.py",
+  "assets": [
+    {
+      "id": "tree_small_02",
+      "name": "Tree Small 02",
+      "source": "https://polyhaven.com/a/tree_small_02",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "license": "CC0-1.0",
+      "runtime": "art/workbench/terrain-composite/models/tree_small_02/model.glb",
+      "runtimeBytes": 21007892,
+      "runtimeTriangles": 247747,
+      "recommendedHeight": [
+        7,
+        11
+      ],
+      "role": "Full broadleaf canopy for sheltered savanna groves",
+      "geometryTreatment": "Separate runtime simplification, ratio 0.12, maximum error 0.002; original retained",
+      "meshes": [
+        {
+          "name": "BezierCurve.002",
+          "triangles": 247747,
+          "bounds": {
+            "min": [
+              -1.3086811304092407,
+              -0.024031998589634895,
+              -1.3799093961715698
+            ],
+            "max": [
+              1.6075055599212646,
+              4.531851768493652,
+              2.8985373973846436
+            ]
+          }
+        }
+      ],
+      "verifiedAlpha": [
+        {
+          "material": "tree_small_02_leaves",
+          "cutoff": 0.45,
+          "rgbaRange": [
+            0,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "id": "quiver_tree_02",
+      "name": "Quiver Tree 02",
+      "source": "https://polyhaven.com/a/quiver_tree_02",
+      "authors": {
+        "Dario Barresi": "photography",
+        "Rico Cilliers": "modeling"
+      },
+      "license": "CC0-1.0",
+      "runtime": "art/workbench/terrain-composite/models/quiver_tree_02/model.glb",
+      "runtimeBytes": 3038420,
+      "runtimeTriangles": 19696,
+      "recommendedHeight": [
+        3.5,
+        5.5
+      ],
+      "role": "Sparse upright desert aloe accent",
+      "geometryTreatment": "Separate runtime simplification, ratio 0.24, maximum error 0.012; original retained",
+      "meshes": [
+        {
+          "name": "tree_small_25m",
+          "triangles": 19696,
+          "bounds": {
+            "min": [
+              -0.48388946056365967,
+              -0.049302227795124054,
+              -0.4320497214794159
+            ],
+            "max": [
+              0.3877491354942322,
+              1.4184858798980713,
+              0.4484403729438782
+            ]
+          }
+        }
+      ],
+      "verifiedAlpha": []
+    },
+    {
+      "id": "shrub_04",
+      "name": "Shrub 04",
+      "source": "https://polyhaven.com/a/shrub_04",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "license": "CC0-1.0",
+      "runtime": "art/workbench/terrain-composite/models/shrub_04/model.glb",
+      "runtimeBytes": 2228760,
+      "runtimeTriangles": 16832,
+      "recommendedHeight": [
+        0.7,
+        1.5
+      ],
+      "role": "Silvery-green shrubs in small irregular groups",
+      "geometryTreatment": "Separate runtime simplification, ratio 0.5, maximum error 0.001; original retained",
+      "meshes": [
+        {
+          "name": "shrub_04_a",
+          "triangles": 2600,
+          "bounds": {
+            "min": [
+              -0.024753978475928307,
+              -0.002650568960234523,
+              -0.030295355245471
+            ],
+            "max": [
+              0.08143848925828934,
+              0.14980021119117737,
+              0.05458671227097511
+            ]
+          }
+        },
+        {
+          "name": "shrub_04_b",
+          "triangles": 4361,
+          "bounds": {
+            "min": [
+              -0.06358107924461365,
+              -0.002383045619353652,
+              -0.06619173288345337
+            ],
+            "max": [
+              0.04802986606955528,
+              0.15995773673057556,
+              0.06388277560472488
+            ]
+          }
+        },
+        {
+          "name": "shrub_04_c",
+          "triangles": 4208,
+          "bounds": {
+            "min": [
+              -0.07172858715057373,
+              -0.005937241483479738,
+              -0.07382097095251083
+            ],
+            "max": [
+              0.11102752387523651,
+              0.2132624387741089,
+              0.057933706790208817
+            ]
+          }
+        },
+        {
+          "name": "shrub_04_d",
+          "triangles": 5663,
+          "bounds": {
+            "min": [
+              -0.0936768427491188,
+              -0.004625620320439339,
+              -0.07500956952571869
+            ],
+            "max": [
+              0.048936210572719574,
+              0.20903176069259644,
+              0.07108771800994873
+            ]
+          }
+        }
+      ],
+      "verifiedAlpha": [
+        {
+          "material": "shrub_04",
+          "cutoff": 0.45,
+          "rgbaRange": [
+            0,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grass_medium_02",
+      "name": "Grass Medium 02",
+      "source": "https://polyhaven.com/a/grass_medium_02",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "license": "CC0-1.0",
+      "runtime": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+      "runtimeBytes": 933668,
+      "runtimeTriangles": 7842,
+      "recommendedHeight": [
+        0.35,
+        0.8
+      ],
+      "role": "Dry grass tufts around vegetation pockets",
+      "geometryTreatment": "Source geometry retained",
+      "meshes": [
+        {
+          "name": "Plane.001",
+          "triangles": 714,
+          "bounds": {
+            "min": [
+              -0.05556991323828697,
+              -0.002838333137333393,
+              -0.056573495268821716
+            ],
+            "max": [
+              0.06355194747447968,
+              0.15409204363822937,
+              0.06318891793489456
+            ]
+          }
+        },
+        {
+          "name": "Plane.002",
+          "triangles": 1760,
+          "bounds": {
+            "min": [
+              -0.060163434594869614,
+              -0.0040363832376897335,
+              -0.10509301722049713
+            ],
+            "max": [
+              0.1189635768532753,
+              0.1755276322364807,
+              0.09417536109685898
+            ]
+          }
+        },
+        {
+          "name": "Plane.003",
+          "triangles": 1215,
+          "bounds": {
+            "min": [
+              -0.13893021643161774,
+              -0.005509789101779461,
+              -0.1609298586845398
+            ],
+            "max": [
+              0.12274692207574844,
+              0.226151704788208,
+              0.08858048170804977
+            ]
+          }
+        },
+        {
+          "name": "Plane.004",
+          "triangles": 2489,
+          "bounds": {
+            "min": [
+              -0.18113653361797333,
+              -0.005133261438459158,
+              -0.15386725962162018
+            ],
+            "max": [
+              0.13623955845832825,
+              0.2552432417869568,
+              0.20805847644805908
+            ]
+          }
+        },
+        {
+          "name": "Plane.005",
+          "triangles": 1664,
+          "bounds": {
+            "min": [
+              -0.21328848600387573,
+              -0.0034316747914999723,
+              -0.1754019558429718
+            ],
+            "max": [
+              0.14228084683418274,
+              0.3998044431209564,
+              0.25784459710121155
+            ]
+          }
+        }
+      ],
+      "verifiedAlpha": [
+        {
+          "material": "grass_medium_02",
+          "cutoff": 0.38,
+          "rgbaRange": [
+            0,
+            255
+          ]
+        }
+      ]
+    }
+  ]
+}

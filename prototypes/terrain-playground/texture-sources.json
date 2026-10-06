@@ -1,0 +1,59 @@
+[
+  {
+    "id": "rock_face_03",
+    "name": "Rock Face 03",
+    "authors": {
+      "Dario Barresi": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/rock_face_03",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_face_03/rock_face_03_diff_1k.jpg",
+    "md5": "e4c34abb1aad5befe12754fad507147a"
+  },
+  {
+    "id": "rock_face_04",
+    "name": "Rock Face 04",
+    "authors": {
+      "Dimitrios Savva": "All"
+    },
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/rock_face_04",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_face_04/rock_face_04_diff_1k.jpg",
+    "md5": "4f125d5914b417c740ad798a5803cb7f"
+  },
+  {
+    "id": "sandstone_cracks",
+    "name": "Sandstone Cracks",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/sandstone_cracks",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_cracks/sandstone_cracks_diff_1k.jpg",
+    "md5": "94619de4f4d33ad9fe6711d3ad88ec4a"
+  },
+  {
+    "id": "mud_cracked_dry_03",
+    "name": "Mud Cracked Dry 03",
+    "authors": {
+      "Dario Barresi": "Processing",
+      "Dimitrios Savva": "Photography"
+    },
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/mud_cracked_dry_03",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/mud_cracked_dry_03/mud_cracked_dry_03_diff_1k.jpg",
+    "md5": "6a86cfde5a73073397fcd13a5b6fed94"
+  },
+  {
+    "id": "aerial_ground_rock",
+    "name": "Aerial Ground Rock",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/aerial_ground_rock",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_ground_rock/aerial_ground_rock_diff_1k.jpg",
+    "md5": "bf5dca7bdd00de98f6a18ed10ec74b42"
+  }
+]

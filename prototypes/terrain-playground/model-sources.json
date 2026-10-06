@@ -1,0 +1,269 @@
+[
+  {
+    "id": "namaqualand_boulders_01",
+    "license": "CC0-1.0",
+    "authors": {
+      "Greg Zaal": "Photography",
+      "Jenelle van Heerden": "modeling"
+    },
+    "page": "https://polyhaven.com/a/namaqualand_boulders_01",
+    "files": {
+      "model.gltf": {
+        "include": {
+          "textures/namaqualand_boulders_01_arm_2k.jpg": {
+            "size": 2568715,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_arm_2k.jpg",
+            "md5": "cbfae923e097de8f0f080bbb80adcae1"
+          },
+          "textures/namaqualand_boulders_01_nor_gl_2k.jpg": {
+            "size": 4153995,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_nor_gl_2k.jpg",
+            "md5": "9e3097a5834701165c5bf29970f92086"
+          },
+          "namaqualand_boulders_01.bin": {
+            "size": 927724,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulders_01/namaqualand_boulders_01.bin",
+            "md5": "58ed8a29120ad0807320ce49a9d14c2a"
+          },
+          "textures/namaqualand_boulders_01_diff_2k.jpg": {
+            "size": 2855649,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_diff_2k.jpg",
+            "md5": "97c35767a39c957e19bbbe75edf99627"
+          }
+        },
+        "size": 4427,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulders_01/namaqualand_boulders_01_2k.gltf",
+        "md5": "c44025a1e5ad690f097cd4db5167dae7"
+      },
+      "textures/namaqualand_boulders_01_arm_2k.jpg": {
+        "size": 2568715,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_arm_2k.jpg",
+        "md5": "cbfae923e097de8f0f080bbb80adcae1"
+      },
+      "textures/namaqualand_boulders_01_nor_gl_2k.jpg": {
+        "size": 4153995,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_nor_gl_2k.jpg",
+        "md5": "9e3097a5834701165c5bf29970f92086"
+      },
+      "namaqualand_boulders_01.bin": {
+        "size": 927724,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulders_01/namaqualand_boulders_01.bin",
+        "md5": "58ed8a29120ad0807320ce49a9d14c2a"
+      },
+      "textures/namaqualand_boulders_01_diff_2k.jpg": {
+        "size": 2855649,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulders_01/namaqualand_boulders_01_diff_2k.jpg",
+        "md5": "97c35767a39c957e19bbbe75edf99627"
+      }
+    }
+  },
+  {
+    "id": "namaqualand_boulder_02",
+    "license": "CC0-1.0",
+    "authors": {
+      "Greg Zaal": "Photography",
+      "Rico Cilliers": "modeling"
+    },
+    "page": "https://polyhaven.com/a/namaqualand_boulder_02",
+    "files": {
+      "model.gltf": {
+        "include": {
+          "namaqualand_boulder_02.bin": {
+            "size": 2297768,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_02/namaqualand_boulder_02.bin",
+            "md5": "aa8f2212633a07a7e9a805e90977f4fd"
+          },
+          "textures/namaqualand_boulder_02_diff_2k.jpg": {
+            "size": 3867934,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_diff_2k.jpg",
+            "md5": "0f37f02ceb397383a0d0bddfaef4441d"
+          },
+          "textures/namaqualand_boulder_02_arm_2k.jpg": {
+            "size": 2914937,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_arm_2k.jpg",
+            "md5": "732a68f2aeb07223278987dfcafe83ac"
+          },
+          "textures/namaqualand_boulder_02_nor_gl_2k.jpg": {
+            "size": 3919158,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_nor_gl_2k.jpg",
+            "md5": "9591cab5cf9658a9eb23da834856a661"
+          }
+        },
+        "size": 2818,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/namaqualand_boulder_02/namaqualand_boulder_02_2k.gltf",
+        "md5": "9193646b820fdbc76cb9c3c77f0c5c38"
+      },
+      "namaqualand_boulder_02.bin": {
+        "size": 2297768,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_02/namaqualand_boulder_02.bin",
+        "md5": "aa8f2212633a07a7e9a805e90977f4fd"
+      },
+      "textures/namaqualand_boulder_02_diff_2k.jpg": {
+        "size": 3867934,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_diff_2k.jpg",
+        "md5": "0f37f02ceb397383a0d0bddfaef4441d"
+      },
+      "textures/namaqualand_boulder_02_arm_2k.jpg": {
+        "size": 2914937,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_arm_2k.jpg",
+        "md5": "732a68f2aeb07223278987dfcafe83ac"
+      },
+      "textures/namaqualand_boulder_02_nor_gl_2k.jpg": {
+        "size": 3919158,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/namaqualand_boulder_02/namaqualand_boulder_02_nor_gl_2k.jpg",
+        "md5": "9591cab5cf9658a9eb23da834856a661"
+      }
+    }
+  },
+  {
+    "id": "wild_rooibos_bush",
+    "license": "CC0-1.0",
+    "authors": {
+      "James Ray Cock": "modeling",
+      "Jenelle van Heerden": "photography"
+    },
+    "page": "https://polyhaven.com/a/wild_rooibos_bush",
+    "files": {
+      "model.gltf": {
+        "include": {
+          "textures/wild_rooibos_bush_diff_2k.jpg": {
+            "size": 1383104,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_diff_2k.jpg",
+            "md5": "620baee5986d736ab68603c4a2e938eb"
+          },
+          "textures/wild_rooibos_bush_arm_2k.jpg": {
+            "size": 1415231,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_arm_2k.jpg",
+            "md5": "0934d20e828feefac3ca5accb3aca52f"
+          },
+          "textures/wild_rooibos_bush_nor_gl_2k.jpg": {
+            "size": 1916171,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_nor_gl_2k.jpg",
+            "md5": "d03a229d64ce136e9bd1b8f723b41d6a"
+          },
+          "wild_rooibos_bush.bin": {
+            "size": 1236928,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wild_rooibos_bush/wild_rooibos_bush.bin",
+            "md5": "0d6c39ac444bac0381ecdff32a191a9c"
+          }
+        },
+        "size": 23122,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wild_rooibos_bush/wild_rooibos_bush_2k.gltf",
+        "md5": "72698fe321de65c3958cbc6d53bfe887"
+      },
+      "textures/wild_rooibos_bush_diff_2k.jpg": {
+        "size": 1383104,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_diff_2k.jpg",
+        "md5": "620baee5986d736ab68603c4a2e938eb"
+      },
+      "textures/wild_rooibos_bush_arm_2k.jpg": {
+        "size": 1415231,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_arm_2k.jpg",
+        "md5": "0934d20e828feefac3ca5accb3aca52f"
+      },
+      "textures/wild_rooibos_bush_nor_gl_2k.jpg": {
+        "size": 1916171,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wild_rooibos_bush/wild_rooibos_bush_nor_gl_2k.jpg",
+        "md5": "d03a229d64ce136e9bd1b8f723b41d6a"
+      },
+      "wild_rooibos_bush.bin": {
+        "size": 1236928,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wild_rooibos_bush/wild_rooibos_bush.bin",
+        "md5": "0d6c39ac444bac0381ecdff32a191a9c"
+      },
+      "textures/alpha.png": {
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/wild_rooibos_bush/wild_rooibos_bush_alpha_2k.png",
+        "md5": "54f2820a6fce80d83ce013f57ce6421a"
+      }
+    }
+  },
+  {
+    "id": "quiver_tree_01",
+    "license": "CC0-1.0",
+    "authors": {
+      "James Ray Cock": "Photography",
+      "Dario Barresi": "Photography",
+      "Rico Cilliers": "modeling"
+    },
+    "page": "https://polyhaven.com/a/quiver_tree_01",
+    "files": {
+      "model.gltf": {
+        "include": {
+          "textures/quiver_tree_01_trunk_diff_2k.jpg": {
+            "size": 2734373,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_trunk_diff_2k.jpg",
+            "md5": "7b2eb7c29995b9bef8dec86ab36d85fa"
+          },
+          "textures/quiver_tree_01_leaf_nor_gl_2k.jpg": {
+            "size": 3559481,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_leaf_nor_gl_2k.jpg",
+            "md5": "48fa639eca1995608bd822c3d5102c61"
+          },
+          "textures/quiver_tree_01_trunk_arm_2k.jpg": {
+            "size": 1871432,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_trunk_arm_2k.jpg",
+            "md5": "741bf10e3c5a3a19574f19ee9f19b324"
+          },
+          "textures/quiver_tree_01_trunk_nor_gl_2k.jpg": {
+            "size": 4045445,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_trunk_nor_gl_2k.jpg",
+            "md5": "54bca1f06abfad95f385ee32e6dc2b5d"
+          },
+          "textures/quiver_tree_01_leaf_diff_2k.jpg": {
+            "size": 2276970,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_leaf_diff_2k.jpg",
+            "md5": "6b390fedf7aae696f0f68ce606232a5f"
+          },
+          "quiver_tree_01.bin": {
+            "size": 4413204,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/quiver_tree_01/quiver_tree_01.bin",
+            "md5": "4d02b6a0e57a20fbaee31c6b7820b0f2"
+          },
+          "textures/quiver_tree_01_leaf_arm_2k.jpg": {
+            "size": 2654551,
+            "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_leaf_arm_2k.jpg",
+            "md5": "5ab84c81760cd2c526a4833ffeab6a3e"
+          }
+        },
+        "size": 5080,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/quiver_tree_01/quiver_tree_01_2k.gltf",
+        "md5": "e52d346140a73feeac75b1fd1e08f237"
+      },
+      "textures/quiver_tree_01_trunk_diff_2k.jpg": {
+        "size": 2734373,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_trunk_diff_2k.jpg",
+        "md5": "7b2eb7c29995b9bef8dec86ab36d85fa"
+      },
+      "textures/quiver_tree_01_leaf_nor_gl_2k.jpg": {
+        "size": 3559481,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_leaf_nor_gl_2k.jpg",
+        "md5": "48fa639eca1995608bd822c3d5102c61"
+      },
+      "textures/quiver_tree_01_trunk_arm_2k.jpg": {
+        "size": 1871432,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_trunk_arm_2k.jpg",
+        "md5": "741bf10e3c5a3a19574f19ee9f19b324"
+      },
+      "textures/quiver_tree_01_trunk_nor_gl_2k.jpg": {
+        "size": 4045445,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_trunk_nor_gl_2k.jpg",
+        "md5": "54bca1f06abfad95f385ee32e6dc2b5d"
+      },
+      "textures/quiver_tree_01_leaf_diff_2k.jpg": {
+        "size": 2276970,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_leaf_diff_2k.jpg",
+        "md5": "6b390fedf7aae696f0f68ce606232a5f"
+      },
+      "quiver_tree_01.bin": {
+        "size": 4413204,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/quiver_tree_01/quiver_tree_01.bin",
+        "md5": "4d02b6a0e57a20fbaee31c6b7820b0f2"
+      },
+      "textures/quiver_tree_01_leaf_arm_2k.jpg": {
+        "size": 2654551,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/quiver_tree_01/quiver_tree_01_leaf_arm_2k.jpg",
+        "md5": "5ab84c81760cd2c526a4833ffeab6a3e"
+      }
+    }
+  }
+]

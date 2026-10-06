@@ -1,0 +1,92 @@
+{
+  "recipe": "python3 tools/assets/grade_terrain_biome_vegetation.py",
+  "assets": [
+    {
+      "id": "tree_small_02",
+      "source": "https://polyhaven.com/a/tree_small_02",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-composite/models/tree_small_02/model.glb",
+      "inputSHA256": "d1de180097518768e0b34eebaf98f39ed97157edc8dddd9713a7e59be60a20cc",
+      "output": "art/workbench/terrain-composite/models/tree_small_02/biome.glb",
+      "outputSHA256": "9fb5319268f8f6c359ae0d2b7933578c3cce2e2d8582223556cb7b88933b4a2d",
+      "palette": {
+        "version": "desert-olive-v2",
+        "brightness": 0.8,
+        "sourceChroma": 0.22,
+        "dustTint": [
+          1.02,
+          1.08,
+          0.73
+        ]
+      },
+      "geometryAndOtherMapsPreserved": true,
+      "edits": [
+        {
+          "material": "tree_small_02_leaves",
+          "originalMap": "art/workbench/terrain-composite/models/tree_small_02/biome-source/tree_small_02_leaves-original.png",
+          "gradedMap": "art/workbench/terrain-composite/models/tree_small_02/biome-source/tree_small_02_leaves-desert-olive.png",
+          "alphaPreserved": true,
+          "selectiveGreenMask": false
+        }
+      ]
+    },
+    {
+      "id": "shrub_04",
+      "source": "https://polyhaven.com/a/shrub_04",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-composite/models/shrub_04/model.glb",
+      "inputSHA256": "74c8c2eb4c83e9048126cb60aedc5dc3689501ef8ab1002455fdabaef6b06470",
+      "output": "art/workbench/terrain-composite/models/shrub_04/biome.glb",
+      "outputSHA256": "a3be5b9af22ea4fa8502f63293b5815d18745d00b2e18792acbf54bce657213f",
+      "palette": {
+        "version": "desert-olive-v2",
+        "brightness": 0.8,
+        "sourceChroma": 0.22,
+        "dustTint": [
+          1.02,
+          1.08,
+          0.73
+        ]
+      },
+      "geometryAndOtherMapsPreserved": true,
+      "edits": [
+        {
+          "material": "shrub_04",
+          "originalMap": "art/workbench/terrain-composite/models/shrub_04/biome-source/shrub_04-original.png",
+          "gradedMap": "art/workbench/terrain-composite/models/shrub_04/biome-source/shrub_04-desert-olive.png",
+          "alphaPreserved": true,
+          "selectiveGreenMask": false
+        }
+      ]
+    },
+    {
+      "id": "quiver_tree_02",
+      "source": "https://polyhaven.com/a/quiver_tree_02",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-composite/models/quiver_tree_02/model.glb",
+      "inputSHA256": "531b6dcbecef990a5f86b59b0ce1d118c6015dfd5ac82169bd5bb5a39a56c9a4",
+      "output": "art/workbench/terrain-composite/models/quiver_tree_02/biome.glb",
+      "outputSHA256": "e424de7045c9cd1bdfa1d9a7df5ff60a514092152459b2df367138c75b44a5ed",
+      "palette": {
+        "version": "desert-olive-v2",
+        "brightness": 0.8,
+        "sourceChroma": 0.22,
+        "dustTint": [
+          1.02,
+          1.08,
+          0.73
+        ]
+      },
+      "geometryAndOtherMapsPreserved": true,
+      "edits": [
+        {
+          "material": "quiver_tree_02",
+          "originalMap": "art/workbench/terrain-composite/models/quiver_tree_02/biome-source/quiver_tree_02-original.png",
+          "gradedMap": "art/workbench/terrain-composite/models/quiver_tree_02/biome-source/quiver_tree_02-desert-olive.png",
+          "alphaPreserved": true,
+          "selectiveGreenMask": true
+        }
+      ]
+    }
+  ]
+}

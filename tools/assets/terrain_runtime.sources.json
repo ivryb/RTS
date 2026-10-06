@@ -1,0 +1,408 @@
+{
+  "recipe": "tools/assets/prepare_terrain_runtime.py",
+  "license": "CC0-1.0",
+  "assets": {
+    "tree": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/tree_small_02/savanna.glb",
+        "sha256": "4c67eabf5f89d455c8710007bd0db7a0c5783705d738d664127e3fa954dfa905",
+        "bytes": 21686820,
+        "meshes": [
+          {
+            "name": "BezierCurve.002",
+            "triangles": 247747
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/tree.glb",
+        "sha256": "c9a6f058b38ff2f6795c4b26f2dc63c4f75ae872e6aff0610a9c46281f8aeff2",
+        "bytes": 6586248,
+        "meshes": [
+          {
+            "name": "Scanned crown with preserved leaf silhouettes",
+            "triangles": 66229
+          }
+        ]
+      },
+      "textures": [
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ]
+      ],
+      "treatment": "Each leaf island reduced to its six-vertex convex silhouette, preserving all crown islands, original UV samples, branches and trunk",
+      "materialTreatment": {
+        "version": "dusty-leaves-v1",
+        "minimum": 0.74,
+        "sourceRange": 0.24,
+        "input": {
+          "path": "art/workbench/renders/terrain-playground/baselines/approved-2026-10-06/assets/art/workbench/terrain-composite/models/runtime/tree.glb",
+          "sha256": "e6c138880cc73b91f974a3aa55d69ab56d907bc49b019be1466b82ab0b9618dd",
+          "bytes": 6011496,
+          "meshes": [
+            {
+              "name": "Scanned crown with preserved leaf silhouettes",
+              "triangles": 66229
+            }
+          ]
+        },
+        "preserved": "Every geometry buffer and all other embedded images are byte-identical"
+      }
+    },
+    "grass": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/grass_medium_02/savanna.glb",
+        "sha256": "8901805bb6d3ebbea9254d57aa75495a3126d28e7b0349b7c24824fc25b3216e",
+        "bytes": 2375348,
+        "meshes": [
+          {
+            "name": "savanna_tussock_a",
+            "triangles": 7842
+          },
+          {
+            "name": "savanna_tussock_b",
+            "triangles": 11546
+          },
+          {
+            "name": "savanna_tussock_c",
+            "triangles": 9506
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/grass.glb",
+        "sha256": "8b82849c8c0df38deba016efa3399aaf07ccb4d3b0f5e25fa151ad83fe1e5ff4",
+        "bytes": 200152,
+        "meshes": [
+          {
+            "name": "savanna_tussock_a",
+            "triangles": 548
+          },
+          {
+            "name": "savanna_tussock_b",
+            "triangles": 808
+          },
+          {
+            "name": "savanna_tussock_c",
+            "triangles": 665
+          }
+        ]
+      },
+      "textures": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "treatment": "UV seam vertices rejoined before quadric surface collapse to 7%; material UV loops retained"
+    },
+    "aloe": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/quiver_tree_02/biome.glb",
+        "sha256": "e424de7045c9cd1bdfa1d9a7df5ff60a514092152459b2df367138c75b44a5ed",
+        "bytes": 4815688,
+        "meshes": [
+          {
+            "name": "tree_small_25m",
+            "triangles": 19696
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/aloe.glb",
+        "sha256": "47965a59fb6916a1d826a977d659d90fa1ff5c63fcbda91c7defe452c7b85cd1",
+        "bytes": 619984,
+        "meshes": [
+          {
+            "name": "tree_small_25m",
+            "triangles": 1954
+          }
+        ]
+      },
+      "textures": [
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ]
+      ],
+      "treatment": "UV seam vertices rejoined before quadric surface collapse to 10%; material UV loops retained"
+    },
+    "sage": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/shrub_04/savanna.glb",
+        "sha256": "8e27eb927937609a0b9cf55a618178c47a7602f1785b9657c49bc658dcedcca9",
+        "bytes": 3018280,
+        "meshes": [
+          {
+            "name": "shrub_04_a",
+            "triangles": 2600
+          },
+          {
+            "name": "shrub_04_b",
+            "triangles": 4361
+          },
+          {
+            "name": "shrub_04_c",
+            "triangles": 4208
+          },
+          {
+            "name": "shrub_04_d",
+            "triangles": 5663
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/sage.glb",
+        "sha256": "b7c5974f68daffa92fb89b7a65612a969b8e85ae65a4936c59a032922bdb27d1",
+        "bytes": 195376,
+        "meshes": [
+          {
+            "name": "shrub_04_a",
+            "triangles": 364
+          },
+          {
+            "name": "shrub_04_b",
+            "triangles": 610
+          },
+          {
+            "name": "shrub_04_c",
+            "triangles": 587
+          },
+          {
+            "name": "shrub_04_d",
+            "triangles": 789
+          }
+        ]
+      },
+      "textures": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "treatment": "UV seam vertices rejoined before quadric surface collapse to 14%; material UV loops retained"
+    },
+    "rooibos": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/wild_rooibos_bush/savanna.glb",
+        "sha256": "e9855086550b764a2c76c431d11e0e3c05bf20eeb7fa07ad377ba4b79108772b",
+        "bytes": 12965716,
+        "meshes": [
+          {
+            "name": "savanna_rooibos_a",
+            "triangles": 13151
+          },
+          {
+            "name": "savanna_rooibos_b",
+            "triangles": 6287
+          },
+          {
+            "name": "savanna_rooibos_c",
+            "triangles": 4204
+          },
+          {
+            "name": "savanna_rooibos_d",
+            "triangles": 2684
+          },
+          {
+            "name": "savanna_rooibos_e",
+            "triangles": 1193
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/rooibos.glb",
+        "sha256": "459bd17b6d11da4c6e14e33ebcdc6d1a351dc706fa00bc5f7b60126a7e12aef3",
+        "bytes": 276052,
+        "meshes": [
+          {
+            "name": "savanna_rooibos_a",
+            "triangles": 1315
+          },
+          {
+            "name": "savanna_rooibos_b",
+            "triangles": 628
+          },
+          {
+            "name": "savanna_rooibos_c",
+            "triangles": 420
+          },
+          {
+            "name": "savanna_rooibos_d",
+            "triangles": 268
+          },
+          {
+            "name": "savanna_rooibos_e",
+            "triangles": 119
+          }
+        ]
+      },
+      "textures": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "treatment": "UV seam vertices rejoined before quadric surface collapse to 10%; material UV loops retained"
+    },
+    "pebbles": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/oxide-pebbles.glb",
+        "sha256": "489fec14b8eae1b7b387e1a7063dbc7f9d4b9f23b9196ec86e107f31492c12b9",
+        "bytes": 7303480,
+        "meshes": [
+          {
+            "name": "oxide-pebbles-a",
+            "triangles": 999
+          },
+          {
+            "name": "oxide-pebbles-b",
+            "triangles": 999
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/pebbles.glb",
+        "sha256": "820a54a428bc7bcc367c4255cdecf4907eb36a16921e9e6ae446d820cce8d996",
+        "bytes": 264660,
+        "meshes": [
+          {
+            "name": "oxide-pebbles-a",
+            "triangles": 465
+          },
+          {
+            "name": "oxide-pebbles-b",
+            "triangles": 449
+          }
+        ]
+      },
+      "textures": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "treatment": "Meshoptimizer 0.24.0 index-only simplification with locked open boundaries; original positions, UVs and normals retained; UV/normal error weights 0.3/0.1, maximum relative error 0.025; embedded textures resized and encoded as WebP"
+    },
+    "talus": {
+      "source": {
+        "path": "art/workbench/terrain-composite/models/oxide-talus.glb",
+        "sha256": "067b60b6799008290c8c4c14f571bb74d34dcff98bef35ddb6aa62355a5d14e3",
+        "bytes": 7487624,
+        "meshes": [
+          {
+            "name": "oxide-talus-a",
+            "triangles": 4999
+          },
+          {
+            "name": "oxide-talus-b",
+            "triangles": 5000
+          }
+        ]
+      },
+      "runtime": {
+        "path": "art/workbench/terrain-composite/models/runtime/talus.glb",
+        "sha256": "8a9219218ccdb299671d5cfbcf8b73545b88805ea447c6906a581cb845df4384",
+        "bytes": 963976,
+        "meshes": [
+          {
+            "name": "oxide-talus-a",
+            "triangles": 1897
+          },
+          {
+            "name": "oxide-talus-b",
+            "triangles": 1900
+          }
+        ]
+      },
+      "textures": [
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ]
+      ],
+      "treatment": "Meshoptimizer 0.24.0 index-only simplification with locked open boundaries; original positions, UVs and normals retained; UV/normal error weights 0.3/0.1, maximum relative error 0.025; embedded textures resized and encoded as WebP"
+    }
+  }
+}

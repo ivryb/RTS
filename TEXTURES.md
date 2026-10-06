@@ -14,7 +14,7 @@ Texture roles are chosen manually rather than randomized by seed. **Aerial Beach
 | Coast Sand 05                  |  No  |     Yes      | Patch only; its 17.5 m catalog scale makes the pattern 30% smaller without resizing the image.           |
 | Dirt Aerial 03                 |  No  |     Yes      | Patch texture only.                                                                                      |
 
-Steep generated faces use **Marble Cliff 02**. It is projected in world space from orientation-corrected sides, then shifts back to the ungraded sand material across a broad smoothed slope range. Alternating terrain diagonals and the continuous blend avoid directional side artifacts, vertical texture streaks, bright ridge seams, and triangle-shaped material crops.
+The live game and the hub’s **New terrain** use the approved oxide environment: **Cliff Side** on faces at 12 m, **Rock Face 03** on weathered caps at 7 m, **Aerial Ground Rock** on talus at 7 m, and **Mud Cracked Dry 03** in sheltered alluvial ground at 6.8 m. The shared material keeps these roles and scales identical in both scenes. **Marble Cliff 02** remains in the hub’s Old terrain comparison. The runtime assets and source recipes are recorded in `assets/models/terrain/manifest.json`. For ownership and visual verification, read [terrain generation](docs/terrain_generation.md).
 
 ## Reserved for authored terrain
 

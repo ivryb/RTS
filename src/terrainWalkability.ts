@@ -7,7 +7,8 @@ export interface TerrainSurface {
   size: number;
   segments: number;
   heights: Float32Array;
-  /** When present, this authored mask owns navigation instead of visual slope. */
+  trianglePattern?: "alternating" | "fixed";
+  /** Excludes authored rock obstacles in addition to slope constraints. */
   mountainMask?: Float32Array;
 }
 
@@ -44,12 +45,16 @@ export const createTerrainReachability = (
       const topRight = heightAt(x + 1, z);
       const bottomLeft = heightAt(x, z + 1);
       const bottomRight = heightAt(x + 1, z + 1);
-      const firstWalkable = (x + z) % 2 === 0
+      const firstWalkable = terrain.trianglePattern !== "fixed" && (x + z) % 2 === 0
         ? gradientIsWalkable(bottomRight - bottomLeft, bottomLeft - topLeft)
         : gradientIsWalkable(topRight - topLeft, bottomLeft - topLeft);
-      const secondWalkable = (x + z) % 2 === 0
+      const secondWalkable = terrain.trianglePattern !== "fixed" && (x + z) % 2 === 0
         ? gradientIsWalkable(topRight - topLeft, bottomRight - topRight)
         : gradientIsWalkable(bottomRight - bottomLeft, bottomRight - topRight);
+      const mask = terrain.mountainMask;
+      const corner = z * vertexRow + x;
+      if (mask && [corner, corner + 1, corner + vertexRow, corner + vertexRow + 1]
+        .some(i => mask[i] >= .5)) continue;
       if (firstWalkable && secondWalkable) walkable[z * terrain.segments + x] = 1;
     }
   }

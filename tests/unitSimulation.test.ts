@@ -1060,6 +1060,41 @@ describe("unit simulation", () => {
     });
   });
 
+  test("routes a Hornet behind an enemy on terrain without crossing blocked rock", () => {
+    const hornet = unitAt("hornet-1", -8, 0, false, 1_524);
+    const enemy = { ...unitAt("behemoth-enemy", 0, 0, false, 1_161), ownerId: "player-2" };
+    const segments = 40;
+    const terrain = {
+      size: 40,
+      segments,
+      heights: new Float32Array((segments + 1) ** 2),
+      mountainMask: new Float32Array((segments + 1) ** 2),
+    };
+    // Rock closes one side of the enemy, leaving a real detour on the other side.
+    for (let z = 22; z <= segments; z += 1) {
+      for (let x = 18; x <= 22; x += 1) terrain.mountainMask[z * (segments + 1) + x] = 1;
+    }
+    const simulation = new LocalUnitSimulation([hornet, enemy], [], terrain);
+    try {
+      simulation.dispatch("player-1", {
+        type: "move", unitIds: [hornet.id], target: toSimPoint(8, 0),
+      });
+      expect(simulation.snapshot().find((unit) => unit.id === hornet.id)!.moving).toBe(true);
+      for (let tick = 0; tick < 80; tick += 1) {
+        simulation.step();
+        const current = simulation.snapshot().find((unit) => unit.id === hornet.id)!;
+        expect(distanceBetween(current, enemy)).toBeGreaterThanOrEqual(hornet.radius + enemy.radius - 1);
+        if (Math.abs(current.position.x) < 3_500) expect(current.position.z).toBeLessThan(0);
+      }
+      expect(simulation.snapshot().find((unit) => unit.id === hornet.id)).toMatchObject({
+        position: toSimPoint(8, 0), moving: false,
+      });
+      expect(simulation.snapshot().find((unit) => unit.id === enemy.id)!.position).toEqual(enemy.position);
+    } finally {
+      simulation.dispose();
+    }
+  });
+
   test("resolves collisions deterministically regardless of spawn order", () => {
     const units = [
       unitAt("behemoth-1", 0, 0, false, 1_161),

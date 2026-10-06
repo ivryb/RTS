@@ -1,0 +1,195 @@
+[
+  {
+    "seed": 77,
+    "hash": "72194936c771fe2e47deca6307c8480cfde4dfe12c8309b1cc1f0a9f043a07d6",
+    "sites": [
+      {
+        "x": -62.20041537291939,
+        "z": 31.397227181641586,
+        "label": "Base A",
+        "role": "base",
+        "player": 1
+      },
+      {
+        "x": 71.86216930407447,
+        "z": -27.02096905382345,
+        "label": "Base B",
+        "role": "base",
+        "player": 2
+      },
+      {
+        "x": -75.67986842850223,
+        "z": -14.848078877199441,
+        "label": "Natural A",
+        "role": "expansion",
+        "player": 1
+      },
+      {
+        "x": 50.551136846188456,
+        "z": -79.03801530925557,
+        "label": "Natural B",
+        "role": "expansion",
+        "player": 2
+      },
+      {
+        "x": 56.09236475173384,
+        "z": 31.513253735844046,
+        "label": "Contested ground",
+        "role": "contest",
+        "player": 0
+      },
+      {
+        "x": 1.1724903276190162,
+        "z": 84.8255936508067,
+        "label": "Supply 1",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": 10.934401826467365,
+        "z": -87.77841507503763,
+        "label": "Supply 2",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": 58.0472570322454,
+        "z": 68.20043254364282,
+        "label": "Supply 3",
+        "role": "expansion",
+        "player": 0
+      }
+    ]
+  },
+  {
+    "seed": 3564,
+    "hash": "218b3a64fa13155aef9deb55b4a8035b904109e8b7b15fb34550db7b33a2a86d",
+    "sites": [
+      {
+        "x": -82.38273057224407,
+        "z": -6.2772736142280765,
+        "label": "Base A",
+        "role": "base",
+        "player": 1
+      },
+      {
+        "x": 73.01109920431325,
+        "z": 24.056197701643704,
+        "label": "Base B",
+        "role": "base",
+        "player": 2
+      },
+      {
+        "x": -35.10960406111553,
+        "z": -14.722053130157292,
+        "label": "Natural A",
+        "role": "expansion",
+        "player": 1
+      },
+      {
+        "x": 40.62275918433443,
+        "z": -14.37145341327414,
+        "label": "Natural B",
+        "role": "expansion",
+        "player": 2
+      },
+      {
+        "x": 6.391004635486752,
+        "z": 15.246594901196659,
+        "label": "Contested ground",
+        "role": "contest",
+        "player": 0
+      },
+      {
+        "x": -13.497712976299226,
+        "z": -43.796718675643206,
+        "label": "Supply 1",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": -11.179234837181866,
+        "z": 68.6290799905546,
+        "label": "Supply 2",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": 61.603337524458766,
+        "z": -45.553946481086314,
+        "label": "Supply 3",
+        "role": "expansion",
+        "player": 0
+      }
+    ]
+  },
+  {
+    "seed": 43942,
+    "hash": "0a01c3b701a7e0c4f3cc19cfcb465022a3be6af2e96ac38b359fc07946bd5398",
+    "sites": [
+      {
+        "x": 73.23646444892648,
+        "z": 33.90079030882809,
+        "label": "Base A",
+        "role": "base",
+        "player": 1
+      },
+      {
+        "x": -69.34252832071087,
+        "z": -23.51333404044201,
+        "label": "Base B",
+        "role": "base",
+        "player": 2
+      },
+      {
+        "x": 85.80579240899533,
+        "z": -11.632355750538409,
+        "label": "Natural A",
+        "role": "expansion",
+        "player": 1
+      },
+      {
+        "x": -68.81072906823829,
+        "z": 28.47475870512426,
+        "label": "Natural B",
+        "role": "expansion",
+        "player": 2
+      },
+      {
+        "x": -27.83048899518326,
+        "z": 17.70789917279035,
+        "label": "Contested ground",
+        "role": "contest",
+        "player": 0
+      },
+      {
+        "x": -17.03177791275084,
+        "z": -34.57065847842023,
+        "label": "Supply 1",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": 15.97540870681405,
+        "z": -56.237633916549385,
+        "label": "Supply 2",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": 58.73837077245116,
+        "z": -35.952391367871314,
+        "label": "Supply 3",
+        "role": "expansion",
+        "player": 0
+      },
+      {
+        "x": -28.93758672242984,
+        "z": 68.3479594453238,
+        "label": "Supply 4",
+        "role": "expansion",
+        "player": 0
+      }
+    ]
+  }
+]

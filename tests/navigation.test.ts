@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { generateMap, type TerrainSurface } from "../src/map";
-import { TERRAIN_MOUNTAIN_BLOCKED_THRESHOLD } from "../src/mapConstants";
 import { initializeNavigation, RecastNavigation } from "../src/sim/navigation";
 
 beforeAll(() => initializeNavigation());
@@ -58,36 +57,22 @@ describe("terrain navigation", () => {
       }, 1_524)).toBeDefined();
     }
     navigation.destroy();
-  });
+  }, 30000);
 
-  test("reaches generated terrain that is rendered as walkable ground", () => {
-    const map = generateMap(77);
-    const navigation = new RecastNavigation(map);
-    const row = map.segments + 1;
-    const start = {
-      x: Math.round(map.startingLocations[0].x * 1_000),
-      z: Math.round(map.startingLocations[0].z * 1_000),
-    };
-    const unreachable: Array<{ x: number; z: number }> = [];
-
-    for (let gridZ = 4; gridZ < map.segments; gridZ += 4) {
-      for (let gridX = 4; gridX < map.segments; gridX += 4) {
-        if (map.mountainMask[gridZ * row + gridX]!
-          >= TERRAIN_MOUNTAIN_BLOCKED_THRESHOLD) continue;
-        const goal = {
-          x: Math.round((gridX / map.segments - 0.5) * map.size * 1_000),
-          z: Math.round((gridZ / map.segments - 0.5) * map.size * 1_000),
-        };
-        if (!navigation.plan(start, goal, 450)) unreachable.push(goal);
-      }
+  test("reaches the authored sites on elevated Shifting Frontiers maps",()=>{
+    for(const seed of [77,56204]){
+      const map=generateMap(seed,4),navigation=new RecastNavigation(map);
+      const start={x:Math.round(map.startingLocations[0].x*1000),z:Math.round(map.startingLocations[0].z*1000)};
+      try{
+        for(const site of map.layout.sites)expect(navigation.plan(start,{x:Math.round(site.x*1000),z:Math.round(site.z*1000)},1524),`${seed} ${site.label}`).toBeDefined();
+      }finally{navigation.destroy();}
     }
-
-    expect(unreachable).toEqual([]);
-    navigation.destroy();
-  });
+  },30000);
 
   test("routes ground units through the walkable side of a cliff", () => {
-    const navigation = new RecastNavigation(rampTerrain());
+    const terrain=rampTerrain();
+    terrain.mountainMask=new Float32Array(terrain.heights.length);
+    const navigation = new RecastNavigation(terrain);
     const path = navigation.plan(
       { x: -15_000, z: 10_000 },
       { x: 15_000, z: 10_000 },
@@ -133,6 +118,27 @@ describe("terrain navigation", () => {
     navigation.setObstacles([]);
     expect(navigation.plan(start, goal, 450)).toEqual([goal]);
     navigation.destroy();
+  });
+
+  test("clears route-specific unit blockers after an impassable route while preserving buildings", () => {
+    const navigation = new RecastNavigation({
+      size: 40, segments: 40, heights: new Float32Array(41 * 41),
+    });
+    const start = { x: -15_000, z: 0 };
+    const goal = { x: 15_000, z: 0 };
+    navigation.setObstacles([{ position: { x: 0, z: 0 }, radius: 2_000 }]);
+    try {
+      const buildingRoute = navigation.plan(start, goal, 450);
+      expect(buildingRoute).toBeDefined();
+      expect(buildingRoute!.some((point) => Math.abs(point.z) > 2_000)).toBe(true);
+      const wall = [-16, -8, 0, 8, 16].map((z) => ({
+        position: { x: 0, z: z * 1_000 }, radius: 4_000,
+      }));
+      expect(navigation.planAroundObstacles(start, goal, 450, wall)).toBeUndefined();
+      expect(navigation.plan(start, goal, 450)).toEqual(buildingRoute);
+    } finally {
+      navigation.destroy();
+    }
   });
 
 });

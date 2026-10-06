@@ -4,7 +4,7 @@ export interface UnitDefinition {
   maxHealth: number;
   radius: number;
   speed: number;
-  movement: "ground" | "air";
+  movement: "ground";
   attack: "none" | "direct" | "ground";
   attackMinRange?: number;
   attackRange?: number;
@@ -27,7 +27,7 @@ export const UNIT_DEFINITIONS: Record<UnitKind, UnitDefinition> = {
     maxHealth: 45,
     radius: 0.306,
     speed: 10,
-    movement: "air",
+    movement: "ground",
     attack: "none",
   },
   behemoth: {
@@ -46,7 +46,7 @@ export const UNIT_DEFINITIONS: Record<UnitKind, UnitDefinition> = {
     maxHealth: 180,
     radius: 1.309,
     speed: 8.5,
-    movement: "air",
+    movement: "ground",
     attack: "direct",
     attackRange: 14,
     attackDamage: 30,

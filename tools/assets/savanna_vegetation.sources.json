@@ -1,0 +1,318 @@
+{
+  "version": "savanna-vegetation-v1",
+  "recipe": "python3 tools/assets/prepare_savanna_vegetation.py",
+  "assets": [
+    {
+      "id": "tree_small_02",
+      "version": "savanna-vegetation-v1",
+      "source": "https://polyhaven.com/a/tree_small_02",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-composite/models/tree_small_02/model.glb",
+      "inputSHA256": "d1de180097518768e0b34eebaf98f39ed97157edc8dddd9713a7e59be60a20cc",
+      "output": "art/workbench/terrain-composite/models/tree_small_02/savanna.glb",
+      "outputSHA256": "4c67eabf5f89d455c8710007bd0db7a0c5783705d738d664127e3fa954dfa905",
+      "outputBytes": 21686820,
+      "treatment": "Asymmetric scanned crown spread and flattened above the rooted trunk. All original triangles retained; normals transformed by the exact inverse-transpose deformation Jacobian.",
+      "meshes": [
+        {
+          "name": "BezierCurve.002",
+          "triangles": 247747,
+          "bounds": {
+            "min": [
+              -1.8472234787538595,
+              -0.025954558476805688,
+              -1.5298473197897196
+            ],
+            "max": [
+              2.466421947564116,
+              3.2161962604522705,
+              3.33331800699234
+            ]
+          }
+        }
+      ],
+      "textureEdits": [
+        {
+          "material": "tree_small_02_leaves",
+          "targetMeanSRGB": [
+            108,
+            113,
+            80
+          ],
+          "baseMap": "art/workbench/terrain-composite/models/tree_small_02/savanna-source/tree_small_02_leaves-savanna.png",
+          "alphaPreserved": true
+        }
+      ]
+    },
+    {
+      "id": "shrub_04",
+      "version": "savanna-vegetation-v1",
+      "source": "https://polyhaven.com/a/shrub_04",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-composite/models/shrub_04/model.glb",
+      "inputSHA256": "74c8c2eb4c83e9048126cb60aedc5dc3689501ef8ab1002455fdabaef6b06470",
+      "output": "art/workbench/terrain-composite/models/shrub_04/savanna.glb",
+      "outputSHA256": "8e27eb927937609a0b9cf55a618178c47a7602f1785b9657c49bc658dcedcca9",
+      "outputBytes": 3018280,
+      "treatment": "Pale dusty-sage herb accents. Original specimen geometry and alpha preserved.",
+      "meshes": [
+        {
+          "name": "shrub_04_a",
+          "triangles": 2600,
+          "bounds": {
+            "min": [
+              -0.024753978475928307,
+              -0.002650568960234523,
+              -0.030295355245471
+            ],
+            "max": [
+              0.08143848925828934,
+              0.14980021119117737,
+              0.05458671227097511
+            ]
+          }
+        },
+        {
+          "name": "shrub_04_b",
+          "triangles": 4361,
+          "bounds": {
+            "min": [
+              -0.06358107924461365,
+              -0.002383045619353652,
+              -0.06619173288345337
+            ],
+            "max": [
+              0.04802986606955528,
+              0.15995773673057556,
+              0.06388277560472488
+            ]
+          }
+        },
+        {
+          "name": "shrub_04_c",
+          "triangles": 4208,
+          "bounds": {
+            "min": [
+              -0.07172858715057373,
+              -0.005937241483479738,
+              -0.07382097095251083
+            ],
+            "max": [
+              0.11102752387523651,
+              0.2132624387741089,
+              0.057933706790208817
+            ]
+          }
+        },
+        {
+          "name": "shrub_04_d",
+          "triangles": 5663,
+          "bounds": {
+            "min": [
+              -0.0936768427491188,
+              -0.004625620320439339,
+              -0.07500956952571869
+            ],
+            "max": [
+              0.048936210572719574,
+              0.20903176069259644,
+              0.07108771800994873
+            ]
+          }
+        }
+      ],
+      "textureEdits": [
+        {
+          "material": "shrub_04",
+          "targetMeanSRGB": [
+            130,
+            134,
+            110
+          ],
+          "baseMap": "art/workbench/terrain-composite/models/shrub_04/savanna-source/shrub_04-savanna.png",
+          "alphaPreserved": true
+        }
+      ]
+    },
+    {
+      "id": "grass_medium_02",
+      "version": "savanna-tussocks-v2",
+      "source": "https://polyhaven.com/a/grass_medium_02",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+      "inputSHA256": "40586d919678e48d77b54ec5ec62eaab083fd2daf403e5a4d1a0553ae883b85d",
+      "output": "art/workbench/terrain-composite/models/grass_medium_02/savanna.glb",
+      "outputSHA256": "8901805bb6d3ebbea9254d57aa75495a3126d28e7b0349b7c24824fc25b3216e",
+      "outputBytes": 2375348,
+      "treatment": "Three root-centered golden-straw tussocks assembled from five, seven, and six source scan tufts. Each existing curved blade widened 1.85x across its UV cross-sections, retaining its irregular arc and photographed silhouette; smooth normals recomputed. Tufts overlap around a tighter, fuller base. Original triangle count, UVs, alpha pixels, normal and roughness maps preserved. Alpha cutoff 0.30 retains more narrow blade coverage at small mip levels.",
+      "meshes": [
+        {
+          "name": "savanna_tussock_a",
+          "triangles": 7842,
+          "bounds": {
+            "min": [
+              -0.1904319747916271,
+              0.0,
+              -0.19983520226862422
+            ],
+            "max": [
+              0.18092066288577013,
+              0.28,
+              0.21365982657956847
+            ]
+          }
+        },
+        {
+          "name": "savanna_tussock_b",
+          "triangles": 11546,
+          "bounds": {
+            "min": [
+              -0.19857857152046116,
+              0.0,
+              -0.17375153132596438
+            ],
+            "max": [
+              0.23072111568670634,
+              0.28,
+              0.1739206665059008
+            ]
+          }
+        },
+        {
+          "name": "savanna_tussock_c",
+          "triangles": 9506,
+          "bounds": {
+            "min": [
+              -0.2192349938805337,
+              0.0,
+              -0.24061268948966777
+            ],
+            "max": [
+              0.18796691570668841,
+              0.28,
+              0.14927783818387808
+            ]
+          }
+        }
+      ],
+      "textureEdits": [
+        {
+          "material": "grass_medium_02",
+          "targetMeanSRGB": [
+            183,
+            151,
+            91
+          ],
+          "baseMap": "art/workbench/terrain-composite/models/grass_medium_02/savanna-source/grass_medium_02-savanna.png",
+          "alphaPreserved": true
+        }
+      ]
+    },
+    {
+      "id": "wild_rooibos_bush",
+      "version": "savanna-vegetation-v1",
+      "source": "https://polyhaven.com/a/wild_rooibos_bush",
+      "license": "CC0-1.0",
+      "input": "art/workbench/terrain-directions/models/wild_rooibos_bush/model.gltf",
+      "inputSHA256": "315a5488d96ec69eb374352e35dc1c7be830c3b5ad66f5436520274733df9421",
+      "output": "art/workbench/terrain-composite/models/wild_rooibos_bush/savanna.glb",
+      "outputSHA256": "e9855086550b764a2c76c431d11e0e3c05bf20eeb7fa07ad377ba4b79108772b",
+      "outputBytes": 12965716,
+      "treatment": "Existing desert bush scan, five separate root-centered single-material specimens. Original alpha restored for twig and leaf silhouettes; authored atlas leaf region graded sage with warm dry wood. Source geometry retained.",
+      "meshes": [
+        {
+          "name": "savanna_rooibos_a",
+          "triangles": 13151,
+          "bounds": {
+            "min": [
+              -0.35020989179611206,
+              -0.0020769955590367317,
+              -0.5369825959205627
+            ],
+            "max": [
+              0.3463645279407501,
+              0.5374173521995544,
+              0.3064473271369934
+            ]
+          }
+        },
+        {
+          "name": "savanna_rooibos_b",
+          "triangles": 6287,
+          "bounds": {
+            "min": [
+              -0.23512272536754608,
+              -0.002358302241191268,
+              -0.26039257645606995
+            ],
+            "max": [
+              0.28919631242752075,
+              0.5389080047607422,
+              0.21430246531963348
+            ]
+          }
+        },
+        {
+          "name": "savanna_rooibos_c",
+          "triangles": 4204,
+          "bounds": {
+            "min": [
+              -0.20375770330429077,
+              -0.0019698990508913994,
+              -0.24115999042987823
+            ],
+            "max": [
+              0.2216089963912964,
+              0.44638144969940186,
+              0.23094896972179413
+            ]
+          }
+        },
+        {
+          "name": "savanna_rooibos_d",
+          "triangles": 2684,
+          "bounds": {
+            "min": [
+              -0.14171560108661652,
+              -0.001182745909318328,
+              -0.2249242514371872
+            ],
+            "max": [
+              0.1857093870639801,
+              0.4187602996826172,
+              0.15862591564655304
+            ]
+          }
+        },
+        {
+          "name": "savanna_rooibos_e",
+          "triangles": 1193,
+          "bounds": {
+            "min": [
+              -0.13257183134555817,
+              -0.0009769063908606768,
+              -0.04508111625909805
+            ],
+            "max": [
+              0.14504429697990417,
+              0.30518728494644165,
+              0.12062276154756546
+            ]
+          }
+        }
+      ],
+      "textureEdits": [
+        {
+          "material": "savanna_rooibos",
+          "targetMeanSRGB": [
+            126,
+            115,
+            89
+          ],
+          "baseMap": "art/workbench/terrain-composite/models/wild_rooibos_bush/savanna-source/savanna_rooibos-savanna.png",
+          "alphaPreserved": true
+        }
+      ]
+    }
+  ]
+}

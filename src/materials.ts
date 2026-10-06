@@ -152,7 +152,7 @@ export const applyGroundStyle = (
   material.color.set(tint);
 };
 
-export const createSandMaterial = (mapSize: number, seed: number) => {
+export const createSandMaterial = (mapSize: number, seed: number, options: {cliffs?: boolean} = {}) => {
   const material = new THREE.MeshStandardMaterial({
     color: selectedTint,
     map: loadGroundTexture(selectedTexture, mapSize, seed),
@@ -262,11 +262,11 @@ vec4 sampleGround(
   float antiTileMix,
   vec2 firstOffset,
   vec2 secondOffset,
-  float offsetBlend
+  float offsetBlend,
+  vec2 uvDx,
+  vec2 uvDy
 ) {
-  vec2 uvDx = dFdx(uv);
-  vec2 uvDy = dFdy(uv);
-  if (antiTileMix <= 0.0) return texture2D(source, uv);
+  if (antiTileMix <= 0.0) return textureGrad(source, uv, uvDx, uvDy);
 
   vec4 smoothed = mix(
     textureGrad(source, uv + firstOffset, uvDx, uvDy),
@@ -274,7 +274,7 @@ vec4 sampleGround(
     offsetBlend
   );
   if (antiTileMix >= 1.0) return smoothed;
-  return mix(texture2D(source, uv), smoothed, antiTileMix);
+  return mix(textureGrad(source, uv, uvDx, uvDy), smoothed, antiTileMix);
 }`
       )
       .replace(
@@ -285,13 +285,15 @@ float variation = groundNoise(vGroundWorldPosition.xz * 0.02) * 6.0;
 float offsetBlend = smoothstep(0.15, 0.85, fract(variation));
 vec2 firstOffset = groundTileOffset(floor(variation));
 vec2 secondOffset = groundTileOffset(floor(variation) + 1.0);
+vec2 patchUvDx = dFdx(vPatchUv), patchUvDy = dFdy(vPatchUv);
 vec4 sampledDiffuseColor = sampleGround(
   map,
   vMapUv,
   antiTileMix,
   firstOffset,
   secondOffset,
-  offsetBlend
+  offsetBlend,
+  dFdx(vMapUv), dFdy(vMapUv)
 );
 float patchBlend = vPatchWeight * 0.5;
 if (patchBlend > 0.001) {
@@ -301,12 +303,14 @@ if (patchBlend > 0.001) {
     antiTileMix,
     firstOffset,
     secondOffset,
-    offsetBlend
+    offsetBlend,
+    patchUvDx, patchUvDy
   );
   patchDiffuseColor.rgb *= vec3(0.88, 0.78, 0.66);
   sampledDiffuseColor = mix(sampledDiffuseColor, patchDiffuseColor, patchBlend);
 }
 diffuseColor *= sampledDiffuseColor;
+${options.cliffs === false ? "" : `
 vec2 mountainUv = vGroundWorldPosition.xz / 18.0;
 vec4 mountainDiffuseColor = texture2D(cliffMap, mountainUv);
 vec4 mountainFoundationDiffuse = sampleGround(
@@ -315,7 +319,8 @@ vec4 mountainFoundationDiffuse = sampleGround(
   antiTileMix,
   firstOffset,
   secondOffset,
-  offsetBlend
+  offsetBlend,
+  patchUvDx, patchUvDy
 );
 float mountainBrightness = 0.60;
 vec3 mountainRockColor = mountainDiffuseColor.rgb * mountainBrightness;
@@ -384,9 +389,11 @@ if (cliffBlend > 0.001) {
     cliffDiffuseZ * cliffWeights.z;
   diffuseColor.rgb = mix(diffuseColor.rgb, cliffDiffuseColor.rgb, cliffBlend);
 }
+`}
 #endif`
       );
   };
+  material.customProgramCacheKey = () => `sand-cliffs-${options.cliffs !== false}`;
   material.addEventListener("dispose", () => {
     settings.secondaryMap.dispose();
     settings.cliffMap.dispose();

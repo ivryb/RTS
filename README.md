@@ -4,17 +4,18 @@ Dune77 is a browser-based RTS set in a sun-scorched cyberpunk wasteland. The cur
 
 The game is still early. The combat foundation works; the economy, fog of war, strategic AI, and full multiplayer match remain future work. See [`draft.md`](draft.md) for the game design and [`BACKLOG.md`](BACKLOG.md) for deferred features.
 
+The main game uses the approved New terrain: oxide mountains, sheltered groves and walkable grass. The [terrain hub](prototypes/terrain-playground/README.md) retains Old/New comparisons using the same production generation and rendering.
+
 ## Run it locally
 
 Requirements:
 
 - Node.js 22 or newer
-- pnpm 9 or newer
 - Bun 1.3 or newer
 
 ```sh
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
 
 Open the URL printed by Vite, normally `http://localhost:5173`.
@@ -33,15 +34,15 @@ No environment variables are required to run the game. Meshy API tooling is opti
 ## Checks
 
 ```sh
-pnpm test
-pnpm build
+bun run test
+bun run build
 ```
 
-The visual checks reuse a running `pnpm dev` server:
+The visual checks reuse a running `bun run dev` server:
 
 ```sh
-pnpm preview:capture
-pnpm preview:capture:terrain-topology
+bun run preview:capture
+bun run preview:capture:terrain-hub
 ```
 
 Generated screenshots go to the ignored `art/workbench/renders/previews/` directory.
@@ -66,7 +67,7 @@ Start with [`docs/architecture.md`](docs/architecture.md) for the code flow and 
 
 ## Collaboration
 
-Keep `main` runnable. Use a short-lived branch and a pull request for meaningful changes. Run the narrowest relevant checks while working, then run `pnpm test` and `pnpm build` before merging.
+Keep `main` runnable. Use a short-lived branch and a pull request for meaningful changes. Run the narrowest relevant checks while working, then run `bun run test` and `bun run build` before merging.
 
 ## License
 

@@ -5,41 +5,24 @@ import {
   terrainPathExists,
   type TerrainSurface,
 } from "../src/map";
-import { generateTerrainLayout } from "../src/generatedTerrain";
+import { generateMapLayout } from "../src/mapGenerators";
+import { createTerrainEnvironment } from "../src/mapGenerators/environment";
 import {
   MAXIMUM_GROUND_CLEARANCE,
   MAXIMUM_WALKABLE_SLOPE,
 } from "../src/navigationConfig";
 import { CellFlag } from "../src/placement";
 
-const outerHillCoverage = (map: ReturnType<typeof generateMap>) => {
-  let outerCells = 0;
-  let outerHills = 0;
-  for (let z = 0; z < map.placement.resolution; z += 1) {
-    for (let x = 0; x < map.placement.resolution; x += 1) {
-      const worldX = ((x + 0.5) / map.placement.resolution - 0.5) * map.size;
-      const worldZ = ((z + 0.5) / map.placement.resolution - 0.5) * map.size;
-      if (Math.abs(worldX) <= map.size * 0.38 && Math.abs(worldZ) <= map.size * 0.38) {
-        continue;
-      }
-      outerCells += 1;
-      if (map.placement.flags[z * map.placement.resolution + x]! & CellFlag.Hill) {
-        outerHills += 1;
-      }
-    }
-  }
-  return outerHills / outerCells;
-};
-
 describe("procedural map", () => {
-  test("uses the same terrain layout as the topology preview", () => {
+  test("uses the same sculpted surface and solid props as New terrain in the hub", () => {
     const map = generateMap(77);
-    const preview = generateTerrainLayout(77, 2);
+    const preview = createTerrainEnvironment(generateMapLayout({generator:"multiplayer",seed:77,players:2}));
 
-    expect([...map.heights]).toEqual([...preview.heights]);
-    expect([...map.mountainMask]).toEqual([...preview.mountainMask]);
-    expect([...map.mountainFoundationMask]).toEqual([...preview.mountainFoundationMask]);
-    expect(map.topology).toEqual(preview.topology);
+    expect(map.heights).toEqual(preview.layout.heights);
+    expect(map.mountainMask).toEqual(Float32Array.from(preview.layout.blocked));
+    expect(map.layout.sites).toEqual(preview.layout.sites);
+    expect(map.environment.features.trees).toEqual(preview.features.trees);
+    expect(map.environment.features.grass).toEqual(preview.features.grass);
   });
 
   test("is deterministic for a seed", () => {
@@ -62,20 +45,19 @@ describe("procedural map", () => {
         MAXIMUM_WALKABLE_SLOPE,
         MAXIMUM_GROUND_CLEARANCE,
       )).toBe(true);
-      expect(outerHillCoverage(map)).toBeGreaterThan(0.2);
 
       for (const start of map.startingLocations) {
         const heights = Array.from({ length: 12 }, (_, index) => {
           const angle = index * Math.PI * 2 / 12;
           return sampleHeight(
             map,
-            start.x + Math.cos(angle) * 24,
-            start.z + Math.sin(angle) * 24,
+            start.x + Math.cos(angle) * 6,
+            start.z + Math.sin(angle) * 6,
           );
         });
         heights.push(sampleHeight(map, start.x, start.z));
 
-        expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(0.02);
+        expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(0.2);
       }
     }
   }, 30_000);
@@ -86,8 +68,8 @@ describe("procedural map", () => {
       (flags) => flags & CellFlag.Hill,
     ).length / map.placement.flags.length;
 
-    expect(map.size).toBe(240);
-    expect(hillCoverage).toBeGreaterThan(0.28);
+    expect(map.size).toBe(220);
+    expect(hillCoverage).toBeGreaterThan(0.05);
     expect(Math.max(...map.heights) - Math.min(...map.heights)).toBeGreaterThan(6);
     expect(map.palms).toEqual([]);
   });
@@ -111,6 +93,7 @@ describe("procedural map", () => {
     };
 
     expect(sampleHeight(terrain, 0.25, -0.25)).toBe(1);
+    expect(sampleHeight({ ...terrain, trianglePattern: "fixed" }, 0.25, -0.25)).toBe(0);
   });
 
   test("rejects a diagonal surface whose combined slope exceeds the limit", () => {

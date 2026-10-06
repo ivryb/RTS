@@ -42,6 +42,8 @@ Generated PBR maps, editable Blender assemblies, and the appendable material lib
 
 The source files under `assets/source/polyhaven/` came from Poly Haven under CC0. Their README records the asset pages and authors. Runtime conversions live under `assets/textures/terrain/`. See [`TEXTURES.md`](../TEXTURES.md) for current roles and rejected experiments.
 
+The approved New terrain is used by both the main game and terrain hub. Its six environment GLBs live in `assets/models/terrain/`; its nine scanned surface maps live in `assets/textures/terrain/`. The [production manifest](../assets/models/terrain/manifest.json) records exact approved bytes, source URLs, licenses and recipe hashes. The [source note](../assets/source/polyhaven/terrain/README.md) records retained original maps and the explicit single-runtime-copy exception for models with embedded geometry and textures. The grass bed's authored geometry follows CC BY-SA 4.0; its photographic maps and the other scanned assets remain CC0. Runtime imports are static Vite asset URLs, so production builds include the files without serving the ignored workbench.
+
 ## Licensing
 
 - The project-created concepts, portraits, models, and model textures were generated for Dune77 with AI-assisted tools.

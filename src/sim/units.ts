@@ -590,7 +590,11 @@ class PathPlanner {
     const escape = pathStart.x === start.x && pathStart.z === start.z ? [] : [pathStart];
     if (pathStart.x === pathGoal.x && pathStart.z === pathGoal.z) return escape;
     if (this.navigation.hasTerrain) {
-      const path = this.navigation.plan(pathStart, pathGoal, unitRadius);
+      let path = this.navigation.plan(pathStart, pathGoal, unitRadius);
+      // The terrain mesh contains buildings, but unit blockers need a fresh detour.
+      if (path && !routeIsClear(pathStart, path, obstacles, unitRadius)) {
+        path = this.navigation.planAroundObstacles(pathStart, pathGoal, unitRadius, obstacles);
+      }
       return path && routeIsClear(pathStart, path, obstacles, unitRadius)
         ? [...escape, ...path]
         : undefined;
@@ -675,6 +679,7 @@ const planAttackRing = (
   radius: number,
   reservations: readonly CircularObstacle[],
   planner: PathPlanner,
+  maximumRange = Infinity,
 ) => {
   const spacing = unit.radius * 2 + ATTACK_SEPARATION_GAP;
   const samples = ringSlotCount(radius, spacing);
@@ -693,6 +698,8 @@ const planAttackRing = (
     if (!attackSpotIsFree(unit, approach, reservations)) continue;
     const path = planner.plan(unit.position, approach);
     if (!path) continue;
+    const endpoint = path.at(-1) ?? unit.position;
+    if (distance(endpoint, target) > maximumRange) continue;
     const length = pathLength(unit.position, path);
     if (length < shortestLength) {
       shortest = path;
@@ -802,7 +809,6 @@ export class LocalUnitSimulation implements GameSimulation {
   private readonly buildings = new Map<string, BuildingState>();
   private readonly commands = new Map<string, DispatchResult>();
   private readonly groundNavigation: RecastNavigation;
-  private readonly airNavigation: RecastNavigation;
   private readonly attackStalls = new Map<string, {
     waypoint: SimPoint;
     bestDistance: number;
@@ -828,7 +834,6 @@ export class LocalUnitSimulation implements GameSimulation {
   ) {
     this.eliminationPlayerIds = [...new Set(options.commandCenterElimination ?? [])];
     this.groundNavigation = new RecastNavigation(terrain);
-    this.airNavigation = terrain ? new RecastNavigation() : this.groundNavigation;
     for (const unit of units) this.units.set(unit.id, structuredClone(unit));
     for (const building of buildings) {
       const authoritative = structuredClone(building);
@@ -1019,12 +1024,14 @@ export class LocalUnitSimulation implements GameSimulation {
       directApproachRadius(builder, site),
       [],
       this.createPathPlanner(builder),
+      // Recast can project a requested edge point outside construction reach.
+      // Reject that endpoint instead of repeatedly walking to the same unusable spot.
+      directMaximumRange(builder, site) + POSITION_ROUNDING_TOLERANCE,
     );
   }
 
   dispose() {
     this.groundNavigation.destroy();
-    if (this.airNavigation !== this.groundNavigation) this.airNavigation.destroy();
   }
 
   dispatch(playerId: string, command: PlayerCommand): DispatchResult {
@@ -1092,7 +1099,7 @@ export class LocalUnitSimulation implements GameSimulation {
     const obstacles = this.pathingObstacles(commandedIds, buildings);
     const planners = new Map<string, PathPlanner>();
     const plannerFor = (unit: UnitState) => {
-      const navigation = this.navigationFor(unit);
+      const navigation = this.groundNavigation;
       const key = `${UNIT_DEFINITIONS[unit.kind].movement}:${unit.radius}`;
       let planner = planners.get(key);
       if (!planner) {
@@ -1104,7 +1111,7 @@ export class LocalUnitSimulation implements GameSimulation {
     const destinations = command.type === "move" ? formationTargets(command.target, units) : [];
     const sharedNavigation = units.length > 0 && units.every((unit) =>
       UNIT_DEFINITIONS[unit.kind].movement === UNIT_DEFINITIONS[units[0]!.kind].movement
-    ) ? this.navigationFor(units[0]!) : undefined;
+    ) ? this.groundNavigation : undefined;
     const sharedPaths = command.type === "move"
       && sharedNavigation
       ? formationPaths(command.target, units, destinations, obstacles, sharedNavigation)
@@ -1467,8 +1474,8 @@ export class LocalUnitSimulation implements GameSimulation {
         if (!segmentIsClear(exitStart, position, blockers, unit.radius)) continue;
         unit.position = position;
         this.setNavigationObstacles(this.pathingBuildings());
-        if (!this.navigationFor(unit).plan(exitStart, position, unit.radius)) continue;
-        if (!this.navigationFor(unit).plan(position, position, unit.radius)) continue;
+        if (!this.groundNavigation.plan(exitStart, position, unit.radius)) continue;
+        if (!this.groundNavigation.plan(position, position, unit.radius)) continue;
         const path = rallyPoint ? this.createPathPlanner(unit).plan(position, rallyPoint) : [];
         if (!path) continue;
         return { position, path };
@@ -1996,14 +2003,8 @@ export class LocalUnitSimulation implements GameSimulation {
     return new PathPlanner(
       [...this.pathingObstacles(new Set([unit.id]), buildings), ...extraObstacles],
       unit.radius,
-      this.navigationFor(unit),
+      this.groundNavigation,
     );
-  }
-
-  private navigationFor(unit: UnitState) {
-    return UNIT_DEFINITIONS[unit.kind].movement === "air"
-      ? this.airNavigation
-      : this.groundNavigation;
   }
 
   private setNavigationObstacles(buildings: readonly BuildingState[]) {

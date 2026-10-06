@@ -1,0 +1,141 @@
+{
+  "version": "oasis-grass-bed-v10",
+  "recipe": "tools/assets/prepare_oasis_grass.py",
+  "source": {
+    "path": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+    "sha256": "40586d919678e48d77b54ec5ec62eaab083fd2daf403e5a4d1a0553ae883b85d",
+    "bytes": 933668
+  },
+  "colorSource": {
+    "path": "art/workbench/terrain-composite/models/grass_medium_02/savanna.glb",
+    "sha256": "8901805bb6d3ebbea9254d57aa75495a3126d28e7b0349b7c24824fc25b3216e",
+    "bytes": 2375348
+  },
+  "license": "CC0-1.0",
+  "sourceURL": "https://polyhaven.com/a/grass_medium_02",
+  "status": "prepared",
+  "output": {
+    "path": "art/workbench/terrain-composite/models/runtime/oasis-grass.glb",
+    "sha256": "c6c264daebd1dac399116151baf7901c0c36ea8845bb1ddc033b7a686c4c7bd9",
+    "bytes": 867168
+  },
+  "photographicStrips": 3,
+  "sectionsPerBlade": 8,
+  "bladeWidth": [
+    0.01,
+    0.04
+  ],
+  "variants": [
+    {
+      "name": "oasis_grass_a",
+      "blades": 96,
+      "triangles": 1248,
+      "height": 1.0,
+      "rootRadius": 0.7011321687128215,
+      "crownRadius": 1.1299769281821055,
+      "bladeWidthRange": [
+        0.006985663043125002,
+        0.04236254298130975
+      ],
+      "bounds": {
+        "min": [
+          -0.8215652801574791,
+          0.0,
+          -1.0594583399983812
+        ],
+        "max": [
+          0.7022962697048267,
+          1.0,
+          0.7446510177675484
+        ]
+      }
+    },
+    {
+      "name": "oasis_grass_b",
+      "blades": 108,
+      "triangles": 1404,
+      "height": 1.0,
+      "rootRadius": 0.7382184366137723,
+      "crownRadius": 1.0314153513513105,
+      "bladeWidthRange": [
+        0.006920736554253863,
+        0.04072377990881486
+      ],
+      "bounds": {
+        "min": [
+          -0.7789007295256103,
+          0.0,
+          -1.001992401855053
+        ],
+        "max": [
+          0.8219838168853106,
+          1.0,
+          0.8345000584839375
+        ]
+      }
+    },
+    {
+      "name": "oasis_grass_c",
+      "blades": 102,
+      "triangles": 1326,
+      "height": 1.0,
+      "rootRadius": 0.7267900922825676,
+      "crownRadius": 1.0278787974956065,
+      "bladeWidthRange": [
+        0.005953519057276662,
+        0.04384166047005323
+      ],
+      "bounds": {
+        "min": [
+          -0.7707782603691958,
+          0.0,
+          -0.7332312690670566
+        ],
+        "max": [
+          0.6710191920893236,
+          1.0,
+          0.8787639101949254
+        ]
+      }
+    }
+  ],
+  "images": [
+    {
+      "name": "grass_medium_02_nor_gl",
+      "input": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+      "sha256": "0b464550366ed72a6cad9c357e19ac4c83fc9adc87272771479138129853b300",
+      "bytes": 118146
+    },
+    {
+      "name": "grass_medium_02_diff-grass_medium_02_alpha",
+      "input": "art/workbench/terrain-composite/models/grass_medium_02/savanna.glb",
+      "sha256": "2ea043761537f0800670213c9962ab1424585e4d7b793a0994d634d7402e984e",
+      "bytes": 264195
+    },
+    {
+      "name": "grass_medium_02_rough",
+      "input": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+      "sha256": "f0d57bfd95bff7710526b49d47cf2326ee3796e425639d53b983d1472480b57d",
+      "bytes": 241181
+    }
+  ],
+  "treatment": "Smooth tapered blades with planar quads and gentle independent bends, full-circle bearings and varied blade widths. The irregular root spread is retained with fewer, finer blades for open ground cover; mostly low blades are interspersed with occasional taller leaves. UV triangles stay within padded opaque photographic leaf bodies instead of crossing scanned silhouettes. Geometry owns the outline; OPAQUE material prevents alpha cutoff holes at smaller mips. Reuses the existing warm savanna 1K color/alpha map and original 1K normal/packed maps byte-for-byte. A darker, less yellow base-color factor mutes the photographed straw; neutral basal vertex shading, normal strength and matte roughness are unchanged. No raster edits.",
+  "checks": {
+    "sourceUnchanged": true,
+    "colorSourceUnchanged": true,
+    "allSelectedImageBytesUnchanged": true,
+    "alphaMatchesOriginal": true,
+    "finiteVertexAttributes": true,
+    "unitNormals": true,
+    "photoUVs": {
+      "samplesPerMip": 6426,
+      "minimumPhotoAlphaByMip": {
+        "1024": 0.9999999999999998,
+        "512": 0.9997941176470589,
+        "256": 0.9843235294117647,
+        "128": 0.9042647058823529
+      },
+      "minimumAlphaWithin5PixelMargin": 0.9999999999999998
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { TerrainSurface } from "./terrainWalkability";
 
 const VIEW_HEIGHT = 56;
 export const DEFAULT_ZOOM = 1.3;
@@ -49,8 +50,16 @@ export class MapCamera {
     this.updatePosition();
   }
 
-  setMapSize(mapSize: number) {
-    this.mapSize = mapSize;
+  setTerrain(terrain: Pick<TerrainSurface, "size" | "heights">) {
+    this.mapSize = terrain.size;
+    const direction = this.offset.clone().normalize();
+    const height = terrain.heights.reduce((maximum, y) => Math.max(maximum, Math.abs(y)), 0);
+    const depth = terrain.size * (Math.abs(direction.x) + Math.abs(direction.z)) + height * Math.abs(direction.y);
+    // Orthographic framing is independent of distance. Keep the whole terrain in
+    // front of the near plane even when panning to an edge, with room for models.
+    this.offset.copy(direction).multiplyScalar(depth + 32);
+    this.camera.far = 2 * (depth + 32);
+    this.camera.updateProjectionMatrix();
     this.clampTarget();
     this.updatePosition();
   }

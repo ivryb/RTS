@@ -1,0 +1,471 @@
+{
+  "version": 1,
+  "approval": "Current New terrain approved for main-game promotion on 2026-10-06. Runtime files copied byte-for-byte; no art conversion during promotion.",
+  "sourcePolicy": "Third-party scans and derived maps retain CC0. The generated oasis-grass geometry follows the project CC BY-SA 4.0 asset license; its photographic maps remain CC0. Runtime GLBs also serve as editable source copies; no duplicate large model archives are added.",
+  "models": [
+    {
+      "path": "assets/models/terrain/talus.glb",
+      "sha256": "8a9219218ccdb299671d5cfbcf8b73545b88805ea447c6906a581cb845df4384",
+      "bytes": 963976,
+      "sourceURL": "https://polyhaven.com/a/namaqualand_boulders_01",
+      "sourceLicense": "CC0-1.0",
+      "license": "CC0-1.0",
+      "authors": {
+        "Greg Zaal": "Photography",
+        "Jenelle van Heerden": "modeling"
+      },
+      "approvedCopyOf": "art/workbench/terrain-composite/models/runtime/talus.glb",
+      "sourcePreservation": "Single editable runtime GLB; see assets/source/polyhaven/terrain/README.md.",
+      "sourceInputs": [
+        {
+          "path": "art/workbench/terrain-composite/models/oxide-talus.glb",
+          "sha256": "067b60b6799008290c8c4c14f571bb74d34dcff98bef35ddb6aa62355a5d14e3",
+          "bytes": 7487624
+        }
+      ],
+      "sourceLedger": "tools/assets/terrain_runtime.sources.json",
+      "recipes": [
+        {
+          "path": "tools/assets/prepare_oxide_talus.py",
+          "sha256": "475b5df1c799c0d612914f28c81874f100c8f22616add5687635b8c305c25e23"
+        },
+        {
+          "path": "tools/assets/prepare_terrain_runtime.mjs",
+          "sha256": "57b0c338e875f7537b302ada07f53d33a79ee3e44a1a3555017b6213f3acf76f"
+        }
+      ],
+      "treatment": "Meshoptimizer 0.24.0 index-only simplification with locked open boundaries; original positions, UVs and normals retained; UV/normal error weights 0.3/0.1, maximum relative error 0.025; embedded textures resized and encoded as WebP"
+    },
+    {
+      "path": "assets/models/terrain/pebbles.glb",
+      "sha256": "820a54a428bc7bcc367c4255cdecf4907eb36a16921e9e6ae446d820cce8d996",
+      "bytes": 264660,
+      "sourceURL": "https://polyhaven.com/a/namaqualand_boulders_01",
+      "sourceLicense": "CC0-1.0",
+      "license": "CC0-1.0",
+      "authors": {
+        "Greg Zaal": "Photography",
+        "Jenelle van Heerden": "modeling"
+      },
+      "approvedCopyOf": "art/workbench/terrain-composite/models/runtime/pebbles.glb",
+      "sourcePreservation": "Single editable runtime GLB; see assets/source/polyhaven/terrain/README.md.",
+      "sourceInputs": [
+        {
+          "path": "art/workbench/terrain-composite/models/oxide-pebbles.glb",
+          "sha256": "489fec14b8eae1b7b387e1a7063dbc7f9d4b9f23b9196ec86e107f31492c12b9",
+          "bytes": 7303480
+        }
+      ],
+      "sourceLedger": "tools/assets/terrain_runtime.sources.json",
+      "recipes": [
+        {
+          "path": "tools/assets/prepare_oxide_talus.py",
+          "sha256": "475b5df1c799c0d612914f28c81874f100c8f22616add5687635b8c305c25e23"
+        },
+        {
+          "path": "tools/assets/prepare_terrain_runtime.mjs",
+          "sha256": "57b0c338e875f7537b302ada07f53d33a79ee3e44a1a3555017b6213f3acf76f"
+        }
+      ],
+      "treatment": "Meshoptimizer 0.24.0 index-only simplification with locked open boundaries; original positions, UVs and normals retained; UV/normal error weights 0.3/0.1, maximum relative error 0.025; embedded textures resized and encoded as WebP"
+    },
+    {
+      "path": "assets/models/terrain/tree.glb",
+      "sha256": "c9a6f058b38ff2f6795c4b26f2dc63c4f75ae872e6aff0610a9c46281f8aeff2",
+      "bytes": 6586248,
+      "sourceURL": "https://polyhaven.com/a/tree_small_02",
+      "sourceLicense": "CC0-1.0",
+      "license": "CC0-1.0",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "approvedCopyOf": "art/workbench/terrain-composite/models/runtime/tree.glb",
+      "sourcePreservation": "Single editable runtime GLB; see assets/source/polyhaven/terrain/README.md.",
+      "sourceInputs": [
+        {
+          "path": "art/workbench/terrain-composite/models/tree_small_02/savanna.glb",
+          "sha256": "4c67eabf5f89d455c8710007bd0db7a0c5783705d738d664127e3fa954dfa905",
+          "bytes": 21686820
+        }
+      ],
+      "sourceLedger": "tools/assets/terrain_runtime.sources.json",
+      "recipes": [
+        {
+          "path": "tools/assets/prepare_savanna_vegetation.py",
+          "sha256": "e27661056b1fd13a7f67fb1b07c3dd1807512b96b85afcdf4338fe6ebe5608ff"
+        },
+        {
+          "path": "tools/assets/prepare_terrain_runtime.py",
+          "sha256": "93db0013561ba62177b2f85f1a3d679b8025f7b4f10ce88d6e08ac9eed848d4d"
+        }
+      ],
+      "treatment": "Each leaf island reduced to its six-vertex convex silhouette, preserving all crown islands, original UV samples, branches and trunk; leaf roughness remapped to 0.74 + 0.24 \u00d7 source G; all other geometry/maps preserved."
+    },
+    {
+      "path": "assets/models/terrain/sage.glb",
+      "sha256": "b7c5974f68daffa92fb89b7a65612a969b8e85ae65a4936c59a032922bdb27d1",
+      "bytes": 195376,
+      "sourceURL": "https://polyhaven.com/a/shrub_04",
+      "sourceLicense": "CC0-1.0",
+      "license": "CC0-1.0",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "approvedCopyOf": "art/workbench/terrain-composite/models/runtime/sage.glb",
+      "sourcePreservation": "Single editable runtime GLB; see assets/source/polyhaven/terrain/README.md.",
+      "sourceInputs": [
+        {
+          "path": "art/workbench/terrain-composite/models/shrub_04/savanna.glb",
+          "sha256": "8e27eb927937609a0b9cf55a618178c47a7602f1785b9657c49bc658dcedcca9",
+          "bytes": 3018280
+        }
+      ],
+      "sourceLedger": "tools/assets/terrain_runtime.sources.json",
+      "recipes": [
+        {
+          "path": "tools/assets/prepare_savanna_vegetation.py",
+          "sha256": "e27661056b1fd13a7f67fb1b07c3dd1807512b96b85afcdf4338fe6ebe5608ff"
+        },
+        {
+          "path": "tools/assets/prepare_terrain_runtime.py",
+          "sha256": "93db0013561ba62177b2f85f1a3d679b8025f7b4f10ce88d6e08ac9eed848d4d"
+        }
+      ],
+      "treatment": "UV seam vertices rejoined before quadric surface collapse to 14%; material UV loops retained"
+    },
+    {
+      "path": "assets/models/terrain/oasis-grass.glb",
+      "sha256": "c6c264daebd1dac399116151baf7901c0c36ea8845bb1ddc033b7a686c4c7bd9",
+      "bytes": 867168,
+      "sourceURL": "https://polyhaven.com/a/grass_medium_02",
+      "sourceLicense": "CC0-1.0",
+      "license": "CC-BY-SA-4.0",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "approvedCopyOf": "art/workbench/terrain-composite/models/runtime/oasis-grass.glb",
+      "sourcePreservation": "Single editable runtime GLB; see assets/source/polyhaven/terrain/README.md.",
+      "geometryLicense": "CC-BY-SA-4.0",
+      "textureLicense": "CC0-1.0",
+      "sourceInputs": [
+        {
+          "path": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+          "sha256": "40586d919678e48d77b54ec5ec62eaab083fd2daf403e5a4d1a0553ae883b85d",
+          "bytes": 933668
+        },
+        {
+          "path": "art/workbench/terrain-composite/models/grass_medium_02/savanna.glb",
+          "sha256": "8901805bb6d3ebbea9254d57aa75495a3126d28e7b0349b7c24824fc25b3216e",
+          "bytes": 2375348
+        }
+      ],
+      "sourceLedger": "tools/assets/oasis_grass.sources.json",
+      "recipes": [
+        {
+          "path": "tools/assets/prepare_oasis_grass.py",
+          "sha256": "5c1c48f7ac5b2e51f857551b6f4d44e5fb55848788b8e7f69d8fdbf7ad98bbe9"
+        }
+      ],
+      "treatment": "Smooth tapered blades with planar quads and gentle independent bends, full-circle bearings and varied blade widths. The irregular root spread is retained with fewer, finer blades for open ground cover; mostly low blades are interspersed with occasional taller leaves. UV triangles stay within padded opaque photographic leaf bodies instead of crossing scanned silhouettes. Geometry owns the outline; OPAQUE material prevents alpha cutoff holes at smaller mips. Reuses the existing warm savanna 1K color/alpha map and original 1K normal/packed maps byte-for-byte. A darker, less yellow base-color factor mutes the photographed straw; neutral basal vertex shading, normal strength and matte roughness are unchanged. No raster edits."
+    },
+    {
+      "path": "assets/models/terrain/rooibos.glb",
+      "sha256": "459bd17b6d11da4c6e14e33ebcdc6d1a351dc706fa00bc5f7b60126a7e12aef3",
+      "bytes": 276052,
+      "sourceURL": "https://polyhaven.com/a/wild_rooibos_bush",
+      "sourceLicense": "CC0-1.0",
+      "license": "CC0-1.0",
+      "authors": {
+        "James Ray Cock": "modeling",
+        "Jenelle van Heerden": "photography"
+      },
+      "approvedCopyOf": "art/workbench/terrain-composite/models/runtime/rooibos.glb",
+      "sourcePreservation": "Single editable runtime GLB; see assets/source/polyhaven/terrain/README.md.",
+      "sourceInputs": [
+        {
+          "path": "art/workbench/terrain-composite/models/wild_rooibos_bush/savanna.glb",
+          "sha256": "e9855086550b764a2c76c431d11e0e3c05bf20eeb7fa07ad377ba4b79108772b",
+          "bytes": 12965716
+        }
+      ],
+      "sourceLedger": "tools/assets/terrain_runtime.sources.json",
+      "recipes": [
+        {
+          "path": "tools/assets/prepare_savanna_vegetation.py",
+          "sha256": "e27661056b1fd13a7f67fb1b07c3dd1807512b96b85afcdf4338fe6ebe5608ff"
+        },
+        {
+          "path": "tools/assets/prepare_terrain_runtime.py",
+          "sha256": "93db0013561ba62177b2f85f1a3d679b8025f7b4f10ce88d6e08ac9eed848d4d"
+        }
+      ],
+      "treatment": "UV seam vertices rejoined before quadric surface collapse to 10%; material UV loops retained"
+    }
+  ],
+  "textures": [
+    {
+      "path": "assets/textures/terrain/oxide-cliff-color.webp",
+      "sha256": "e24393c8e944a44cea27136e82c20cbe29bf27d1148c39c909e31c318d275d3c",
+      "bytes": 1448088,
+      "sourceURL": "https://polyhaven.com/a/cliff_side",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/titanium/cliff_side_diff_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/oxide-cliff-color.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_scree.py",
+        "sha256": "ca460e8ea4db801d6415311dc683eb215a089719f2be93fa3cba05e365bfa914"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/cliff-side-normal.webp",
+      "sha256": "a5d29354e91565c711d97eb4c6e78207e5d6526cf0f073fe1bc2b0c901a889c1",
+      "bytes": 1509012,
+      "sourceURL": "https://polyhaven.com/a/cliff_side",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/titanium/cliff_side_nor_gl_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/cliff-side-normal.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_oxide_cliff.py",
+        "sha256": "1d400bc9d65c2bf54d1d1bb5ac4bc907f8972e6f8317ea4bf0f30b9eb6fbef8f"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/cliff-side-roughness.webp",
+      "sha256": "a15020bbf3c35acfe6bc4d9fd8612a42fbbdc104b7509d71920ab0077e50e479",
+      "bytes": 568732,
+      "sourceURL": "https://polyhaven.com/a/cliff_side",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/titanium/cliff_side_rough_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/cliff-side-roughness.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_oxide_cliff.py",
+        "sha256": "1d400bc9d65c2bf54d1d1bb5ac4bc907f8972e6f8317ea4bf0f30b9eb6fbef8f"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/biome-oasis-color.webp",
+      "sha256": "10dbe9130119a3204cc0d37f5913d0253760a4da6d9724fd27994d360f1da533",
+      "bytes": 1374466,
+      "sourceURL": "https://polyhaven.com/a/mud_cracked_dry_03",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/terrain/mud_cracked_dry_03_diff_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/biome-oasis-color.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_ground.py",
+        "sha256": "f8588ab25f4440f8a902a484d5abbd0ed7b1aa21ac4e317837c8d10d0c8c991d"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/biome-oasis-normal.webp",
+      "sha256": "5a4c4ebbd2f08969b8111cf5a493cd4982c0aa5645d540c2cb1afbde53bf9f6b",
+      "bytes": 2498690,
+      "sourceURL": "https://polyhaven.com/a/mud_cracked_dry_03",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/terrain/mud_cracked_dry_03_nor_gl_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/biome-oasis-normal.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_ground.py",
+        "sha256": "f8588ab25f4440f8a902a484d5abbd0ed7b1aa21ac4e317837c8d10d0c8c991d"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/oxide-weathered-color.webp",
+      "sha256": "71c26496118ce8eb02d14a9d87ad56da1a9c5bc90e6e80530e01cc4362731414",
+      "bytes": 1786214,
+      "sourceURL": "https://polyhaven.com/a/rock_face_03",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/terrain/rock_face_03_diff_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/oxide-weathered-color.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_scree.py",
+        "sha256": "ca460e8ea4db801d6415311dc683eb215a089719f2be93fa3cba05e365bfa914"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/oxide-weathered-normal.webp",
+      "sha256": "8ec394ec82f668a5bf51ab8586e5520b526e2de0c7a52ecd7a8b26fc3919ff42",
+      "bytes": 2220284,
+      "sourceURL": "https://polyhaven.com/a/rock_face_03",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/terrain/rock_face_03_nor_gl_2k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/oxide-weathered-normal.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_scree.py",
+        "sha256": "ca460e8ea4db801d6415311dc683eb215a089719f2be93fa3cba05e365bfa914"
+      },
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/oxide-scree-color.webp",
+      "sha256": "e30bab26943143abe18474bcea3bf434f4f58cbd728cc6311015679e23a281ae",
+      "bytes": 401716,
+      "sourceURL": "https://polyhaven.com/a/aerial_ground_rock",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/terrain/aerial_ground_rock_diff_1k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/oxide-scree-color.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_scree.py",
+        "sha256": "ca460e8ea4db801d6415311dc683eb215a089719f2be93fa3cba05e365bfa914"
+      },
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "path": "assets/textures/terrain/oxide-scree-normal.webp",
+      "sha256": "c8ac7fccfe8d2cf9e334f34a46fb21905347f9691ca9219755c5f7e120fabd12",
+      "bytes": 386744,
+      "sourceURL": "https://polyhaven.com/a/aerial_ground_rock",
+      "license": "CC0-1.0",
+      "sourcePath": "assets/source/polyhaven/terrain/aerial_ground_rock_nor_gl_1k.jpg",
+      "approvedCopyOf": "art/workbench/terrain-composite/textures/oxide-scree-normal.webp",
+      "recipe": {
+        "path": "tools/assets/prepare_biome_scree.py",
+        "sha256": "ca460e8ea4db801d6415311dc683eb215a089719f2be93fa3cba05e365bfa914"
+      },
+      "dimensions": [
+        1024,
+        1024
+      ]
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "assets/source/polyhaven/titanium/cliff_side_diff_2k.jpg",
+      "sha256": "bc6f92d72eb6383ecc3a1094ed9f5b37efb36ccf83cf29699bb5990e6775afee",
+      "bytes": 3387348,
+      "sourceURL": "https://polyhaven.com/a/cliff_side",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_diff_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "James Ray Cock": "Photography",
+        "Jenelle van Heerden": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/titanium/cliff_side_nor_gl_2k.jpg",
+      "sha256": "eec5c0bb3daa1ad72f0f9c1d19caf78e84dfedcf3283b35b5a5dcf163718025f",
+      "bytes": 3585856,
+      "sourceURL": "https://polyhaven.com/a/cliff_side",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_nor_gl_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "James Ray Cock": "Photography",
+        "Jenelle van Heerden": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/titanium/cliff_side_rough_2k.jpg",
+      "sha256": "7fd4f6d289b1b44c812533eaea7802e640dda55070b9746025a9d33117a1bd1f",
+      "bytes": 1765122,
+      "sourceURL": "https://polyhaven.com/a/cliff_side",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_rough_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "James Ray Cock": "Photography",
+        "Jenelle van Heerden": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/terrain/rock_face_03_diff_2k.jpg",
+      "sha256": "644ee79df7ffbf5f6afc330b64dd3f33794bab8820915fe61ffe0c88ecfd7ece",
+      "bytes": 3814362,
+      "sourceURL": "https://polyhaven.com/a/rock_face_03",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_diff_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "Rico Cilliers": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/terrain/rock_face_03_nor_gl_2k.jpg",
+      "sha256": "a498cef4ba6191f6959b6d03fb835263c77271948264a289af24497ab7111dec",
+      "bytes": 4473242,
+      "sourceURL": "https://polyhaven.com/a/rock_face_03",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_nor_gl_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "Rico Cilliers": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/terrain/mud_cracked_dry_03_diff_2k.jpg",
+      "sha256": "5f711035ea182d94791259b22576eb4f54912e3f1d56786dcc391982f6f764b4",
+      "bytes": 3910412,
+      "sourceURL": "https://polyhaven.com/a/mud_cracked_dry_03",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/mud_cracked_dry_03/mud_cracked_dry_03_diff_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Dario Barresi": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/terrain/mud_cracked_dry_03_nor_gl_2k.jpg",
+      "sha256": "cb3d9760fa63ff49406fd75d6494b7840e44ee9b75ba05a4d81e0b7300c12582",
+      "bytes": 5026404,
+      "sourceURL": "https://polyhaven.com/a/mud_cracked_dry_03",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/mud_cracked_dry_03/mud_cracked_dry_03_nor_gl_2k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dimitrios Savva": "Photography",
+        "Dario Barresi": "Processing"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/terrain/aerial_ground_rock_diff_1k.jpg",
+      "sha256": "c14761998b32630dd193b0fbfd31c8c6f5a144a701b84f87f9d7c33596cc554f",
+      "bytes": 599629,
+      "sourceURL": "https://polyhaven.com/a/aerial_ground_rock",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_ground_rock/aerial_ground_rock_diff_1k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Rob Tuytel": "All"
+      }
+    },
+    {
+      "path": "assets/source/polyhaven/terrain/aerial_ground_rock_nor_gl_1k.jpg",
+      "sha256": "f2eb54b43510bb96391c690e40a7fb78f5c5d9dbbb0f00fd26e4cd9aff2aa4d9",
+      "bytes": 613846,
+      "sourceURL": "https://polyhaven.com/a/aerial_ground_rock",
+      "downloadURL": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_ground_rock/aerial_ground_rock_nor_gl_1k.jpg",
+      "license": "CC0-1.0",
+      "authors": {
+        "Rob Tuytel": "All"
+      }
+    }
+  ]
+}

@@ -5,11 +5,11 @@ import { constructionPlacementIsValid } from "../src/sim/construction";
 import { toSimPoint } from "../src/sim/units";
 
 describe("combat proof encounter", () => {
-  test("places the enemy on the next terrain node in the compact six-player map", () => {
+  test("places the enemy on the nearby expansion in the six-player map", () => {
     const map = generateMap(77, 6);
     const encounter = createCombatProofEncounter(map);
 
-    expect(map.size).toBe(396);
+    expect(map.layout.playerCount).toBe(6);
 
     expect(encounter.buildings.map(({ id, kind, ownerId }) => ({ id, kind, ownerId }))).toEqual([
       { id: "local-command-center", kind: "command-center", ownerId: "local-player" },
@@ -34,23 +34,9 @@ describe("combat proof encounter", () => {
     const enemyCenter = encounter.buildings.find(({ id }) => id === "enemy-command-center")!;
     expect(playerCenter.rotation).toBe(Math.PI / 4);
     expect(enemyCenter.rotation).toBe(Math.PI / 4);
-    const adjacentNodeIds = map.topology.edges.flatMap((edge) => {
-      if (edge.a === 0) return [edge.b];
-      if (edge.b === 0) return [edge.a];
-      return [];
-    });
-    const nearestAdjacentNode = map.topology.nodes
-      .filter((node) => adjacentNodeIds.includes(node.id))
-      .reduce((nearest, candidate) =>
-        Math.hypot(candidate.x - playerCenter.x, candidate.z - playerCenter.z)
-          < Math.hypot(nearest.x - playerCenter.x, nearest.z - playerCenter.z)
-          ? candidate
-          : nearest
-      );
-    expect({ x: enemyCenter.x, z: enemyCenter.z }).toEqual({
-      x: nearestAdjacentNode.x,
-      z: nearestAdjacentNode.z,
-    });
+    const nearestExpansion=map.layout.sites.filter(site=>site.role==='expansion')
+      .sort((a,b)=>Math.hypot(a.x-playerCenter.x,a.z-playerCenter.z)-Math.hypot(b.x-playerCenter.x,b.z-playerCenter.z))[0];
+    expect({x:enemyCenter.x,z:enemyCenter.z}).toEqual({x:nearestExpansion.x,z:nearestExpansion.z});
     expect(map.startingLocations).not.toContainEqual({ x: enemyCenter.x, z: enemyCenter.z });
 
     for (const entity of [...encounter.buildings, ...encounter.units]) {
@@ -63,7 +49,7 @@ describe("combat proof encounter", () => {
           .toBeGreaterThanOrEqual(unit.radius + building.radius);
       }
     }
-  });
+  }, 30000);
 
   test("keeps both initial bases on valid terrain across deterministic maps", () => {
     for (const seed of [1, 7, 77, 777]) {

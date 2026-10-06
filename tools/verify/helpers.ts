@@ -36,6 +36,7 @@ export interface MatchSnapshot {
 declare global {
   interface Window {
     __dune77?: {
+      ready: () => Promise<void>;
       inspect: () => MatchSnapshot | null;
       project: (x: number, z: number, y?: number) => {
         x: number;
@@ -50,11 +51,12 @@ declare global {
  * Waits until simulation frames arrive AND model GLBs finish loading,
  * otherwise raycast picking silently misses buildings that have no presentation yet. */
 export async function openGame(page: Page, seed = 77) {
-  await page.goto(`/?seed=${seed}&verify=1`);
+  await page.goto(`./?seed=${seed}&verify=1`);
   await page.waitForFunction(() =>
     Boolean(window.__dune77?.inspect()?.units.length),
   );
   await page.waitForLoadState("networkidle");
+  await page.evaluate(() => window.__dune77!.ready());
 }
 
 export const snapshot = (page: Page) =>

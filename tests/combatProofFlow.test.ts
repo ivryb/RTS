@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import * as THREE from "three";
-import { createCombatProofEncounter } from "../src/combatProofEncounter";
+import { createCombatProofEncounter, type CombatProofEncounter } from "../src/combatProofEncounter";
 import { generateMap } from "../src/map";
 import { initializeNavigation } from "../src/sim/navigation";
 import type { BuildingKind } from "../src/sim/units";
@@ -46,6 +46,18 @@ const settlePresentations = async (system: UnitSystem) => {
 const advance = async (system: UnitSystem, seconds: number) => {
   system.update(seconds);
   await settlePresentations(system);
+};
+
+const armyStagingPoint = (encounter: CombatProofEncounter) => {
+  const enemyCenter = encounter.buildings.find(({ id }) => id === "enemy-command-center")!;
+  const direction = new THREE.Vector2(
+    enemyCenter.x - encounter.focus.x, enemyCenter.z - encounter.focus.z,
+  ).normalize();
+  // The map center can lie across a mountain; the proof army leaves along the enemy approach.
+  return {
+    x: encounter.focus.x + direction.x * 20,
+    z: encounter.focus.z + direction.y * 20,
+  };
 };
 
 const validPlacement = (
@@ -139,11 +151,7 @@ describe("assembled combat proof", () => {
 
   test("lets Ghostrunners leave the starting area before reaching nearby defenses", async () => {
     const { encounter, system } = await createProof();
-    const distanceFromCenter = Math.hypot(encounter.focus.x, encounter.focus.z);
-    const destination = {
-      x: encounter.focus.x - encounter.focus.x / distanceFromCenter * 40,
-      z: encounter.focus.z - encounter.focus.z / distanceFromCenter * 40,
-    };
+    const destination = armyStagingPoint(encounter);
 
     expect(system.select(["ghostrunner-2"])).toBe(1);
     expect(system.moveSelected(destination.x, destination.z)).toBe(true);
@@ -153,9 +161,12 @@ describe("assembled combat proof", () => {
     expect(ghostrunner?.moving).toBe(false);
     expect(Math.hypot(ghostrunner!.x - destination.x, ghostrunner!.z - destination.z))
       .toBeLessThan(1);
+    expect(ghostrunner?.health).toBe(ghostrunner?.maxHealth);
     system.dispose();
   });
 
+  // Building and resetting two six-player worlds can exceed Bun's default
+  // five seconds on laptops. This checks the complete flow, not render speed.
   test("supports production, construction, siege victory, and a clean reset", async () => {
     const { encounter, system } = await createProof();
     const playerStart = encounter.focus;
@@ -190,6 +201,9 @@ describe("assembled combat proof", () => {
       kind: "command-center",
       lifecycle: "active",
     });
+    // This clearing borders a mountain; explicitly rally toward the army's walkable approach.
+    const rally = armyStagingPoint(encounter);
+    expect(system.setRallyPointSelected(rally.x, rally.z)).toBe(true);
     expect(system.trainSelected("behemoth")).toBe(true);
     expect(system.trainSelected("behemoth")).toBe(true);
     await advance(system, 71);
@@ -226,5 +240,5 @@ describe("assembled combat proof", () => {
       productionQueue: [],
     });
     restarted.system.dispose();
-  });
+  }, 15_000);
 });

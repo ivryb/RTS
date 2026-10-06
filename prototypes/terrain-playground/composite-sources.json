@@ -1,0 +1,1187 @@
+{
+  "mountains": {
+    "asset": "Cliff Side",
+    "page": "https://polyhaven.com/a/cliff_side",
+    "license": "CC0-1.0",
+    "authors": {
+      "Dario Barresi": "Photography",
+      "James Ray Cock": "Photography",
+      "Jenelle van Heerden": "Processing"
+    },
+    "sourceWidthMeters": 1.8,
+    "processing": "Source color graded to restrained oxide mean RGB117/81/55; original2K normal and roughness retained. Runtime triplanar scale12m.",
+    "files": [
+      {
+        "role": "color",
+        "source": "cliff_side_diff_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_diff_2k.jpg",
+        "md5": "6d129836144e271b30071281241e237d",
+        "runtime": "oxide-cliff-color.webp"
+      },
+      {
+        "role": "normal",
+        "source": "cliff_side_nor_gl_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_nor_gl_2k.jpg",
+        "md5": "8209033c3ad15185977d91c92cf5866f",
+        "runtime": "cliff-side-normal.webp"
+      },
+      {
+        "role": "roughness",
+        "source": "cliff_side_rough_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_rough_2k.jpg",
+        "md5": "44abb195b6c4c7b6da902e97e5bbbef2",
+        "runtime": "cliff-side-roughness.webp"
+      }
+    ],
+    "gradeRecipe": "tools/assets/prepare_biome_scree.py",
+    "status": "Selected review candidate: New terrain cliff faces; user approval pending.",
+    "tileWidthMeters": 12,
+    "normalStrength": 0.6,
+    "previousSurfaces": [
+      {
+        "asset": "Rock Face 03",
+        "status": "Rejected on 6 October as an all-surface mountain material at 4 m; retained for comparison.",
+        "page": "https://polyhaven.com/a/rock_face_03",
+        "license": "CC0-1.0",
+        "authors": {
+          "Dario Barresi": "Photography",
+          "Rico Cilliers": "Processing"
+        },
+        "sourceWidthMeters": 2.7,
+        "tileWidthMeters": 4,
+        "processing": "Original 2K resolution and aligned PBR maps retained. Color mean matched to the existing oxide cliff; luminance contrast 1.0, chroma 0.9. No blur, sharpening, or synthetic strata.",
+        "files": [
+          {
+            "role": "color",
+            "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_diff_2k.jpg",
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_diff_2k.jpg",
+            "md5": "657add9e8a8dffaeed19bdfc58078b59",
+            "sha256": "644ee79df7ffbf5f6afc330b64dd3f33794bab8820915fe61ffe0c88ecfd7ece",
+            "runtime": "oxide-weathered-color.webp"
+          },
+          {
+            "role": "normal",
+            "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_nor_gl_2k.jpg",
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_nor_gl_2k.jpg",
+            "md5": "279b33e71ae6275cafa24e6597024c98",
+            "sha256": "a498cef4ba6191f6959b6d03fb835263c77271948264a289af24497ab7111dec",
+            "runtime": "oxide-weathered-normal.webp"
+          },
+          {
+            "role": "roughness",
+            "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_rough_2k.jpg",
+            "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_rough_2k.jpg",
+            "md5": "8895a8b199487fd6cfeed2fed1fb39b4",
+            "sha256": "9ca3e9e196685f702328f24d66f039b72f5330fc35cf2a2c265cfa50a7916301",
+            "runtime": "oxide-weathered-roughness.webp"
+          }
+        ],
+        "gradeRecipe": "tools/assets/prepare_biome_scree.py"
+      }
+    ],
+    "caprock": {
+      "asset": "Rock Face 03",
+      "page": "https://polyhaven.com/a/rock_face_03",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "sourceWidthMeters": 2.7,
+      "tileWidthMeters": 7,
+      "normalStrength": 0.6,
+      "processing": "Original 2K resolution and aligned PBR maps retained. Color mean matched to the existing oxide cliff; luminance contrast 1.0, chroma 0.9. No blur, sharpening, or synthetic strata.",
+      "gradeRecipe": "tools/assets/prepare_biome_scree.py",
+      "files": [
+        {
+          "role": "color",
+          "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_diff_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_diff_2k.jpg",
+          "md5": "657add9e8a8dffaeed19bdfc58078b59",
+          "sha256": "644ee79df7ffbf5f6afc330b64dd3f33794bab8820915fe61ffe0c88ecfd7ece",
+          "runtime": "oxide-weathered-color.webp"
+        },
+        {
+          "role": "normal",
+          "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_nor_gl_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_nor_gl_2k.jpg",
+          "md5": "279b33e71ae6275cafa24e6597024c98",
+          "sha256": "a498cef4ba6191f6959b6d03fb835263c77271948264a289af24497ab7111dec",
+          "runtime": "oxide-weathered-normal.webp"
+        }
+      ],
+      "usage": "Upward-facing weathered bedrock, blended continuously with Cliff Side on steep faces; fixed roughness 0.9."
+    }
+  },
+  "basalt": [
+    {
+      "file": "art/workbench/terrain-composite/models/basalt-island-01.glb",
+      "bytes": 11602216,
+      "triangles": 41552,
+      "dimensions_glTF_xyz": [
+        15.730204582214355,
+        6.3650593757629395,
+        8.94955825805664
+      ],
+      "ground_y": 0,
+      "blender_bounds": [
+        [
+          -8.582868576049805,
+          -4.8000006675720215,
+          -0.6983327865600586
+        ],
+        [
+          7.147336006164551,
+          4.149558067321777,
+          5.666726589202881
+        ]
+      ],
+      "seed": 7183,
+      "front_axis_glTF": "-Z",
+      "rear_axis_glTF": "+Z",
+      "burial_fraction_of_width": 0.04439438679326786,
+      "solid_core_radius_fraction": 0.5037584451952296
+    },
+    {
+      "file": "art/workbench/terrain-composite/models/basalt-island-02.glb",
+      "bytes": 11575908,
+      "triangles": 40810,
+      "dimensions_glTF_xyz": [
+        15.540863037109375,
+        6.893497467041016,
+        11.220731735229492
+      ],
+      "ground_y": 0,
+      "blender_bounds": [
+        [
+          -8.242237091064453,
+          -5.59999942779541,
+          -0.5886156558990479
+        ],
+        [
+          7.298625946044922,
+          5.62073278427124,
+          6.304882049560547
+        ]
+      ],
+      "seed": 9021,
+      "front_axis_glTF": "-Z",
+      "rear_axis_glTF": "+Z",
+      "burial_fraction_of_width": 0.03787535187032517,
+      "solid_core_radius_fraction": 0.5164582722838958
+    },
+    {
+      "file": "art/workbench/terrain-composite/models/basalt-island-03.glb",
+      "bytes": 11502892,
+      "triangles": 39936,
+      "dimensions_glTF_xyz": [
+        15.410377502441406,
+        5.736653804779053,
+        9.959245681762695
+      ],
+      "ground_y": 0,
+      "blender_bounds": [
+        [
+          -8.472793579101562,
+          -4.399999618530273,
+          -0.6113947033882141
+        ],
+        [
+          6.9375834465026855,
+          5.559245586395264,
+          5.125258922576904
+        ]
+      ],
+      "seed": 11213,
+      "front_axis_glTF": "-Z",
+      "rear_axis_glTF": "+Z",
+      "burial_fraction_of_width": 0.0396742197451914,
+      "solid_core_radius_fraction": 0.5005191902456269
+    },
+    {
+      "file": "art/workbench/terrain-composite/models/basalt-scree.glb",
+      "bytes": 5564780,
+      "meshes": [
+        {
+          "name": "basalt-scree-a",
+          "triangles": 442,
+          "dimensions_glTF_xyz": [
+            1.4173634052276611,
+            0.6715512275695801,
+            1.3688477277755737
+          ]
+        },
+        {
+          "name": "basalt-scree-b",
+          "triangles": 416,
+          "dimensions_glTF_xyz": [
+            1.4344273805618286,
+            1.6273202896118164,
+            1.625781774520874
+          ]
+        }
+      ],
+      "ground_y": 0
+    }
+  ],
+  "basaltTextures": {
+    "asset": "Rock Face 03",
+    "authors": {
+      "Dario Barresi": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "license": "CC0-1.0",
+    "page": "https://polyhaven.com/a/rock_face_03",
+    "maps": [
+      {
+        "map": "diff",
+        "file": "rock_face_03_diff_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_diff_2k.jpg"
+      },
+      {
+        "map": "nor_gl",
+        "file": "rock_face_03_nor_gl_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_nor_gl_2k.jpg"
+      },
+      {
+        "map": "rough",
+        "file": "rock_face_03_rough_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_rough_2k.jpg"
+      }
+    ],
+    "derived_diffuse": [
+      "basalt-charcoal-walls.png",
+      "basalt-dusted-crowns.png",
+      "basalt-dusty-footing.png",
+      "basalt-bedrock-color.png"
+    ],
+    "grading": "Charcoal-graded granular rock scan. Wall atlases carry baked lower-wall dust; terrain bedrock maps remain tileable without that vertical gradient. Previous Dark Rock originals are preserved.",
+    "geometry": "Original Dune77 procedural basalt studies; CC BY-SA 4.0"
+  },
+  "rubble": {
+    "talus": {
+      "file": "art/workbench/terrain-composite/models/oxide-talus.glb",
+      "bytes": 7487624,
+      "source": "art/workbench/terrain-directions/models/namaqualand_boulders_01/model.gltf",
+      "source_page": "https://polyhaven.com/a/namaqualand_boulders_01",
+      "license": "CC0-1.0",
+      "source_color_sha256": "50b0df89cd96e47f22c7723ef822f712c2cb3071ec114bd4fb7981c0be0b74be",
+      "palette_reference": "art/workbench/terrain-composite/textures/oxide-cliff-color.webp",
+      "palette_sha256": "e24393c8e944a44cea27136e82c20cbe29bf27d1148c39c909e31c318d275d3c",
+      "grade": {
+        "source_valid_uv_mean_srgb": [
+          137.97163451679805,
+          111.1244387394341,
+          81.93126518584744
+        ],
+        "cliff_mean_srgb": [
+          117.04936480522156,
+          81.11550092697144,
+          54.888819456100464
+        ],
+        "graded_valid_uv_mean_srgb": [
+          117.04888959447194,
+          81.11591360181929,
+          54.89908224301603
+        ],
+        "luminance_contrast": 0.82,
+        "retained_chroma": 0.42
+      },
+      "texture_resolution": 2048,
+      "meshes": [
+        {
+          "mesh": "oxide-talus-a",
+          "source_triangles": 16058,
+          "triangles": 4999,
+          "dimensions_glTF_xyz": [
+            1.319169521331787,
+            0.9132024645805359,
+            2.0
+          ]
+        },
+        {
+          "mesh": "oxide-talus-b",
+          "source_triangles": 24792,
+          "triangles": 5000,
+          "dimensions_glTF_xyz": [
+            1.1635901927947998,
+            0.7153069376945496,
+            2.0
+          ]
+        }
+      ],
+      "processing": "Original scanned silhouettes and UVs, 5k triangles per variant, original 2K normal and ARM maps; diffuse graded to current oxide cliff mean while retaining photographed grain and mineral bands.",
+      "usage": "Two independent identity-transform meshes; Y-up, centered at x=z=0, base y=0, longest horizontal axis 2m. Intended placement width 1\u20133m at mountain feet; bury 6\u201312% of width for terrain contact."
+    },
+    "pebbles": {
+      "file": "art/workbench/terrain-composite/models/oxide-pebbles.glb",
+      "bytes": 7303480,
+      "source": "art/workbench/terrain-directions/models/namaqualand_boulders_01/model.gltf",
+      "source_page": "https://polyhaven.com/a/namaqualand_boulders_01",
+      "license": "CC0-1.0",
+      "source_color_sha256": "50b0df89cd96e47f22c7723ef822f712c2cb3071ec114bd4fb7981c0be0b74be",
+      "palette_reference": "art/workbench/terrain-composite/textures/oxide-cliff-color.webp",
+      "palette_sha256": "e24393c8e944a44cea27136e82c20cbe29bf27d1148c39c909e31c318d275d3c",
+      "grade": {
+        "source_valid_uv_mean_srgb": [
+          137.97163451679805,
+          111.1244387394341,
+          81.93126518584744
+        ],
+        "cliff_mean_srgb": [
+          117.04936480522156,
+          81.11550092697144,
+          54.888819456100464
+        ],
+        "graded_valid_uv_mean_srgb": [
+          117.04888959447194,
+          81.11591360181929,
+          54.89908224301603
+        ],
+        "luminance_contrast": 0.82,
+        "retained_chroma": 0.42
+      },
+      "texture_resolution": 2048,
+      "meshes": [
+        {
+          "mesh": "oxide-pebbles-a",
+          "triangles": 999,
+          "dimensions_glTF_xyz": [
+            1.304640293121338,
+            0.9041613340377808,
+            2.0
+          ]
+        },
+        {
+          "mesh": "oxide-pebbles-b",
+          "triangles": 999,
+          "dimensions_glTF_xyz": [
+            1.1730071306228638,
+            0.7251941561698914,
+            1.9999998807907104
+          ]
+        }
+      ],
+      "processing": "1k-triangle LOD of each scanned talus variant; exactly the same matched 2K color, normal and ARM maps as oxide-talus.glb.",
+      "usage": "Two independent identity-transform meshes; Y-up, centered at x=z=0, base y=0, longest horizontal axis 2m. Scale to placement widths below 1.2m; bury 6\u201312% of width."
+    }
+  },
+  "vegetation": {
+    "sourceLibrary": "https://polyhaven.com/models",
+    "license": "CC0-1.0",
+    "reproduce": "python3 tools/assets/fetch_terrain_composite_vegetation.py",
+    "assets": [
+      {
+        "id": "tree_small_02",
+        "name": "Tree Small 02",
+        "source": "https://polyhaven.com/a/tree_small_02",
+        "authors": {
+          "Rico Cilliers": "All"
+        },
+        "license": "CC0-1.0",
+        "runtime": "art/workbench/terrain-composite/models/tree_small_02/model.glb",
+        "runtimeBytes": 21007892,
+        "runtimeTriangles": 247747,
+        "recommendedHeight": [
+          7,
+          11
+        ],
+        "role": "Full broadleaf canopy for sheltered savanna groves",
+        "geometryTreatment": "Separate runtime simplification, ratio 0.12, maximum error 0.002; original retained",
+        "meshes": [
+          {
+            "name": "BezierCurve.002",
+            "triangles": 247747,
+            "bounds": {
+              "min": [
+                -1.3086811304092407,
+                -0.024031998589634895,
+                -1.3799093961715698
+              ],
+              "max": [
+                1.6075055599212646,
+                4.531851768493652,
+                2.8985373973846436
+              ]
+            }
+          }
+        ],
+        "verifiedAlpha": [
+          {
+            "material": "tree_small_02_leaves",
+            "cutoff": 0.45,
+            "rgbaRange": [
+              0,
+              255
+            ]
+          }
+        ]
+      },
+      {
+        "id": "quiver_tree_02",
+        "name": "Quiver Tree 02",
+        "source": "https://polyhaven.com/a/quiver_tree_02",
+        "authors": {
+          "Dario Barresi": "photography",
+          "Rico Cilliers": "modeling"
+        },
+        "license": "CC0-1.0",
+        "runtime": "art/workbench/terrain-composite/models/quiver_tree_02/model.glb",
+        "runtimeBytes": 3038420,
+        "runtimeTriangles": 19696,
+        "recommendedHeight": [
+          3.5,
+          5.5
+        ],
+        "role": "Sparse upright desert aloe accent",
+        "geometryTreatment": "Separate runtime simplification, ratio 0.24, maximum error 0.012; original retained",
+        "meshes": [
+          {
+            "name": "tree_small_25m",
+            "triangles": 19696,
+            "bounds": {
+              "min": [
+                -0.48388946056365967,
+                -0.049302227795124054,
+                -0.4320497214794159
+              ],
+              "max": [
+                0.3877491354942322,
+                1.4184858798980713,
+                0.4484403729438782
+              ]
+            }
+          }
+        ],
+        "verifiedAlpha": []
+      },
+      {
+        "id": "shrub_04",
+        "name": "Shrub 04",
+        "source": "https://polyhaven.com/a/shrub_04",
+        "authors": {
+          "Rico Cilliers": "All"
+        },
+        "license": "CC0-1.0",
+        "runtime": "art/workbench/terrain-composite/models/shrub_04/model.glb",
+        "runtimeBytes": 2228760,
+        "runtimeTriangles": 16832,
+        "recommendedHeight": [
+          0.7,
+          1.5
+        ],
+        "role": "Silvery-green shrubs in small irregular groups",
+        "geometryTreatment": "Separate runtime simplification, ratio 0.5, maximum error 0.001; original retained",
+        "meshes": [
+          {
+            "name": "shrub_04_a",
+            "triangles": 2600,
+            "bounds": {
+              "min": [
+                -0.024753978475928307,
+                -0.002650568960234523,
+                -0.030295355245471
+              ],
+              "max": [
+                0.08143848925828934,
+                0.14980021119117737,
+                0.05458671227097511
+              ]
+            }
+          },
+          {
+            "name": "shrub_04_b",
+            "triangles": 4361,
+            "bounds": {
+              "min": [
+                -0.06358107924461365,
+                -0.002383045619353652,
+                -0.06619173288345337
+              ],
+              "max": [
+                0.04802986606955528,
+                0.15995773673057556,
+                0.06388277560472488
+              ]
+            }
+          },
+          {
+            "name": "shrub_04_c",
+            "triangles": 4208,
+            "bounds": {
+              "min": [
+                -0.07172858715057373,
+                -0.005937241483479738,
+                -0.07382097095251083
+              ],
+              "max": [
+                0.11102752387523651,
+                0.2132624387741089,
+                0.057933706790208817
+              ]
+            }
+          },
+          {
+            "name": "shrub_04_d",
+            "triangles": 5663,
+            "bounds": {
+              "min": [
+                -0.0936768427491188,
+                -0.004625620320439339,
+                -0.07500956952571869
+              ],
+              "max": [
+                0.048936210572719574,
+                0.20903176069259644,
+                0.07108771800994873
+              ]
+            }
+          }
+        ],
+        "verifiedAlpha": [
+          {
+            "material": "shrub_04",
+            "cutoff": 0.45,
+            "rgbaRange": [
+              0,
+              255
+            ]
+          }
+        ]
+      },
+      {
+        "id": "grass_medium_02",
+        "name": "Grass Medium 02",
+        "source": "https://polyhaven.com/a/grass_medium_02",
+        "authors": {
+          "Rico Cilliers": "All"
+        },
+        "license": "CC0-1.0",
+        "runtime": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+        "runtimeBytes": 933668,
+        "runtimeTriangles": 7842,
+        "recommendedHeight": [
+          0.35,
+          0.8
+        ],
+        "role": "Dry grass tufts around vegetation pockets",
+        "geometryTreatment": "Source geometry retained",
+        "meshes": [
+          {
+            "name": "Plane.001",
+            "triangles": 714,
+            "bounds": {
+              "min": [
+                -0.05556991323828697,
+                -0.002838333137333393,
+                -0.056573495268821716
+              ],
+              "max": [
+                0.06355194747447968,
+                0.15409204363822937,
+                0.06318891793489456
+              ]
+            }
+          },
+          {
+            "name": "Plane.002",
+            "triangles": 1760,
+            "bounds": {
+              "min": [
+                -0.060163434594869614,
+                -0.0040363832376897335,
+                -0.10509301722049713
+              ],
+              "max": [
+                0.1189635768532753,
+                0.1755276322364807,
+                0.09417536109685898
+              ]
+            }
+          },
+          {
+            "name": "Plane.003",
+            "triangles": 1215,
+            "bounds": {
+              "min": [
+                -0.13893021643161774,
+                -0.005509789101779461,
+                -0.1609298586845398
+              ],
+              "max": [
+                0.12274692207574844,
+                0.226151704788208,
+                0.08858048170804977
+              ]
+            }
+          },
+          {
+            "name": "Plane.004",
+            "triangles": 2489,
+            "bounds": {
+              "min": [
+                -0.18113653361797333,
+                -0.005133261438459158,
+                -0.15386725962162018
+              ],
+              "max": [
+                0.13623955845832825,
+                0.2552432417869568,
+                0.20805847644805908
+              ]
+            }
+          },
+          {
+            "name": "Plane.005",
+            "triangles": 1664,
+            "bounds": {
+              "min": [
+                -0.21328848600387573,
+                -0.0034316747914999723,
+                -0.1754019558429718
+              ],
+              "max": [
+                0.14228084683418274,
+                0.3998044431209564,
+                0.25784459710121155
+              ]
+            }
+          }
+        ],
+        "verifiedAlpha": [
+          {
+            "material": "grass_medium_02",
+            "cutoff": 0.38,
+            "rgbaRange": [
+              0,
+              255
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "biomeGround": [
+    {
+      "biome": "basalt",
+      "version": "warm-desert-ground-v3",
+      "page": "https://polyhaven.com/a/gravelly_sand",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "All"
+      },
+      "meters": 7,
+      "source_maps": [
+        {
+          "source": "gravelly_sand_diff_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravelly_sand/gravelly_sand_diff_2k.jpg",
+          "sha256": "cdab7130a67bc70f8c241b9ab2cd41b731d2baf1ec533939a333573b80070dd6"
+        },
+        {
+          "source": "gravelly_sand_nor_gl_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravelly_sand/gravelly_sand_nor_gl_2k.jpg",
+          "sha256": "191985454de9403961aab2a6ffd33b6ca1e4c2715712e03f3c928a8140322719"
+        }
+      ],
+      "catalog_meters": 2.48,
+      "output_mean_srgb": [
+        82.0,
+        73.15,
+        58.76
+      ],
+      "luminance_contrast": 1.05,
+      "retained_chroma": 0.28,
+      "processing": "Warm source grade anchored near the accepted sand albedo. Original scanned grain, relief alignment, and normal map preserved; no synthetic noise or mismatched surface composite.",
+      "placement": "Local sand-filled rock aprons only; this scan was rejected as a broad repeating terrain base."
+    },
+    {
+      "biome": "oasis",
+      "version": "warm-desert-ground-v3",
+      "page": "https://polyhaven.com/a/mud_cracked_dry_03",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Processing",
+        "Dimitrios Savva": "Photography"
+      },
+      "meters": 6.8,
+      "source_maps": [
+        {
+          "source": "mud_cracked_dry_03_diff_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/mud_cracked_dry_03/mud_cracked_dry_03_diff_2k.jpg",
+          "sha256": "5f711035ea182d94791259b22576eb4f54912e3f1d56786dcc391982f6f764b4"
+        },
+        {
+          "source": "mud_cracked_dry_03_nor_gl_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/mud_cracked_dry_03/mud_cracked_dry_03_nor_gl_2k.jpg",
+          "sha256": "cb3d9760fa63ff49406fd75d6494b7840e44ee9b75ba05a4d81e0b7300c12582"
+        }
+      ],
+      "catalog_meters": 1.5,
+      "output_mean_srgb": [
+        107.9,
+        78.23,
+        51.68
+      ],
+      "luminance_contrast": 0.65,
+      "retained_chroma": 0.25,
+      "processing": "Warm source grade anchored near the accepted sand albedo. Original scanned grain, relief alignment, and normal map preserved; no synthetic noise or mismatched surface composite.",
+      "placement": "Subtle alluvial pockets and dry drainage beds; retain accepted sand between pockets."
+    },
+    {
+      "biome": "summit dust",
+      "page": "https://polyhaven.com/a/dirt_aerial_03",
+      "license": "CC0-1.0",
+      "source": "assets/source/polyhaven/dirt-aerial-03-diffuse-2k.jpg",
+      "sha256": "ababa6da0b641cc44c54837c5166fd0ed37eb5408013a9d339b84b2d958a8822",
+      "output_mean_srgb": [
+        124,
+        79,
+        47
+      ],
+      "luminance_contrast": 0.55,
+      "retained_chroma": 0.08,
+      "processing": "Fine rust-colored dust from the existing dirt scan; restrained contrast prevents gray blotches."
+    }
+  ],
+  "biomeVegetation": {
+    "version": "savanna-vegetation-v1",
+    "recipe": "python3 tools/assets/prepare_savanna_vegetation.py",
+    "assets": [
+      {
+        "id": "tree_small_02",
+        "version": "savanna-vegetation-v1",
+        "source": "https://polyhaven.com/a/tree_small_02",
+        "license": "CC0-1.0",
+        "input": "art/workbench/terrain-composite/models/tree_small_02/model.glb",
+        "inputSHA256": "d1de180097518768e0b34eebaf98f39ed97157edc8dddd9713a7e59be60a20cc",
+        "output": "art/workbench/terrain-composite/models/tree_small_02/savanna.glb",
+        "outputSHA256": "4c67eabf5f89d455c8710007bd0db7a0c5783705d738d664127e3fa954dfa905",
+        "outputBytes": 21686820,
+        "treatment": "Asymmetric scanned crown spread and flattened above the rooted trunk. All original triangles retained; normals transformed by the exact inverse-transpose deformation Jacobian.",
+        "meshes": [
+          {
+            "name": "BezierCurve.002",
+            "triangles": 247747,
+            "bounds": {
+              "min": [
+                -1.8472234787538595,
+                -0.025954558476805688,
+                -1.5298473197897196
+              ],
+              "max": [
+                2.466421947564116,
+                3.2161962604522705,
+                3.33331800699234
+              ]
+            }
+          }
+        ],
+        "textureEdits": [
+          {
+            "material": "tree_small_02_leaves",
+            "targetMeanSRGB": [
+              108,
+              113,
+              80
+            ],
+            "baseMap": "art/workbench/terrain-composite/models/tree_small_02/savanna-source/tree_small_02_leaves-savanna.png",
+            "alphaPreserved": true
+          }
+        ]
+      },
+      {
+        "id": "shrub_04",
+        "version": "savanna-vegetation-v1",
+        "source": "https://polyhaven.com/a/shrub_04",
+        "license": "CC0-1.0",
+        "input": "art/workbench/terrain-composite/models/shrub_04/model.glb",
+        "inputSHA256": "74c8c2eb4c83e9048126cb60aedc5dc3689501ef8ab1002455fdabaef6b06470",
+        "output": "art/workbench/terrain-composite/models/shrub_04/savanna.glb",
+        "outputSHA256": "8e27eb927937609a0b9cf55a618178c47a7602f1785b9657c49bc658dcedcca9",
+        "outputBytes": 3018280,
+        "treatment": "Pale dusty-sage herb accents. Original specimen geometry and alpha preserved.",
+        "meshes": [
+          {
+            "name": "shrub_04_a",
+            "triangles": 2600,
+            "bounds": {
+              "min": [
+                -0.024753978475928307,
+                -0.002650568960234523,
+                -0.030295355245471
+              ],
+              "max": [
+                0.08143848925828934,
+                0.14980021119117737,
+                0.05458671227097511
+              ]
+            }
+          },
+          {
+            "name": "shrub_04_b",
+            "triangles": 4361,
+            "bounds": {
+              "min": [
+                -0.06358107924461365,
+                -0.002383045619353652,
+                -0.06619173288345337
+              ],
+              "max": [
+                0.04802986606955528,
+                0.15995773673057556,
+                0.06388277560472488
+              ]
+            }
+          },
+          {
+            "name": "shrub_04_c",
+            "triangles": 4208,
+            "bounds": {
+              "min": [
+                -0.07172858715057373,
+                -0.005937241483479738,
+                -0.07382097095251083
+              ],
+              "max": [
+                0.11102752387523651,
+                0.2132624387741089,
+                0.057933706790208817
+              ]
+            }
+          },
+          {
+            "name": "shrub_04_d",
+            "triangles": 5663,
+            "bounds": {
+              "min": [
+                -0.0936768427491188,
+                -0.004625620320439339,
+                -0.07500956952571869
+              ],
+              "max": [
+                0.048936210572719574,
+                0.20903176069259644,
+                0.07108771800994873
+              ]
+            }
+          }
+        ],
+        "textureEdits": [
+          {
+            "material": "shrub_04",
+            "targetMeanSRGB": [
+              130,
+              134,
+              110
+            ],
+            "baseMap": "art/workbench/terrain-composite/models/shrub_04/savanna-source/shrub_04-savanna.png",
+            "alphaPreserved": true
+          }
+        ]
+      },
+      {
+        "id": "grass_medium_02",
+        "version": "savanna-tussocks-v2",
+        "source": "https://polyhaven.com/a/grass_medium_02",
+        "license": "CC0-1.0",
+        "input": "art/workbench/terrain-composite/models/grass_medium_02/model.glb",
+        "inputSHA256": "40586d919678e48d77b54ec5ec62eaab083fd2daf403e5a4d1a0553ae883b85d",
+        "output": "art/workbench/terrain-composite/models/grass_medium_02/savanna.glb",
+        "outputSHA256": "8901805bb6d3ebbea9254d57aa75495a3126d28e7b0349b7c24824fc25b3216e",
+        "outputBytes": 2375348,
+        "treatment": "Three root-centered golden-straw tussocks assembled from five, seven, and six source scan tufts. Each existing curved blade widened 1.85x across its UV cross-sections, retaining its irregular arc and photographed silhouette; smooth normals recomputed. Tufts overlap around a tighter, fuller base. Original triangle count, UVs, alpha pixels, normal and roughness maps preserved. Alpha cutoff 0.30 retains more narrow blade coverage at small mip levels.",
+        "meshes": [
+          {
+            "name": "savanna_tussock_a",
+            "triangles": 7842,
+            "bounds": {
+              "min": [
+                -0.1904319747916271,
+                0.0,
+                -0.19983520226862422
+              ],
+              "max": [
+                0.18092066288577013,
+                0.28,
+                0.21365982657956847
+              ]
+            }
+          },
+          {
+            "name": "savanna_tussock_b",
+            "triangles": 11546,
+            "bounds": {
+              "min": [
+                -0.19857857152046116,
+                0.0,
+                -0.17375153132596438
+              ],
+              "max": [
+                0.23072111568670634,
+                0.28,
+                0.1739206665059008
+              ]
+            }
+          },
+          {
+            "name": "savanna_tussock_c",
+            "triangles": 9506,
+            "bounds": {
+              "min": [
+                -0.2192349938805337,
+                0.0,
+                -0.24061268948966777
+              ],
+              "max": [
+                0.18796691570668841,
+                0.28,
+                0.14927783818387808
+              ]
+            }
+          }
+        ],
+        "textureEdits": [
+          {
+            "material": "grass_medium_02",
+            "targetMeanSRGB": [
+              183,
+              151,
+              91
+            ],
+            "baseMap": "art/workbench/terrain-composite/models/grass_medium_02/savanna-source/grass_medium_02-savanna.png",
+            "alphaPreserved": true
+          }
+        ]
+      },
+      {
+        "id": "wild_rooibos_bush",
+        "version": "savanna-vegetation-v1",
+        "source": "https://polyhaven.com/a/wild_rooibos_bush",
+        "license": "CC0-1.0",
+        "input": "art/workbench/terrain-directions/models/wild_rooibos_bush/model.gltf",
+        "inputSHA256": "315a5488d96ec69eb374352e35dc1c7be830c3b5ad66f5436520274733df9421",
+        "output": "art/workbench/terrain-composite/models/wild_rooibos_bush/savanna.glb",
+        "outputSHA256": "e9855086550b764a2c76c431d11e0e3c05bf20eeb7fa07ad377ba4b79108772b",
+        "outputBytes": 12965716,
+        "treatment": "Existing desert bush scan, five separate root-centered single-material specimens. Original alpha restored for twig and leaf silhouettes; authored atlas leaf region graded sage with warm dry wood. Source geometry retained.",
+        "meshes": [
+          {
+            "name": "savanna_rooibos_a",
+            "triangles": 13151,
+            "bounds": {
+              "min": [
+                -0.35020989179611206,
+                -0.0020769955590367317,
+                -0.5369825959205627
+              ],
+              "max": [
+                0.3463645279407501,
+                0.5374173521995544,
+                0.3064473271369934
+              ]
+            }
+          },
+          {
+            "name": "savanna_rooibos_b",
+            "triangles": 6287,
+            "bounds": {
+              "min": [
+                -0.23512272536754608,
+                -0.002358302241191268,
+                -0.26039257645606995
+              ],
+              "max": [
+                0.28919631242752075,
+                0.5389080047607422,
+                0.21430246531963348
+              ]
+            }
+          },
+          {
+            "name": "savanna_rooibos_c",
+            "triangles": 4204,
+            "bounds": {
+              "min": [
+                -0.20375770330429077,
+                -0.0019698990508913994,
+                -0.24115999042987823
+              ],
+              "max": [
+                0.2216089963912964,
+                0.44638144969940186,
+                0.23094896972179413
+              ]
+            }
+          },
+          {
+            "name": "savanna_rooibos_d",
+            "triangles": 2684,
+            "bounds": {
+              "min": [
+                -0.14171560108661652,
+                -0.001182745909318328,
+                -0.2249242514371872
+              ],
+              "max": [
+                0.1857093870639801,
+                0.4187602996826172,
+                0.15862591564655304
+              ]
+            }
+          },
+          {
+            "name": "savanna_rooibos_e",
+            "triangles": 1193,
+            "bounds": {
+              "min": [
+                -0.13257183134555817,
+                -0.0009769063908606768,
+                -0.04508111625909805
+              ],
+              "max": [
+                0.14504429697990417,
+                0.30518728494644165,
+                0.12062276154756546
+              ]
+            }
+          }
+        ],
+        "textureEdits": [
+          {
+            "material": "savanna_rooibos",
+            "targetMeanSRGB": [
+              126,
+              115,
+              89
+            ],
+            "baseMap": "art/workbench/terrain-composite/models/wild_rooibos_bush/savanna-source/savanna_rooibos-savanna.png",
+            "alphaPreserved": true
+          }
+        ]
+      },
+      {
+        "id": "quiver_tree_02",
+        "source": "https://polyhaven.com/a/quiver_tree_02",
+        "license": "CC0-1.0",
+        "input": "art/workbench/terrain-composite/models/quiver_tree_02/model.glb",
+        "inputSHA256": "531b6dcbecef990a5f86b59b0ce1d118c6015dfd5ac82169bd5bb5a39a56c9a4",
+        "output": "art/workbench/terrain-composite/models/quiver_tree_02/biome.glb",
+        "outputSHA256": "e424de7045c9cd1bdfa1d9a7df5ff60a514092152459b2df367138c75b44a5ed",
+        "palette": {
+          "version": "desert-olive-v2",
+          "brightness": 0.8,
+          "sourceChroma": 0.22,
+          "dustTint": [
+            1.02,
+            1.08,
+            0.73
+          ]
+        },
+        "geometryAndOtherMapsPreserved": true,
+        "edits": [
+          {
+            "material": "quiver_tree_02",
+            "originalMap": "art/workbench/terrain-composite/models/quiver_tree_02/biome-source/quiver_tree_02-original.png",
+            "gradedMap": "art/workbench/terrain-composite/models/quiver_tree_02/biome-source/quiver_tree_02-desert-olive.png",
+            "alphaPreserved": true,
+            "selectiveGreenMask": true
+          }
+        ]
+      }
+    ]
+  },
+  "basaltBedrock": {
+    "page": "https://polyhaven.com/a/rock_face_03",
+    "authors": {
+      "Dario Barresi": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "license": "CC0-1.0",
+    "color": "basalt-bedrock-color.webp",
+    "normal": "basalt-bedrock-normal.webp",
+    "roughness": "basalt-bedrock-roughness.webp",
+    "meters": 3.2,
+    "tint": "#ffffff",
+    "normalStrength": 0.42,
+    "processing": "Tileable 2K granular scanned PBR graded charcoal; no vertical atlas or dust gradient."
+  },
+  "geologySurfaces": [
+    {
+      "role": "oxide scree",
+      "source": "art/workbench/terrain-directions/textures/aerial_ground_rock.jpg",
+      "page": "https://polyhaven.com/a/aerial_ground_rock",
+      "author": "Rob Tuytel",
+      "license": "CC0-1.0",
+      "normal": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_ground_rock/aerial_ground_rock_nor_gl_1k.jpg",
+      "meters": 7,
+      "mean_srgb": [
+        132,
+        92,
+        58
+      ],
+      "sourceSHA256": "c14761998b32630dd193b0fbfd31c8c6f5a144a701b84f87f9d7c33596cc554f"
+    },
+    {
+      "role": "oxide cliff",
+      "source": "art/workbench/terrain-composite/textures/cliff_side_diff_2k.jpg",
+      "page": "https://polyhaven.com/a/cliff_side",
+      "license": "CC0-1.0",
+      "meters": 12,
+      "mean_srgb": [
+        117,
+        81,
+        55
+      ],
+      "processing": "Restrained source chroma and contrast; original normal and roughness maps retained.",
+      "sourceSHA256": "bc6f92d72eb6383ecc3a1094ed9f5b37efb36ccf83cf29699bb5990e6775afee",
+      "status": "Selected New terrain cliff-face candidate; user approval pending."
+    },
+    {
+      "role": "weathered oxide mountain",
+      "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_diff_2k.jpg",
+      "page": "https://polyhaven.com/a/rock_face_03",
+      "license": "CC0-1.0",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "sourceWidthMeters": 2.7,
+      "meters": 7,
+      "mean_srgb": [
+        117,
+        81,
+        55
+      ],
+      "sourceMetadata": "https://api.polyhaven.com/info/rock_face_03",
+      "sourceFiles": "https://api.polyhaven.com/files/rock_face_03",
+      "maps": {
+        "diff": {
+          "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_diff_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_diff_2k.jpg",
+          "md5": "657add9e8a8dffaeed19bdfc58078b59",
+          "sha256": "644ee79df7ffbf5f6afc330b64dd3f33794bab8820915fe61ffe0c88ecfd7ece"
+        },
+        "nor_gl": {
+          "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_nor_gl_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_nor_gl_2k.jpg",
+          "md5": "279b33e71ae6275cafa24e6597024c98",
+          "sha256": "a498cef4ba6191f6959b6d03fb835263c77271948264a289af24497ab7111dec"
+        },
+        "rough": {
+          "source": "art/workbench/terrain-composite/basalt-source/rock_face_03_rough_2k.jpg",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_face_03/rock_face_03_rough_2k.jpg",
+          "md5": "8895a8b199487fd6cfeed2fed1fb39b4",
+          "sha256": "9ca3e9e196685f702328f24d66f039b72f5330fc35cf2a2c265cfa50a7916301"
+        }
+      },
+      "outputs": {
+        "color": "oxide-weathered-color.webp",
+        "normal": "oxide-weathered-normal.webp",
+        "roughness": "oxide-weathered-roughness.webp"
+      },
+      "processing": "Original 2K resolution and aligned PBR maps retained. Color mean matched to the existing oxide cliff; luminance contrast 1.0, chroma 0.9. No blur, sharpening, or synthetic strata.",
+      "sourceSHA256": "644ee79df7ffbf5f6afc330b64dd3f33794bab8820915fe61ffe0c88ecfd7ece",
+      "status": "Selected New terrain caprock candidate only; all-surface 4 m use was rejected."
+    }
+  ]
+}

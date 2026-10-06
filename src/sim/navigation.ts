@@ -66,18 +66,16 @@ const addFloor = (positions: number[], indices: number[]) => {
 const createTerrainGeometry = (terrain: TerrainSurface) => {
   const row = terrain.segments + 1;
   const positions = new Float32Array(row * row * 3);
-  // Generated maps author walkability through their mountain mask. Keeping
-  // that navigation mesh flat prevents visual hill tessellation from opening
-  // or closing routes, while units still render at the sampled terrain height.
+  // Elevation and rock exclusion both constrain routes; flattening here would open cliff shortcuts.
   let offset = 0;
   for (let z = 0; z <= terrain.segments; z += 1) {
     for (let x = 0; x <= terrain.segments; x += 1) {
       positions[offset++] = (x / terrain.segments - 0.5) * terrain.size;
-      positions[offset++] = terrain.mountainMask ? 0 : terrain.heights[z * row + x]!;
+      positions[offset++] = terrain.heights[z * row + x]!;
       positions[offset++] = (z / terrain.segments - 0.5) * terrain.size;
     }
   }
-  const terrainIndices = createTerrainIndices(terrain.segments);
+  const terrainIndices = createTerrainIndices(terrain.segments, terrain.trianglePattern);
   if (!terrain.mountainMask) return { positions, indices: terrainIndices };
 
   const indices: number[] = [];
@@ -163,7 +161,7 @@ const syncTemporaryObstacles = (
     const x = obstacle.position.x * METERS_PER_SIM_UNIT;
     const z = obstacle.position.z * METERS_PER_SIM_UNIT;
     const result = layer.tileCache.addCylinderObstacle(
-      { x, y: (terrain.mountainMask ? 0 : sampleHeight(terrain, x, z)) - 2, z },
+      { x, y: sampleHeight(terrain, x, z) - 2, z },
       obstacle.radius * METERS_PER_SIM_UNIT
         + layer.navigationRadius
         + NAVIGATION_CLEARANCE,
@@ -246,7 +244,7 @@ const createLayer = (
 const toNavigationPoint = (point: SimPoint, terrain?: TerrainSurface) => {
   const x = point.x * METERS_PER_SIM_UNIT;
   const z = point.z * METERS_PER_SIM_UNIT;
-  return { x, y: terrain && !terrain.mountainMask ? sampleHeight(terrain, x, z) : 0, z };
+  return { x, y: terrain ? sampleHeight(terrain, x, z) : 0, z };
 };
 
 const toSimPoint = (point: { x: number; z: number }): SimPoint => ({
@@ -316,6 +314,22 @@ export class RecastNavigation {
     this.destroyLayers();
     this.obstacles = [];
     this.signature = "";
+  }
+
+  planAroundObstacles(
+    start: SimPoint,
+    goal: SimPoint,
+    unitRadius: number,
+    obstacles: readonly NavigationObstacle[],
+  ): SimPoint[] | undefined {
+    const previousObstacles = this.obstacles;
+    try {
+      this.setObstacles([...previousObstacles, ...obstacles]);
+      return this.plan(start, goal, unitRadius);
+    } finally {
+      // Unit blockers belong to this route; later orders must not see stale unit positions.
+      this.setObstacles(previousObstacles);
+    }
   }
 
   private destroyLayers() {
