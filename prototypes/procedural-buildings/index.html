@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Procedural buildings · Dune77</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #201f1b; color: #eee7d7; font: 14px system-ui, sans-serif; }
+    header { position: absolute; top: 24px; left: 28px; z-index: 1; pointer-events: none; }
+    small { color: #d2bf98; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { font-size: 26px; font-weight: 500; margin: 8px 0; }
+    p { color: #d4c9b4; margin: 7px 0; }
+    nav { position: absolute; bottom: 42px; left: 28px; right: 28px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; z-index: 1; }
+    button, select { background: #302e27; color: #eee7d7; border: 1px solid #817252; border-radius: 5px; padding: 10px 14px; font: inherit; cursor: pointer; }
+    button[aria-pressed="true"] { background: #d1be91; color: #24231d; }
+    :focus-visible { outline: 2px solid #e6c887; outline-offset: 3px; }
+    [hidden] { display: none !important; }
+    #turret-controls { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #24231dd9; border-radius: 5px; }
+    #yaw { width: 110px; accent-color: #d1be91; }
+    #status { position: absolute; bottom: 12px; left: 28px; font-size: 12px; }
+    .model-label { position: absolute; transform: translate(-50%, -100%); padding: 6px 10px; border-radius: 5px; background: #24231dd9; color: #eee7d7; font-size: 12px; pointer-events: none; white-space: nowrap; }
+    .model-label span { display: block; margin-top: 2px; color: #c8bda5; font-size: 10px; text-align: center; }
+    canvas { display: block; }
+    @media (max-width: 700px) { header { left: 16px; top: 16px; } h1 { font-size: 22px; } nav { left: 16px; right: 16px; } button, select { padding: 8px 10px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <small>Dune77 / Building workshop</small>
+    <h1>Procedural buildings</h1>
+    <p>Shared Aged desert materials · production models</p>
+    <p>Drag to orbit · scroll to zoom</p>
+  </header>
+  <nav aria-label="Building inspection">
+    <select id="building" aria-label="Building"><option value="all">All buildings</option></select>
+    <button id="references" aria-pressed="false">Meshy references</button>
+    <button id="rear" aria-pressed="false">Rear view</button>
+    <button id="low" aria-pressed="false">Low angle</button>
+    <select id="surface" aria-label="Surface">
+      <option value="materials">Materials</option>
+      <option value="form">Form only</option>
+      <option value="wire">Wireframe</option>
+    </select>
+    <button id="frame">Frame buildings</button>
+    <label id="turret-controls" hidden>Head rotation <input id="yaw" aria-label="Head rotation" type="range" min="0" max="360" value="90" step="1"></label>
+  </nav>
+  <p id="status" role="status">Loading buildings and terrain…</p>
+  <script type="module" src="./preview.ts"></script>
+</body>
+</html>

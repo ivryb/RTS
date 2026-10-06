@@ -46,8 +46,6 @@ const TURRET_IDLE_SWEEP_SPEED = 0.55;
 const TURRET_IDLE_TURN_RESPONSIVENESS = 4.5;
 // The authored TurretHead mesh points its barrel down the local -X axis.
 const TURRET_HEAD_FORWARD_YAW = Math.PI / 2;
-// Center of the barrel-tip vertices in assets/models/turret.glb, slightly extended past the mesh.
-const TURRET_MUZZLE_OFFSET = { x: -0.52, y: 0.17, z: 0 } as const;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const terrainNormal = new THREE.Vector3();
 const localTerrainNormal = new THREE.Vector3();
@@ -1080,26 +1078,21 @@ export class UnitSystem {
         - building.rotation + TURRET_HEAD_FORWARD_YAW;
     }
     // The worker's initial frame can arrive before it initializes weapon state.
-    const muzzle = weaponDefinition ? new THREE.Object3D() : undefined;
-    if (muzzle) {
-      muzzle.name = "Turret muzzle";
-      if (turretHead) {
-        muzzle.position.set(
-          TURRET_MUZZLE_OFFSET.x,
-          TURRET_MUZZLE_OFFSET.y,
-          TURRET_MUZZLE_OFFSET.z,
-        );
-        turretHead.add(muzzle);
-      } else {
-        muzzle.position.y = height * 0.72;
-      }
+    // The model owns its barrel tip so rescaling or replacing the gun cannot leave
+    // projectiles firing from the old mesh's coordinates. Placeholders use a center flash.
+    const muzzle = weaponDefinition
+      ? root.getObjectByName("TurretMuzzle") ?? new THREE.Object3D()
+      : undefined;
+    if (muzzle && !muzzle.parent) {
+      muzzle.name = "TurretMuzzle";
+      muzzle.position.y = height * 0.72;
+      visualRoot.add(muzzle);
     }
     root.add(
       selectionRing,
       healthBar.root,
       selectionHitbox,
       ...(rangeIndicator ? [rangeIndicator] : []),
-      ...(muzzle && !turretHead ? [muzzle] : []),
     );
     root.userData.selectionCenterY = height / 2;
     this.buildingById.set(id, {

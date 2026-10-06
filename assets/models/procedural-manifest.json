@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-10-06",
+  "geometry": "fully procedural; no imported Meshy geometry or texture pixels",
+  "materials": "tools/assets/building_materials/palette.json",
+  "geometry_library": "tools/assets/building_parts.py",
+  "baker": "tools/assets/building_bake.py",
+  "seed": 77,
+  "license": "CC BY-SA 4.0",
+  "assets": [
+    {
+      "slug": "command-center",
+      "design": "field-ivory",
+      "generator": "tools/assets/build_command_center.py",
+      "runtime_file": "assets/models/command-center.glb",
+      "size_bytes": 5389300,
+      "sha256": "1de0bcb91a3e001ca0afd644a7f24bac4ec009b1959206f11590c1fb39aebb86",
+      "triangles": 76290,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 2048,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "Command center / baked runtime"
+      ],
+      "archived_meshy_file": "assets/source/meshy/archive/command-center.glb"
+    },
+    {
+      "slug": "turret",
+      "design": "compact foundation proportions / revision 09",
+      "accepted_at": "2026-10-06",
+      "generator": "tools/assets/build_turret.py",
+      "runtime_file": "assets/models/turret.glb",
+      "size_bytes": 2914192,
+      "sha256": "d5c5a2cd95e77d9892fc4b57c479fca6a85205e35b564880d54be38f87e6230e",
+      "triangles": 47756,
+      "meshes": 2,
+      "materials": 1,
+      "atlas_size": 1024,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "TurretRoot",
+        "TurretBase",
+        "TurretHead",
+        "TurretHeadMesh",
+        "TurretMuzzle"
+      ],
+      "archived_meshy_file": "assets/source/meshy/archive/turret-runtime-2026-10-06.glb",
+      "reference_images": "assets/source/meshy/archive/turret-reference"
+    }
+  ]
+}

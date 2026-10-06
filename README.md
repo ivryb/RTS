@@ -46,6 +46,8 @@ pnpm preview:capture:terrain-topology
 
 Generated screenshots go to the ignored `art/workbench/renders/previews/` directory.
 
+For interactive material and shape reviews, open the [procedural building showcase](prototypes/procedural-buildings/README.md) at `/prototypes/procedural-buildings/`. It shows the production command center and turret together, with optional archived Meshy comparisons.
+
 ## Repository map
 
 ```text

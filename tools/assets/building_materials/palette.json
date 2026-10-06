@@ -1,0 +1,132 @@
+{
+  "name": "Aged desert",
+  "materials": {
+    "armor": {
+      "name": "Aged ivory armor",
+      "color": [
+        214,
+        188,
+        148
+      ],
+      "metallic": 0.04,
+      "roughness": 0.66,
+      "normal_strength": 0.28,
+      "textured": true
+    },
+    "roof": {
+      "name": "Weathered roof ivory",
+      "color": [
+        214,
+        189,
+        151
+      ],
+      "metallic": 0.04,
+      "roughness": 0.64,
+      "normal_strength": 0.25,
+      "textured": true
+    },
+    "machinery": {
+      "name": "Graphite machinery",
+      "color": [
+        50,
+        46,
+        40
+      ],
+      "metallic": 0.18,
+      "roughness": 0.68,
+      "normal_strength": 0.6,
+      "textured": true
+    },
+    "structure": {
+      "name": "Worn ochre bronze",
+      "color": [
+        140,
+        108,
+        64
+      ],
+      "metallic": 0.38,
+      "roughness": 0.62,
+      "normal_strength": 0.6,
+      "textured": true
+    },
+    "recess": {
+      "name": "Warm joint rubber",
+      "color": [
+        30,
+        27,
+        23
+      ],
+      "metallic": 0.0,
+      "roughness": 0.91,
+      "textured": false
+    },
+    "indicator": {
+      "name": "Cyan service indicator",
+      "color": [
+        85,
+        209,
+        218
+      ],
+      "metallic": 0.25,
+      "roughness": 0.3,
+      "emission": 1.4,
+      "textured": false
+    },
+    "glass": {
+      "name": "Smoked viewport glass",
+      "color": [
+        48,
+        66,
+        84
+      ],
+      "metallic": 0.3,
+      "roughness": 0.18,
+      "textured": false
+    }
+  },
+  "weathering": {
+    "panel_shadow": [
+      128,
+      98,
+      60
+    ],
+    "paint_highlight": [
+      237,
+      214,
+      177
+    ],
+    "exposed_metal": [
+      176,
+      136,
+      80
+    ],
+    "dark_inset": [
+      65,
+      51,
+      37
+    ],
+    "dust": [
+      168,
+      132,
+      82
+    ],
+    "stain": [
+      112,
+      88,
+      60
+    ],
+    "paint_variation": 4,
+    "metal_variation": 8,
+    "paint_chip_count": 150,
+    "metal_chip_count": 230,
+    "streak_count": 12,
+    "armor_lower_age": 0.8,
+    "armor_side_age": 0.24,
+    "armor_age_depth": 0.14,
+    "roof_edge_age": 0.14,
+    "roof_lower_age": 0.45,
+    "roof_side_age": 0.3,
+    "roof_variation": 10,
+    "roof_blotches": 5
+  }
+}

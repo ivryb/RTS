@@ -66,6 +66,16 @@ const activeBuilding = (
   ...overrides,
 });
 
+const createTurretHead = () => {
+  const head = new THREE.Group();
+  head.name = "TurretHead";
+  const muzzle = new THREE.Object3D();
+  muzzle.name = "TurretMuzzle";
+  muzzle.position.set(-1.585, 0.42, 0);
+  head.add(muzzle);
+  return head;
+};
+
 class TestSession implements MatchSession {
   readonly frames: MatchFrame[];
   readonly commands: PlayerCommand[] = [];
@@ -641,8 +651,7 @@ describe("unit presentation timing", () => {
         const root = new THREE.Group();
         root.name = "turret model";
         root.add(new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2)));
-        const head = new THREE.Group();
-        head.name = "TurretHead";
+        const head = createTurretHead();
         root.add(head);
         return root;
       },
@@ -656,7 +665,7 @@ describe("unit presentation timing", () => {
 
     const head = world.getObjectByName("TurretHead")!;
     expect(head.rotation.y).toBeCloseTo(-Math.PI / 4, 5);
-    expect(head.getObjectByName("Turret muzzle")?.position.toArray()).toEqual([-0.52, 0.17, 0]);
+    expect(head.getObjectByName("TurretMuzzle")?.position.toArray()).toEqual([-1.585, 0.42, 0]);
     system.select([turret.id]);
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(true);
 
@@ -673,6 +682,8 @@ describe("unit presentation timing", () => {
 
     const projectile = world.getObjectByName("Turret projectile")!;
     expect(projectile).toBeDefined();
+    const authoredMuzzle = head.getObjectByName("TurretMuzzle")!;
+    expect(projectile.position.distanceTo(authoredMuzzle.getWorldPosition(new THREE.Vector3()))).toBeLessThan(1e-6);
     // Keep the successful Hornet silhouette: a thin core that reads as a streak,
     // with extra turret weight coming from length instead of cylinder thickness.
     expect(projectile.scale.toArray()).toEqual([1, 1.35, 1]);
@@ -711,8 +722,7 @@ describe("unit presentation timing", () => {
       session,
       () => {
         const root = new THREE.Group();
-        const head = new THREE.Group();
-        head.name = "TurretHead";
+        const head = createTurretHead();
         root.add(head);
         return root;
       },
@@ -726,7 +736,7 @@ describe("unit presentation timing", () => {
       facing: 0,
       targetId: intruder.id,
     };
-    expect(world.getObjectByName("Turret muzzle")).toBeDefined();
+    expect(world.getObjectByName("TurretMuzzle")).toBeDefined();
 
     session.frames.push(frame(2, intruder, armedTurret, [{
       type: "weapon-fired",
@@ -783,8 +793,7 @@ describe("unit presentation timing", () => {
     system.update(0);
 
     const root = new THREE.Group();
-    const head = new THREE.Group();
-    head.name = "TurretHead";
+    const head = createTurretHead();
     root.add(head);
     resolveModel(root);
     await Promise.resolve();
@@ -822,8 +831,7 @@ describe("unit presentation timing", () => {
       new THREE.AnimationClip("Dead", 1, []),
     ], options);
     const turretRoot = new THREE.Group();
-    const head = new THREE.Group();
-    head.name = "TurretHead";
+    const head = createTurretHead();
     turretRoot.add(head);
     system.attachBuilding(turret.id, turretRoot);
     const dead = { ...structuredClone(intruder), health: 0 };
@@ -886,8 +894,7 @@ describe("unit presentation timing", () => {
       session,
       async () => {
         const root = new THREE.Group();
-        const head = new THREE.Group();
-        head.name = "TurretHead";
+        const head = createTurretHead();
         root.add(head);
         return root;
       },
@@ -934,8 +941,7 @@ describe("unit presentation timing", () => {
       session,
       () => {
         const root = new THREE.Group();
-        const head = new THREE.Group();
-        head.name = "TurretHead";
+        const head = createTurretHead();
         root.add(head);
         return root;
       },

@@ -106,6 +106,10 @@ describe("assembled combat proof", () => {
         const root = new THREE.Group();
         const head = new THREE.Group();
         head.name = "TurretHead";
+        const muzzle = new THREE.Object3D();
+        muzzle.name = "TurretMuzzle";
+        muzzle.position.set(-1.585, 0.42, 0);
+        head.add(muzzle);
         root.add(head);
         return root;
       },

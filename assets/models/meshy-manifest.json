@@ -63,20 +63,36 @@
     {
       "slug": "command-center",
       "name": "Dune77 Orbital Bastion Command Center",
-      "runtime_file": "assets/models/command-center.glb",
       "size_bytes": 9579832,
       "face_count": 3827,
-      "source": "original manual Meshy UI export; the runtime GLB is the unchanged source artifact"
+      "source": "original manual Meshy UI export; unchanged source artifact, archived when ivory shoulders was adopted",
+      "status": "archived; replaced by a procedural building",
+      "archive_file": "assets/source/meshy/archive/command-center.glb",
+      "sha256": "ca9f070bcf28c804fab53f30073d9341628ccaae5b25e9688bfdcedf72b42c94",
+      "replacement_manifest": "assets/models/procedural-manifest.json"
     },
     {
       "slug": "turret",
       "name": "Dune77 Turret",
       "source_file": "assets/source/meshy/manual-exports/turret-textured.glb",
-      "runtime_file": "assets/models/turret.glb",
-      "size_bytes": 9002220,
+      "size_bytes": 9002276,
       "face_count": 3799,
       "source": "manual Meshy UI export split by tools/assets/prepare_turret.py",
-      "nodes": ["TurretRoot", "TurretBase", "TurretHead", "TurretHeadMesh"]
+      "nodes": [
+        "TurretRoot",
+        "TurretBase",
+        "TurretHead",
+        "TurretHeadMesh",
+        "TurretMuzzle"
+      ],
+      "status": "archived; replaced by procedural revision 09 on 2026-10-06",
+      "archive_file": "assets/source/meshy/archive/turret-runtime-2026-10-06.glb",
+      "sha256": "657344815c210fa007f3a897419fed67d13fe2a3fa45de56a946eaaf2d443c27",
+      "processing": "Original split Meshy geometry and textures restored unchanged; added a named TurretMuzzle anchor matching the previous firing offset.",
+      "original_split_file": "assets/source/meshy/archive/turret.glb",
+      "original_split_sha256": "35050c87ee3db30cfe21a379fca99a72108511760486577c67e149a4d6b608b8",
+      "reference_images": "assets/source/meshy/archive/turret-reference",
+      "replacement_manifest": "assets/models/procedural-manifest.json"
     },
     {
       "slug": "behemoth",

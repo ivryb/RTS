@@ -41,6 +41,7 @@ The planned backend is Cloudflare PartyServer with one Durable Object per match.
 
 - `tools/preview/` renders production terrain, buildings, units, and effects for visual checks.
 - `tools/assets/` prepares and inspects source assets used by the game.
+- `prototypes/procedural-buildings/` showcases production buildings with their shared materials and archived references, using the production model loader.
 - `prototypes/terrain-topology/` inspects the production terrain generator in 2D and 3D.
 - `prototypes/cloudflare-worker/` tests the planned multiplayer environment.
 - `prototypes/robot-dog-rigging/` explores a reusable mechanical-quadruped rigging process.
