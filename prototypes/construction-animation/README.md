@@ -20,7 +20,9 @@ Open `/prototypes/construction-animation/?option=<file name>&shot=<shot>` on the
 - `turret-close`, `command-center-close`: the same five values at the game's closest zoom (14.4 m).
 - `states`, `states-turret`: just placed, drone working, paused with no drone, damaged, destroyed before completion.
 - `completion`, `completion-turret`: 99%, then 0, 0.15, 0.4 and 1 s after completion.
+- `destroyed`, `destroyed-turret`: a site at 40%, then 0.1, 0.2, 0.3 and 0.6 s after it is destroyed.
 - `film`, `film-turret`: one build at real Turret speed (10 s of work), with the drone leaving for 1.5 s at 40%.
+- `film-command-center`: 12 s of a Command Center build at its real pace (30 to 50% of its 60 s), since `film` builds it six times too fast.
 - `perf`: five Command Centers and five Turrets under construction at once.
 
 ## Capture
