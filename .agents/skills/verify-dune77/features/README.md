@@ -43,6 +43,8 @@ live in [`../SKILL.md`](../SKILL.md).
   and stop orders, destination marker.
 - [Train units](./train-units.md) — Command Center selection, training queue,
   spawn and rally behavior.
+- [Mine Titanium](./mine-titanium.md) — gather orders, the mining laser,
+  hauling and delivery.
 - [Build buildings](./build-buildings.md) — Scout Drone construction, placement
   preview, accept/cancel, construction progress.
 - [Attack and defense](./attack-and-defense.md) — attack orders, turret range
