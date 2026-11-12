@@ -389,15 +389,11 @@ export const updateHealthBar = (
 
 const disposeEntityOverlays = ({
   selectionRing,
-  selectionHitbox,
   healthBar,
   rangeIndicator,
-}: Pick<BuildingPresentation, "selectionRing" | "healthBar" | "rangeIndicator">
-  & { selectionHitbox?: THREE.Mesh }) => {
+}: Pick<BuildingPresentation, "selectionRing" | "healthBar" | "rangeIndicator">) => {
   selectionRing.geometry.dispose();
   (selectionRing.material as THREE.Material).dispose();
-  selectionHitbox?.geometry.dispose();
-  (selectionHitbox?.material as THREE.Material | undefined)?.dispose();
   for (const child of healthBar.root.children) {
     if (child instanceof THREE.Sprite) child.material.dispose();
   }
@@ -1708,6 +1704,8 @@ export class UnitSystem {
       presentation.mixer?.stopAllAction();
       presentation.harvesting?.dispose();
       disposeEntityOverlays(presentation);
+      presentation.selectionHitbox.geometry.dispose();
+      (presentation.selectionHitbox.material as THREE.Material).dispose();
       if (presentation.constructionBeam) {
         presentation.constructionBeam.geometry.dispose();
         presentation.constructionBeam.material.dispose();
