@@ -1,4 +1,6 @@
-# Combat performance check
+# Performance checks
+
+## Combat
 
 With the existing `bun run dev` server running:
 
@@ -35,7 +37,7 @@ shots beyond the lighting budget, light reuse, and uploads stopping after effect
 expire. This benchmark covers the current opening encounter, not a large-army FPS
 or multiplayer capacity guarantee.
 
-## Local findings (2026-09-27)
+### Local findings (2026-09-27)
 
 Seed 77, 1440 × 900, Chromium/ANGLE Metal on Apple M2; no CPU sampling:
 
@@ -66,3 +68,38 @@ simulation tests). Browser checks cover selection/movement, Scout training, the
 unit preview, and artillery effects. The 400-unit local Worker prototype benchmark
 also ran after fixing its missing spawn-factory return; simulation ticks had a
 6.145 ms 95th percentile in that run.
+
+## Mining laser check
+
+With the `bun run dev` server running:
+
+```sh
+node tools/verify/profile-mining.mjs <label> [drones]
+```
+
+The script loads the mining preview scene (`/tools/preview/?scene=mining`) twice, with the Scout
+Drones extracting and with the same drones idle, and reports the difference: what the mining effect
+adds in draw calls, triangles and script time per frame. Draw calls and triangles are exact and the
+same on any machine. The script time is JavaScript only, measured on the machine that runs it; it
+leaves out drawing, which Boat does in software and which says nothing about a real GPU. Reports go
+to `art/workbench/performance/mining-<label>.json`.
+
+### Findings (2026-11-12)
+
+20 drones mining one deposit, on Boat (AMD EPYC 4585PX, headless Chromium), two runs of each, every
+run the median of 7 passes of 20,000 frames:
+
+| What the effect adds | Mechanical cutter (before) | Laser (after) |
+| --- | ---: | ---: |
+| Draw calls | 80 | 1 |
+| Triangles | 1,840 | 400 |
+| Script time per frame | 19.8 and 20.7 µs | 7.4 and 8.6 µs |
+
+Single passes of the idle scene ranged from 5.6 to 13.1 µs, so differences under about 2 µs are
+noise. The laser is one instanced mesh, so its draw calls stay at 1 for any number of drones; the
+cutter drew four meshes per drone, each with its own geometry and materials.
+
+Finding the rock face happens once when a drone starts mining, not per frame. On a 9,680-triangle
+rock it takes about 91 µs, against about 4,500 µs for casting the same 16 rays with
+`THREE.Raycaster`, because the rock is cut by the beam's vertical plane once and the rays are then
+cast against that outline in 2D.
