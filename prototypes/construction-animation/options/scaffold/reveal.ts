@@ -1,8 +1,9 @@
 import * as THREE from "three";
 
 /**
- * Shows a building only up to a rising cut height: everything above is discarded, the opening
- * is closed with a flat structural cap, and the newest band below the cut is still bare steel.
+ * Shows a building only up to a rising cut height: everything above is discarded and the
+ * newest band below the cut is still bare steel. The main hull's opening is closed by a deck
+ * (`deck.ts`); a thin part the deck leaves alone, such as a mast, is capped here.
  * It expects the baked atlas of `tools/assets/building_bake.py` (contact shading in the red
  * channel of the roughness map) and falls back to the plain band without it.
  * One shader program serves every site; each site owns only its uniforms.
@@ -20,21 +21,34 @@ export interface Reveal {
 
 const PROGRAM_KEY = "d77-scaffold-reveal";
 
+/** The bare structure of a half-built hull, shared by the deck and by the building's own cut. */
+export const structureGlsl = /* glsl */ `
+const vec3 SITE_STEEL = vec3(0.045, 0.038, 0.031);
+const vec3 SITE_RIB = vec3(0.15, 0.1, 0.052);
+const vec3 SITE_HOT_RIB = vec3(0.44, 0.17, 0.04);
+const vec3 SITE_HOT_SEAM = vec3(2.6, 1.05, 0.26);
+// Structural ribs every half metre, at a point of the building's own ground frame.
+float siteRibs(vec2 local) {
+  vec2 cell = abs(fract(local / 0.5) - 0.5);
+  return smoothstep(0.42, 0.46, max(cell.x, cell.y));
+}
+// The flat deck that closes a cut; work runs from 0 (cold) to 1 (ribs glowing).
+vec3 siteDeck(vec2 local, float work) {
+  float rib = siteRibs(local);
+  return mix(SITE_STEEL * 0.75, SITE_RIB, rib) + work * mix(vec3(0.035, 0.014, 0.004), SITE_HOT_RIB, rib);
+}
+`;
+
 const sharedFragment = /* glsl */ `
 uniform float uSiteCut;
 uniform float uSiteBand;
 uniform float uSiteWork;
 uniform vec4 uSiteFrame;
 varying vec3 vSitePosition;
-const vec3 SITE_STEEL = vec3(0.045, 0.038, 0.031);
-const vec3 SITE_RIB = vec3(0.15, 0.1, 0.052);
-const vec3 SITE_HOT_RIB = vec3(0.44, 0.17, 0.04);
-// Structural ribs every half metre, along the building's own ground axes.
-float siteRibs(vec2 world) {
+${structureGlsl}
+vec2 siteLocal(vec2 world) {
   vec2 offset = world - uSiteFrame.xy;
-  vec2 local = vec2(uSiteFrame.z * offset.x - uSiteFrame.w * offset.y, uSiteFrame.w * offset.x + uSiteFrame.z * offset.y);
-  vec2 cell = abs(fract(local / 0.5) - 0.5);
-  return smoothstep(0.42, 0.46, max(cell.x, cell.y));
+  return vec2(uSiteFrame.z * offset.x - uSiteFrame.w * offset.y, uSiteFrame.w * offset.x + uSiteFrame.z * offset.y);
 }
 `;
 
@@ -50,8 +64,8 @@ float siteBare = siteFresh;
 #ifdef USE_ROUGHNESSMAP
   siteBare = max(siteBare, 1.0 - smoothstep(0.04, 0.12, texelRoughness.r));
 #endif
-float siteDeck = smoothstep(0.8, 0.95, siteUp) * siteRibs(vSitePosition.xz);
-diffuseColor.rgb = mix(diffuseColor.rgb, mix(SITE_STEEL, SITE_RIB, siteDeck), siteBare * 0.94);
+float siteFloor = smoothstep(0.8, 0.95, siteUp) * siteRibs(siteLocal(vSitePosition.xz));
+diffuseColor.rgb = mix(diffuseColor.rgb, mix(SITE_STEEL, SITE_RIB, siteFloor), siteBare * 0.94);
 metalnessFactor *= 1.0 - siteBare;
 `;
 
@@ -59,19 +73,19 @@ metalnessFactor *= 1.0 - siteBare;
 // instead of lighting up as one flat plate.
 const hotSeam = /* glsl */ `
 float siteSeam = (1.0 - smoothstep(0.45, 0.85, abs(siteUp))) * (1.0 - smoothstep(0.0, 0.08, siteDepth));
-totalEmissiveRadiance += uSiteWork * (siteSeam * vec3(2.6, 1.05, 0.26) + siteFresh * siteDeck * SITE_HOT_RIB);
+totalEmissiveRadiance += uSiteWork * (siteSeam * SITE_HOT_SEAM + siteFresh * siteFloor * SITE_HOT_RIB);
 `;
 
 // A back face seen through the opening is drawn as the point where the view ray crosses the
-// cut plane, which turns the hollow shell into a flat capped section without a stencil pass.
+// cut plane, which caps a closed shell without a stencil pass. Only parts the deck does not
+// cover show it.
 const cap = /* glsl */ `
 if (!gl_FrontFacing) {
   vec3 siteRay = isOrthographic
     ? vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2])
     : normalize(cameraPosition - vSitePosition);
   vec3 siteCap = vSitePosition + siteRay * ((uSiteCut - vSitePosition.y) / siteRay.y);
-  float siteRib = siteRibs(siteCap.xz);
-  gl_FragColor = vec4(mix(SITE_STEEL * 0.75, SITE_RIB, siteRib) + uSiteWork * mix(vec3(0.035, 0.014, 0.004), SITE_HOT_RIB, siteRib), 1.0);
+  gl_FragColor = vec4(siteDeck(siteLocal(siteCap.xz), uSiteWork), 1.0);
 }
 `;
 

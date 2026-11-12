@@ -1,8 +1,9 @@
-"""Procedural construction scaffold kit: fixed-size pieces the game arranges around any building site.
+"""Procedural construction scaffold kit: the pieces the game arranges around any building site.
 
 One GLB holds every piece as its own named mesh, all sharing one baked atlas. Each piece sits
 at its own pivot so the game can place it with a bay frame: +X along the bay, +Z up, -Y facing
-out of the site (glTF: +X along, +Y up, +Z out). `ScaffoldKit` carries the bay and lift sizes.
+out of the site (glTF: +X along, +Y up, +Z out). `ScaffoldKit` carries the nominal bay and lift
+sizes; the game fits members to a site by scaling them along their length only, never across.
 """
 import argparse
 import hashlib
@@ -58,10 +59,13 @@ ochre = painted(materials.structure, 'Scaffold ochre paint', (1.75, 1.7, 1.55))
 # keeps a third of the graphite tile, enough for seams without bright worn edges.
 plate = painted(materials.machinery, 'Dusty road plate', (.15, .108, .072), 'MIX', .68)
 
-# A bay is the fixed spacing between posts, a lift the fixed spacing between rail levels.
-BAY, LIFT = 2.0, 1.5
+# A bay is the nominal spacing between posts, a lift the nominal spacing between rail levels.
+BAY, LIFT = 1.6, 1.8
 POST_RADIUS, RAIL_RADIUS, BRACE_RADIUS = .075, .055, .042
 PAD_TOP = .06
+# Half the height of the node collar on a post top, and the top of a foot's screw jack: a
+# lamp stands on either.
+COLLAR, JACK_TOP = .085, PAD_TOP+.19
 # Pieces are authored this far apart so the contact-shading bake of one never darkens another.
 SPACING = 4.0
 
@@ -121,7 +125,7 @@ def stripes(name, x0, x1, count, profile, mat, lean=.11):
 piece('ScaffoldPost')
 tube('Post / ochre standard', (0, 0, 0), (0, 0, LIFT), POST_RADIUS, ochre, turn=math.pi/6, caps=False)
 # The node collar sits where the rails meet the post and hides the joint to the post above.
-tube('Post / graphite node collar', (0, 0, LIFT-.085), (0, 0, LIFT+.085), POST_RADIUS+.038, graphite)
+tube('Post / graphite node collar', (0, 0, LIFT-COLLAR), (0, 0, LIFT+COLLAR), POST_RADIUS+.038, graphite)
 
 piece('ScaffoldRail')
 # Both ends disappear inside the node collars, so the ledger is one open tube.
@@ -135,29 +139,32 @@ for x, z in ((.13, .10), (BAY-.13, LIFT-.10)):
 
 piece('ScaffoldFoot')
 block('Foot / base plate', (0, 0, PAD_TOP+.02), (.36, .36, .04), graphite)
-tube('Foot / screw jack', (0, 0, PAD_TOP+.03), (0, 0, PAD_TOP+.19), POST_RADIUS+.03, graphite)
+tube('Foot / screw jack', (0, 0, PAD_TOP+.03), (0, 0, JACK_TOP), POST_RADIUS+.03, graphite)
 
 piece('ScaffoldPad')
-# One steel road plate per bay square; the gap around it reads as the joint between plates.
-block('Pad / steel road plate', (BAY/2, BAY/2, PAD_TOP/2), (BAY-.03, BAY-.03, PAD_TOP), plate)
+# One steel road plate per square of the pad's grid, from the pivot along +X and inward. The
+# game leaves the joint between plates when it lays them.
+block('Pad / steel road plate', (BAY/2, -BAY/2, PAD_TOP/2), (BAY, BAY, PAD_TOP), plate)
+
+piece('ScaffoldPadCut')
+# The same plate cut on the diagonal, with its right angle at the pivot. Any triangle is a
+# sheared copy of it, so a few of them make up a plate trimmed to a slanted side of a pad.
+corners = [(0, 0), (0, -BAY), (BAY, 0)]
+kit.solid('Pad / cut road plate', [at((x, y, 0)) for x, y in corners],
+          [at((x, y, PAD_TOP)) for x, y in corners], plate, 0)
 
 piece('ScaffoldCurb')
 curb = [(-.11, PAD_TOP), (-.11, PAD_TOP+.20), (.11, PAD_TOP+.20), (.11, PAD_TOP)]
 block('Curb / ochre kerb beam', (BAY/2, 0, PAD_TOP+.10), (BAY-.44, .22, .20), ochre)
-stripes('Curb / warning stripes', .26, BAY-.26, 5,
+stripes('Curb / warning stripes', .26, BAY-.26, 4,
         [(y*1.03, PAD_TOP+(z-PAD_TOP)*1.03+.001) for y, z in curb], rubber)
 
-piece('ScaffoldDeck')
-for i in range(3):
-    y = .13+i*.17
-    block('Deck / steel plank', (BAY/2, y, RAIL_RADIUS+.02), (BAY-.04, .15, .04), plate)
-block('Deck / ochre toe board', (BAY/2, .04, RAIL_RADIUS+.10), (BAY-.20, .03, .14), ochre)
-
 piece('ScaffoldBeacon')
-tube('Beacon / mast', (0, 0, .07), (0, 0, .30), .035, graphite)
-block('Beacon / lamp housing', (0, 0, .34), (.15, .15, .08), graphite)
-tube('Beacon / cyan lens', (0, 0, .38), (0, 0, .50), .058, cyan, 8)
-block('Beacon / lamp cap', (0, 0, .51), (.14, .14, .025), graphite)
+# The lamp sits straight on a collar or a jack. On a mast its head was the last thing above
+# ground when the scaffold drops, and it looked as if it floated.
+block('Beacon / lamp housing', (0, 0, .04), (.17, .17, .08), graphite)
+tube('Beacon / cyan lens', (0, 0, .08), (0, 0, .20), .062, cyan, 8)
+block('Beacon / lamp cap', (0, 0, .2125), (.15, .15, .025), graphite)
 
 names = list(pieces)
 ranges = {name: kit.parts[start:(pieces[names[i+1]][1] if i+1 < len(names) else None)]
@@ -175,7 +182,7 @@ bpy.ops.wm.save_as_mainfile(filepath=str(args.output/'scaffold-kit.blend'))
 
 root = bpy.data.objects.new('ScaffoldKit', None)
 bpy.context.collection.objects.link(root)
-root['bay'], root['lift'] = BAY, LIFT
+root['bay'], root['lift'], root['post_top'], root['jack_top'] = BAY, LIFT, LIFT+COLLAR, JACK_TOP
 
 if args.draft:
     runtime = kit.parts[0]
