@@ -71,17 +71,20 @@ test("buildings look the same in every presentation state", async ({ page }) => 
   await page.waitForTimeout(1_000);
   await shot(page, "2-command-center-selected");
 
-  // A Scout Drone starts a Turret beside the home base; the capture shows it mid-construction.
-  await clickEntity(page, "scout-drone-1");
+  // A Scout Drone starts a Turret a few metres away; the close capture shows it early in construction.
+  const scout = opening.units.find((unit) => unit.id === "scout-drone-1")!;
+  await zoom(page, 3);
+  await focusOn(page, scout.x, scout.z);
+  await clickEntity(page, scout.id);
   await page.click('[data-action="build"]');
   await page.click('[data-build-kind="turret"]');
-  const candidates = [[-12, 6], [12, 6], [0, 14], [-12, -8], [12, -8]] as const;
+  const candidates = [[-6, 0], [6, 0], [0, 6], [0, -6], [-5, 5], [5, 5], [-5, -5], [5, -5]] as const;
   let placed = false;
   for (const [dx, dz] of candidates) {
-    const point = await screenPoint(page, home.x + dx, home.z + dz, 0);
+    const point = await screenPoint(page, scout.x + dx, scout.z + dz, 0);
     await page.mouse.move(point.x, point.y);
     await page.waitForTimeout(300);
-    await clickWorld(page, home.x + dx, home.z + dz, { y: 0 });
+    await clickWorld(page, scout.x + dx, scout.z + dz, { y: 0 });
     await page.waitForTimeout(500);
     const current = await snapshot(page);
     if (current.buildings.some((building) => building.lifecycle === "constructing")) {
@@ -91,22 +94,35 @@ test("buildings look the same in every presentation state", async ({ page }) => 
   }
   expect(placed).toBe(true);
   const site = (await snapshot(page)).buildings.find((building) => building.lifecycle === "constructing")!;
-  await focusOn(page, site.x, site.z);
   await waitForSnapshot(page, (snap) => snap.units.some((unit) =>
-    unit.id === "scout-drone-1" && unit.order === "build" && !unit.moving), 60_000);
-  await page.waitForTimeout(4_000);
+    unit.id === scout.id && unit.order === "build" && !unit.moving), 60_000);
+  await focusOn(page, site.x, site.z);
   await shot(page, "3-turret-under-construction");
+  await zoom(page, -3);
 
   await focusOn(page, enemy.x, enemy.z);
   await shot(page, "4-enemy-base");
+  await clickEntity(page, "enemy-turret-left");
+  await page.waitForTimeout(1_000);
+  await shot(page, "4b-enemy-turret-selected");
   await clickEntity(page, "enemy-command-center");
   await page.waitForTimeout(1_000);
   await shot(page, "5-enemy-command-center-selected");
 
   await zoom(page, 6);
   await focusOn(page, home.x, home.z);
+  await clickEntity(page, home.id);
+  await page.mouse.move(5, 400);
   await shot(page, "6-command-center-close");
   await focusOn(page, enemy.x, enemy.z);
   await shot(page, "7-enemy-base-close");
-  await waitForSnapshot(page, (snap) => snap.outcome === undefined);
+
+  // A restart frees the first match's shared models and loads them again for the next one.
+  await page.keyboard.press("KeyR");
+  await page.waitForTimeout(2_000);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => window.__dune77!.ready());
+  await zoom(page, -6);
+  await focusOn(page, enemy.x, enemy.z);
+  await shot(page, "8-enemy-base-after-restart");
 });
