@@ -43,6 +43,7 @@ declare global {
         y: number;
         behind: boolean;
       };
+      minimap: (x: number, z: number) => { x: number; y: number } | undefined;
     };
   }
 }
@@ -80,6 +81,13 @@ export async function waitForSnapshot(
  * y is height above the terrain surface at (x, z), default terrain level. */
 export const screenPoint = (page: Page, x: number, z: number, y = 0) =>
   page.evaluate(([wx, wz, wy]) => window.__dune77!.project(wx, wz, wy), [x, z, y]);
+
+/** Projects world coordinates to page pixels on the minimap, using the map's real size. */
+export async function minimapPoint(page: Page, x: number, z: number) {
+  const point = await page.evaluate(([wx, wz]) => window.__dune77!.minimap(wx, wz), [x, z]);
+  if (!point) throw new Error("minimapPoint: no map is loaded");
+  return point;
+}
 
 export async function clickWorld(
   page: Page,

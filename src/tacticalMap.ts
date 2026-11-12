@@ -14,6 +14,9 @@ export const mapToWorld = (x: number, y: number, size: number) => ({
   z: (y - x) * size,
 });
 
+// Canvas pixels between the canvas edge and the drawn map.
+const MAP_INSET = 18;
+
 export class TacticalMap {
   private readonly context: CanvasRenderingContext2D;
   private readonly terrain = document.createElement("canvas");
@@ -99,7 +102,7 @@ export class TacticalMap {
     this.clock.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
     this.count.textContent = String(state.entities.filter((entity) => entity.friendly && !entity.building).length);
     const size = this.canvas.width;
-    const inset = 18;
+    const inset = MAP_INSET;
     const extent = size - inset * 2;
     const project = (x: number, z: number) => {
       const p = worldToMap(x, z, map.size);
@@ -164,11 +167,23 @@ export class TacticalMap {
   private pointerPoint(event: PointerEvent) {
     if (!this.map) return;
     const bounds = this.canvas.getBoundingClientRect();
-    const inset = 18 / this.canvas.width;
+    const inset = MAP_INSET / this.canvas.width;
     const x = ((event.clientX - bounds.left) / bounds.width - inset) / (1 - inset * 2);
     const y = ((event.clientY - bounds.top) / bounds.height - inset) / (1 - inset * 2);
     const point = mapToWorld(x, y, this.map.size);
     if (Math.max(Math.abs(point.x), Math.abs(point.z)) > this.map.size / 2) return;
     return point;
+  }
+
+  /** Page coordinates where a pointer lands on the world point (x, z); the inverse of a click. */
+  clientPoint(x: number, z: number) {
+    if (!this.map) return;
+    const bounds = this.canvas.getBoundingClientRect();
+    const inset = MAP_INSET / this.canvas.width;
+    const point = worldToMap(x, z, this.map.size);
+    return {
+      x: bounds.left + (inset + point.x * (1 - inset * 2)) * bounds.width,
+      y: bounds.top + (inset + point.y * (1 - inset * 2)) * bounds.height,
+    };
   }
 }

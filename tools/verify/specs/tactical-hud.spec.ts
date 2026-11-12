@@ -1,7 +1,6 @@
-import { mapSizeForPlayerCount } from "../../../src/mapConstants";
 import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
-import { clickEntity, openGame, screenPoint, snapshot, waitForSnapshot } from '../helpers';
+import { clickEntity, minimapPoint, openGame, screenPoint, snapshot, waitForSnapshot } from '../helpers';
 
 const evidence = 'art/workbench/verify/hud';
 
@@ -55,13 +54,8 @@ test('right-clicking the minimap moves the selected unit to that world location'
   await clickEntity(page, 'ghostrunner-1');
   const unit = (await snapshot(page)).units.find((unit) => unit.id === 'ghostrunner-1')!;
   const target = { x: unit.x - 10, z: unit.z + 10 };
-  const size = mapSizeForPlayerCount(6);
-  const box = (await page.locator('#minimap').boundingBox())!;
-  const inset = 18 / 512;
-  await page.locator('#minimap').click({ button: 'right', position: {
-    x: box.width * (inset + (1 - 2 * inset) * (.5 + (target.x - target.z) / (2 * size))),
-    y: box.height * (inset + (1 - 2 * inset) * (.5 + (target.x + target.z) / (2 * size))),
-  } });
+  const point = await minimapPoint(page, target.x, target.z);
+  await page.mouse.click(point.x, point.y, { button: 'right' });
   await waitForSnapshot(page, (state) => {
     const moved = state.units.find((unit) => unit.id === 'ghostrunner-1')!;
     return !moved.moving && Math.hypot(moved.x - target.x, moved.z - target.z) < 1;
@@ -73,13 +67,8 @@ test('enemy selection shows inspection without command buttons or targeting hotk
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGame(page);
   const enemy = (await snapshot(page)).units.find((unit) => unit.ownerId !== 'local-player')!;
-  const size = mapSizeForPlayerCount(6);
-  const box = (await page.locator('#minimap').boundingBox())!;
-  const inset = 18 / 512;
-  await page.locator('#minimap').click({ position: {
-    x: box.width * (inset + (1 - 2 * inset) * (.5 + (enemy.x - enemy.z) / (2 * size))),
-    y: box.height * (inset + (1 - 2 * inset) * (.5 + (enemy.x + enemy.z) / (2 * size))),
-  } });
+  const point = await minimapPoint(page, enemy.x, enemy.z);
+  await page.mouse.click(point.x, point.y);
   await clickEntity(page, enemy.id);
   await expect(page.locator('#unit-panel')).toBeVisible();
   await expect(page.locator('.action-grid')).toBeHidden();
