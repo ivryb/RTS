@@ -18,6 +18,8 @@ Iterate in the real game until the model is ready: load each candidate in the ga
 
 Fix visual problems in source assets first. Do not hide bad tiling, scale, or texture quality with extra runtime shader work unless the asset itself cannot solve it.
 
+Run 3D model work (models, rigs, animation, and in-world effects) on Claude Fable 5.2 (`claude-fable-5-2`) at high reasoning effort: launch its threads and subagents with that model.
+
 ### Visual testing
 Blender, the dev server, previews, and Playwright run on Boat through `box`. A dev server lives only as long as its `box` command, so start it and the capture in one command, then pull the images back:
 
