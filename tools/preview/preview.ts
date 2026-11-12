@@ -166,12 +166,14 @@ if (previewScene === "units" && requestedEffect === "behemoth-barrage") {
 }
 
 // Scout Drones parked around one Titanium Deposit, drawn by the production UnitSystem from a
-// scripted frame. ?drones=N sets the crowd, ?mining=0 leaves them idle as the cost baseline.
+// scripted frame. ?drones=N sets the crowd, ?mining=0 leaves them idle as the cost baseline, and
+// ?deposit=N picks the Nth nearest deposit, which steps through the rock models.
 let miningSystem: UnitSystem | undefined;
 if (previewScene === "mining") {
   const deposit = [...map.titaniumDeposits].sort((a, b) =>
     Math.hypot(a.position.x / POSITION_SCALE - focus.x, a.position.z / POSITION_SCALE - focus.z)
-    - Math.hypot(b.position.x / POSITION_SCALE - focus.x, b.position.z / POSITION_SCALE - focus.z))[0];
+    - Math.hypot(b.position.x / POSITION_SCALE - focus.x, b.position.z / POSITION_SCALE - focus.z))
+    [Number(params.get("deposit")) || 0];
   if (!deposit) throw new Error("This map has no Titanium Deposit");
   const count = Math.max(1, Number(params.get("drones")) || 3);
   const extracting = params.get("mining") !== "0";
@@ -203,6 +205,8 @@ if (previewScene === "mining") {
   const world = new THREE.Group();
   scene.add(world);
   miningSystem = new UnitSystem(world, map, [], [], session, undefined, createUnitModelFactory());
+  // Its warm-up draws the scene, which needs the shadow map this page otherwise renders only on request.
+  renderer.shadowMap.needsUpdate = true;
   await miningSystem.prepareRendering(renderer, scene, new THREE.OrthographicCamera());
   effectFocus = { x: deposit.position.x / POSITION_SCALE, z: deposit.position.z / POSITION_SCALE };
   for (let elapsed = 0; elapsed < 1; elapsed += 1 / 60) miningSystem.update(1 / 60);
