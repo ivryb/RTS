@@ -1,11 +1,15 @@
 import { generateMapLayout, type MapLayout, type PlayerCount, type Point as MapPoint } from "./mapGenerators";
+import { createTitaniumDeposits } from "./mapGenerators/titaniumDeposits";
 import { createTerrainEnvironment } from "./mapGenerators/environment";
+import type { TitaniumDepositState } from "./sim/harvesting";
+import { POSITION_SCALE } from "./sim/simulationConstants";
 import { TERRAIN_HILL_THRESHOLD } from "./mapConstants";
 import type { TerrainSurface } from "./terrainWalkability";
 import {
   CellFlag,
   createPlacementGrid,
   intersects,
+  markDisc,
   type PlacementGrid,
 } from "./placement";
 
@@ -28,6 +32,7 @@ export interface GeneratedMap extends TerrainSurface {
   mountainMask: Float32Array;
   layout: MapLayout;
   environment: ReturnType<typeof createTerrainEnvironment>;
+  titaniumDeposits: readonly TitaniumDepositState[];
 }
 
 /** Match the rendering diagonal so navigation and sampled unit heights share the same surface. */
@@ -90,6 +95,15 @@ export const generateMap = (seed: number, playerCount: PlayerCount = 2): Generat
       }
     }
   }
+  const { deposits } = createTitaniumDeposits(layout, environment.features.trees);
+  const titaniumDeposits = deposits.map(({ id, x, z, radius, amount }) => ({
+    id,
+    position: { x: Math.round(x * POSITION_SCALE), z: Math.round(z * POSITION_SCALE) },
+    radius: Math.round(radius * POSITION_SCALE),
+    amount,
+    initialAmount: amount,
+  }));
+  for (const deposit of deposits) markDisc(placement, deposit.x, deposit.z, deposit.radius, CellFlag.Reserved);
   return {
     seed,
     startingLocations,
@@ -97,6 +111,7 @@ export const generateMap = (seed: number, playerCount: PlayerCount = 2): Generat
     palms: [],
     placement,
     mountainMask: Float32Array.from(layout.blocked),
+    titaniumDeposits,
     layout,
     environment,
   };

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import * as THREE from "three";
-import type { GeneratedMap } from "../src/map";
+import { sampleHeight, type GeneratedMap } from "../src/map";
 import type { MatchFrame, MatchSession } from "../src/matchSession";
 import {
   POSITION_SCALE,
@@ -10,7 +10,8 @@ import {
   type PlayerCommand,
   type UnitState,
 } from "../src/sim/units";
-import { UnitSystem, type UnitPresentationOptions, type UnitSpawn } from "../src/unitSystem";
+import { UnitSystem, createHealthBar, updateHealthBar, type UnitPresentationOptions, type UnitSpawn } from "../src/unitSystem";
+import { ScoutHarvestPresentation } from "../src/orePresentation";
 
 const map = {
   size: 100,
@@ -128,7 +129,174 @@ const spawn = (state: UnitState): UnitSpawn => ({
   attackRange: state.attackRange && state.attackRange / POSITION_SCALE,
 });
 
+test("gather orders affect only owned selected Scouts and reject exhausted ore", () => {
+  const scout = { ...unit("scout-drone"), order: "idle" as const, attacking: false };
+  const enemy = { ...scout, id: "enemy-scout", ownerId: "enemy-player" };
+  const soldier = unit("ghostrunner");
+  const deposit = { id: "ore-1", position: toSimPoint(5, 0), radius: 3000, amount: 200, initialAmount: 200 };
+  const initial = { ...frame(1, [scout, enemy, soldier], []), titaniumDeposits: [deposit] };
+  const session = new TestSession(initial);
+  const system = new UnitSystem(new THREE.Group(), map, [], [], session);
+  system.attachScoutDrone(scout.id, new THREE.Group(), new THREE.Group(), options);
+  system.attachScoutDrone(enemy.id, new THREE.Group(), new THREE.Group(), options);
+  system.attachGhostrunner(soldier.id, new THREE.Group(), [], options);
+  system.select([scout.id, enemy.id, soldier.id]);
+  expect(system.gatherSelected(deposit.id)).toBe(true);
+  expect(session.commands).toEqual([{ type: "gather", unitIds: [scout.id], depositId: deposit.id }]);
+  session.frames.push({ ...frame(2, [scout, enemy, soldier], []), titaniumDeposits: [{ ...deposit, amount: 0 }] });
+  system.update(0);
+  expect(system.gatherSelected(deposit.id)).toBe(false);
+  expect(session.commands).toHaveLength(1);
+  session.frames.push({ ...frame(3, [{ ...scout, cargoTitanium: 6 }, enemy, soldier], []), titaniumDeposits: [{ ...deposit, amount: 0 }] });
+  system.update(0);
+  expect(system.gatherSelected(deposit.id)).toBe(true);
+  expect(session.commands).toHaveLength(2);
+  system.dispose();
+});
+
+test("mechanical cutter reaches the mineral contact and retracts for hauling", () => {
+  const root = new THREE.Group();
+  const world = new THREE.Group();
+  const mining = new ScoutHarvestPresentation(root, world);
+  const contact = new THREE.Vector3(2.2, 0.8, 0);
+  mining.update(2, true, 0, 0, 0, contact, 0.1);
+  expect(mining.tool.visible).toBe(true);
+  expect(mining.cargo.visible).toBe(true);
+  expect(mining.tool.children.some(child => child.position.distanceTo(contact) < 0.001)).toBe(true);
+  mining.update(20, false, 0, 0, 0, undefined, 0.1);
+  expect(mining.tool.visible).toBe(false);
+  expect(mining.cargo.visible).toBe(true);
+  mining.update(0, false, 0, 0, 0, undefined, 0.1);
+  expect(mining.cargo.visible).toBe(false);
+  mining.dispose();
+});
+
+test("authoritative mining and hauling show different physical work states and delivered stock", () => {
+  const scout = unit("scout-drone");
+  scout.attacking = false;
+  scout.order = "gather";
+  scout.cargoTitanium = 2;
+  scout.harvest = { depositId: "ore-1", phase: "extracting", workPosition: toSimPoint(0, 0) };
+  const deposit = { id: "ore-1", position: toSimPoint(5, 0), radius: 3000, amount: 198, initialAmount: 200 };
+  const initial = { ...frame(1, scout, []), titaniumDeposits: [deposit], playerTitanium: { "local-player": 0 } };
+  const session = new TestSession(initial);
+  const world = new THREE.Group();
+  const system = new UnitSystem(world, map, [], [], session);
+  const root = new THREE.Group();
+  system.attachScoutDrone(scout.id, root, new THREE.Group(), options);
+  system.select([scout.id]);
+  system.update(0.1);
+  expect(system.selectedUnits()[0]?.harvest?.phase).toBe("extracting");
+  expect(world.getObjectByName("Construction beam")?.visible).toBe(false);
+  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(true);
+  expect(system.selectedGroups()[0]?.cargoTitanium).toBe(2);
+  scout.cargoTitanium = 20;
+  scout.moving = true;
+  scout.harvest = { depositId: deposit.id, phase: "to-dropoff", dropoffId: "home", workPosition: toSimPoint(-8, 0) };
+  session.frames.push({ ...frame(2, scout, []), titaniumDeposits: [deposit] });
+  system.update(0.1);
+  expect(world.getObjectByName("Scout mineral cutter")?.visible).toBe(false);
+  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(true);
+  expect(system.selectedUnits()[0]?.harvest?.phase).toBe("to-dropoff");
+  scout.cargoTitanium = 0;
+  scout.harvest = { depositId: deposit.id, phase: "to-deposit", workPosition: toSimPoint(0, 0) };
+  session.frames.push({ ...frame(3, scout, []), playerTitanium: { "local-player": 20 } });
+  system.update(0.1);
+  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(false);
+  expect(system.titanium).toBe(20);
+  system.dispose();
+});
+
 describe("unit presentation timing", () => {
+  test("damaged health fills stay aligned with their backing at every unit rotation", () => {
+    const parent = new THREE.Group();
+    const bar = createHealthBar(3, 2.4);
+    parent.add(bar.root);
+    for (const health of [100, 65, 10, 1, 0]) {
+      updateHealthBar(bar, health, 100, true);
+      for (const rotation of [0, Math.PI / 4, Math.PI / 2, Math.PI]) {
+        parent.rotation.set(.2, rotation, -.15);
+        parent.updateMatrixWorld(true);
+        expect(bar.fill.getWorldPosition(new THREE.Vector3()).distanceTo(
+          bar.root.getWorldPosition(new THREE.Vector3()),
+        )).toBeLessThan(.00001);
+        if (health > 0) expect(-bar.fill.center.x * bar.fill.scale.x).toBeCloseTo(-.5);
+      }
+    }
+  });
+
+  test("ground attack feedback survives worker delay and stays at the ground coordinate", () => {
+    const artillery = unit("behemoth");
+    artillery.order = "idle";
+    artillery.attacking = false;
+    const enemy = unit("ghostrunner");
+    enemy.ownerId = "enemy-player";
+    const session = new TestSession(frame(1, [artillery, enemy], []));
+    session.submissionStatus = "queued";
+    const world = new THREE.Group();
+    const system = new UnitSystem(world, map, [spawn(artillery)], [], session);
+    const root = new THREE.Group();
+    const visual = new THREE.Group();
+    for (const name of ["TrackBeltXNegative", "TrackBeltXPositive"]) {
+      const belt = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({ map: new THREE.Texture() }),
+      );
+      belt.name = name;
+      visual.add(belt);
+    }
+    root.add(visual);
+    world.add(root);
+    system.attachBehemoth(artillery.id, root, visual, options);
+    system.select([artillery.id]);
+    expect(system.attackGroundSelected(12, 7)).toBe(true);
+    system.update(.15);
+    const marker = world.getObjectByName("Ground attack target")!;
+    expect(marker.visible).toBe(true);
+    expect(world.getObjectByName("Attack feedback")?.visible).toBe(false);
+    artillery.order = "attack-ground";
+    artillery.attackTargetId = undefined;
+    artillery.attackGroundTarget = toSimPoint(12, 7);
+    artillery.attacking = true;
+    session.frames.push(frame(2, [artillery, enemy], []));
+    system.update(.1);
+    enemy.position = toSimPoint(30, 30);
+    session.frames.push(frame(3, [artillery, enemy], []));
+    system.update(2);
+    expect(marker.visible).toBe(true);
+    expect(marker.position.x).toBe(12);
+    expect(marker.position.z).toBe(7);
+    expect(system.selectedUnits()[0]?.attackTargetId).toBeUndefined();
+    system.select();
+    system.update(0);
+    expect(marker.visible).toBe(false);
+    system.select([artillery.id]);
+    system.update(0);
+    expect(marker.visible).toBe(true);
+    artillery.order = "idle";
+    artillery.attackGroundTarget = undefined;
+    session.frames.push(frame(4, [artillery, enemy], []));
+    system.update(0);
+    expect(marker.visible).toBe(false);
+  });
+
+  test("enemy units are inspectable but cannot receive local orders", () => {
+    const enemy = unit("ghostrunner");
+    enemy.ownerId = "enemy-player";
+    const session = new TestSession(frame(1, enemy, []));
+    const system = new UnitSystem(new THREE.Group(), map, [spawn(enemy)], [], session);
+    const root = new THREE.Group();
+    system.attachGhostrunner(enemy.id, root, [new THREE.AnimationClip("Idle", 1, [])], options);
+    system.select([enemy.id]);
+    expect(system.selectedUnits()).toHaveLength(1);
+    expect(system.selectedCommandableUnits()).toHaveLength(0);
+    expect(system.moveSelected(5, 5)).toBe(false);
+    expect(system.stopSelected()).toBe(false);
+    expect(system.attackSelected("building-1")).toBe(false);
+    expect(system.attackGroundSelected(5, 5)).toBe(false);
+    expect(session.commands).toHaveLength(0);
+  });
+
   test("creates a trained unit model from a later authoritative frame", async () => {
     const session = new TestSession(frame(1, [], []));
     const world = new THREE.Group();
@@ -1033,6 +1201,8 @@ describe("unit presentation timing", () => {
     ];
     system.attachGhostrunner(ghostrunner.id, root, clips, options);
 
+    system.select([ghostrunner.id]);
+    expect(root.getObjectByName("Selection ring")?.visible).toBe(true);
     const dead = structuredClone(ghostrunner);
     dead.health = 0;
     dead.order = "idle";
@@ -1052,6 +1222,8 @@ describe("unit presentation timing", () => {
       }>;
     }).presentations.get(ghostrunner.id)!;
     expect(root.visible).toBe(true);
+    expect(root.getObjectByName("Selection ring")?.visible).toBe(false);
+    expect(system.select([ghostrunner.id])).toBe(0);
     expect(presentation.state).toBe("death");
     expect(presentation.actions.death.isRunning()).toBe(true);
     expect(presentation.actions.death.getEffectiveTimeScale()).toBe(1.3);
@@ -1188,6 +1360,57 @@ describe("unit presentation timing", () => {
     expect(world.getObjectByName("Hornet projectile")).toBeDefined();
   });
 
+  test("reuses flash lights without shading inactive lights or dropping shot animations", () => {
+    const hornets = Array.from({ length: 12 }, (_, index) => ({
+      ...unit("hornet"), id: `hornet-${index}`, facing: Math.PI / 2,
+    }));
+    const building = activeBuilding("building-1", "command-center", {
+      position: hornets[0]!.target,
+    });
+    const session = new TestSession(frame(1, hornets, building));
+    const world = new THREE.Group();
+    const system = new UnitSystem(world, map, hornets.map(spawn), [], session);
+    for (const hornet of hornets) {
+      const root = new THREE.Group();
+      const visual = new THREE.Group();
+      root.add(visual);
+      world.add(root);
+      system.attachHornet(hornet.id, root, visual, options);
+    }
+    const visibleLights = () => {
+      const lights: THREE.PointLight[] = [];
+      world.traverseVisible((object) => {
+        if (object instanceof THREE.PointLight) lights.push(object);
+      });
+      return lights;
+    };
+    const lights = world.children.filter((object) => object instanceof THREE.PointLight);
+    const idleVisible = visibleLights();
+    expect(lights.filter((light) => light.name === "Muzzle flash light")
+      .every((light) => !light.visible)).toBe(true);
+    const fire = (version: number) => {
+      session.frames.push(frame(version, hornets, building, hornets.map((hornet) => ({
+        type: "weapon-fired", tick: version - 1, attackerId: hornet.id,
+        attack: "direct", targetId: building.id, target: building.position,
+        impactTick: version + 4,
+      }))));
+      system.update(0.01);
+    };
+    fire(2);
+    expect(visibleLights()).toHaveLength(idleVisible.length + 8);
+    expect(lights.filter((light) => light.intensity > 0)).toHaveLength(8);
+    expect(world.children.filter((child) => child instanceof THREE.Sprite)).toHaveLength(12);
+    expect(world.children.filter((child) => child.name === "Hornet projectile")).toHaveLength(12);
+    system.update(0.2);
+    expect(visibleLights()).toEqual(idleVisible);
+    expect(lights.every((light) => light.intensity === 0)).toBe(true);
+    fire(3);
+    expect(visibleLights()).toHaveLength(idleVisible.length + 8);
+    expect(lights.filter((light) => light.intensity > 0)).toHaveLength(8);
+    system.dispose();
+    expect(visibleLights()).toHaveLength(0);
+  });
+
   test("drops a queued Hornet shot when the simulation stops the attack", () => {
     const hornet = unit("hornet");
     const building = activeBuilding("building-1", "turret", {
@@ -1249,7 +1472,7 @@ describe("unit presentation timing", () => {
       heights: new Float32Array([0, 0, 20, 20]),
     } as GeneratedMap;
     const system = new UnitSystem(world, slopedMap, [spawn(behemoth)], [], session);
-    expect(world.children.filter((object) => object instanceof THREE.PointLight)).toHaveLength(1);
+    expect(world.children.filter((object) => object.name === "Behemoth barrage light")).toHaveLength(1);
     const root = new THREE.Group();
     const visual = new THREE.Group();
     for (const name of ["TrackBeltXNegative", "TrackBeltXPositive"]) {
@@ -1283,7 +1506,7 @@ describe("unit presentation timing", () => {
       if (object.name === "Behemoth rocket") rockets.push(object);
     });
     expect(rockets).toHaveLength(7);
-    expect(world.children.filter((object) => object instanceof THREE.PointLight)).toHaveLength(1);
+    expect(world.children.filter((object) => object.name === "Behemoth barrage light")).toHaveLength(1);
 
     system.update(1);
     const scorchMarks = world.getObjectByName("Behemoth scorch marks");
@@ -1307,4 +1530,34 @@ describe("unit presentation timing", () => {
     system.update(20);
     expect(scorchMarks?.visible).toBe(true);
   });
+});
+
+
+test("construction preview stays planar over ridges for both building sizes and the blocked cross", () => {
+  const scout = unit("scout-drone");
+  const session = new TestSession(frame(1, scout, []));
+  const world = new THREE.Group();
+  const terrain = { ...map, size: 20, segments: 20, heights: Float32Array.from({ length: 441 }, (_, i) => {
+    const x = i % 21 - 10;
+    const z = Math.floor(i / 21) - 10;
+    return Math.max(0, 3 - Math.abs(x + z) * .8);
+  }) };
+  const system = new UnitSystem(world, terrain, [], [], session);
+  for (const kind of ["turret", "command-center", "turret"] as const) {
+    system.previewConstruction(kind, 0, 0);
+    const preview = world.getObjectByName("Construction placement")!;
+    preview.updateMatrixWorld(true);
+    let checked = 0;
+    preview.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const positions = object.geometry.getAttribute("position");
+      expect(object.material.depthTest).toBe(false);
+      for (let i = 0; i < positions.count; i++) {
+        const point = object.localToWorld(new THREE.Vector3().fromBufferAttribute(positions, i));
+        expect(point.y).toBeCloseTo(sampleHeight(terrain, 0, 0) + .1, 5);
+        checked++;
+      }
+    });
+    expect(checked).toBeGreaterThan(100);
+  }
 });

@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { BUILDING_CATALOG } from "./buildingCatalog";
+import { healthMeter, hudIcon } from "./hudIcons";
 import {
   UNIT_ACTIONS,
   type ActionTargetMode,
@@ -6,7 +8,7 @@ import {
 } from "./unitActions";
 import type { UnitSystem } from "./unitSystem";
 import { POSITION_SCALE, type BuildingKind } from "./sim/units";
-import { MAX_PRODUCTION_QUEUE, TRAINING_SECONDS } from "./sim/production";
+import { TRAINING_SECONDS } from "./sim/production";
 import { UNIT_CATALOG, type UnitKind } from "./unitCatalog";
 
 type TargetMode = ActionTargetMode | "attack-any" | "rally";
@@ -33,11 +35,35 @@ export const formatAttackDamage = (damage: number) => `Attack ${damage}`;
 
 export const selectableEntityId = (picked?: THREE.Object3D) => {
   let object = picked;
-  while (object && !object.userData.buildingId && !object.userData.unitId) {
+  while (object && !object.userData.buildingId && !object.userData.unitId && !object.userData.resourceId) {
     object = object.parent ?? undefined;
   }
-  const candidate: unknown = object?.userData.buildingId ?? object?.userData.unitId;
+  const candidate: unknown = object?.userData.buildingId ?? object?.userData.unitId ?? object?.userData.resourceId;
   return typeof candidate === "string" ? candidate : undefined;
+};
+
+/** Visible geometry wins over generous click helpers belonging to nearby entities. */
+export const pickSurface = (hits: readonly THREE.Intersection[]) => {
+  let fallback: THREE.Intersection | undefined;
+  for (const hit of hits) {
+    let object: THREE.Object3D | null = hit.object;
+    let hidden = false;
+    while (object) {
+      if (!object.visible || object.userData.selectionOverlay) hidden = true;
+      object = object.parent;
+    }
+    if (hidden) continue;
+    if (hit.object.userData.selectionProxy) {
+      fallback ??= hit;
+      continue;
+    }
+    if (!(hit.object instanceof THREE.Mesh)) continue;
+    const material = Array.isArray(hit.object.material)
+      ? hit.object.material[hit.face?.materialIndex ?? 0]
+      : hit.object.material;
+    if (material?.visible && material.opacity > 0) return hit;
+  }
+  return fallback;
 };
 
 export class UnitInput {
@@ -95,7 +121,17 @@ export class UnitInput {
       behemoth: panel.querySelector('[data-train-kind="behemoth"]')!,
     };
     this.rallyButton = panel.querySelector("[data-set-rally]")!;
+    this.rallyButton.prepend(hudIcon("rally"));
+    for (let index = 0; index < 12; index++) {
+      const slot = document.createElement("span");
+      slot.className = "action-slot";
+      slot.setAttribute("aria-hidden", "true");
+      slot.style.gridArea = `${Math.floor(index / 4) + 1} / ${index % 4 + 1}`;
+      this.actionGrid.prepend(slot);
+    }
     for (const [id, action] of Object.entries(UNIT_ACTIONS) as [UnitActionId, typeof UNIT_ACTIONS[UnitActionId]][]) {
+      this.buttons[id].prepend(hudIcon(id));
+      this.buttons[id].title = `${this.buttons[id].querySelector("span")?.textContent} · ${action.hotkey.replace("Key", "")}`;
       this.buttons[id].addEventListener("click", () => {
         if (id === "stop") this.stopSelected();
         else if (id === "build") this.toggleBuildMenu();
@@ -106,12 +142,23 @@ export class UnitInput {
       BuildingKind,
       HTMLButtonElement,
     ][]) {
+      const portrait = document.createElement("img");
+      portrait.src = BUILDING_CATALOG[kind].portrait;
+      portrait.alt = "";
+      portrait.className = "command-portrait";
+      button.prepend(portrait);
       button.addEventListener("click", () => this.setPlacementKind(kind));
     }
     for (const [kind, button] of Object.entries(this.trainButtons) as [
       UnitKind,
       HTMLButtonElement,
     ][]) {
+      const portrait = document.createElement("img");
+      portrait.src = UNIT_CATALOG[kind].portrait;
+      portrait.alt = "";
+      portrait.className = "command-portrait";
+      button.prepend(portrait);
+      button.title = `Train ${UNIT_CATALOG[kind].name} · ${TRAINING_SECONDS[kind]} seconds`;
       const duration = button.querySelector("small");
       if (duration) duration.textContent = `${TRAINING_SECONDS[kind]}s`;
       button.addEventListener("click", () => {
@@ -161,9 +208,11 @@ export class UnitInput {
     }
     const units = system?.selectedUnits() ?? [];
     const groups = system?.selectedGroups() ?? [];
+    const commandable = system?.selectedCommandableUnits() ?? [];
     const buildings = system?.selectedBuildings() ?? [];
-    this.panel.hidden = units.length === 0 && buildings.length === 0;
-    if (!units.length && !buildings.length) return;
+    const deposits = system?.selectedDeposits() ?? [];
+    this.panel.hidden = units.length === 0 && buildings.length === 0 && deposits.length === 0;
+    if (!units.length && !buildings.length && !deposits.length) return;
 
     const signature = JSON.stringify([...groups.map((group) => [
       group.kind,
@@ -174,6 +223,8 @@ export class UnitInput {
       group.attackDamage,
       group.attackMinRange,
       group.attackRange,
+      group.cargoTitanium,
+      group.cargoCapacity,
     ]), ...buildings.map((building) => [
       building.id,
       building.kind,
@@ -185,7 +236,7 @@ export class UnitInput {
       building.maxHealth,
       building.productionQueue,
       building.rallyPoint,
-    ])]);
+    ]), ...deposits.map(deposit => [deposit.id, deposit.amount])]);
     if (signature !== this.rosterSignature) {
       const unitCards = groups.map((group) => {
         const card = document.createElement("article");
@@ -209,7 +260,13 @@ export class UnitInput {
         health.textContent = `Health ${group.health} / ${group.maxHealth}`;
         const speed = document.createElement("span");
         speed.textContent = `Speed ${group.speed.toFixed(2)}`;
-        details.append(name, health, speed);
+        details.append(name, health, healthMeter(group.health, group.maxHealth), speed);
+        if (group.cargoCapacity) {
+          const cargo = document.createElement("span");
+          cargo.className = "cargo-count";
+          cargo.textContent = `Titanium carried ${group.cargoTitanium} / ${group.cargoCapacity}`;
+          details.append(cargo);
+        }
         if (group.attackDamage) {
           const attackDamage = document.createElement("span");
           attackDamage.textContent = formatAttackDamage(group.attackDamage);
@@ -232,8 +289,11 @@ export class UnitInput {
         const card = document.createElement("article");
         card.className = "unit-card building-card";
         const emblem = document.createElement("div");
-        emblem.className = "building-emblem";
-        emblem.textContent = building.kind === "command-center" ? "CC" : "T";
+        emblem.className = "unit-portrait";
+        const image = document.createElement("img");
+        image.src = BUILDING_CATALOG[building.kind].portrait;
+        image.alt = building.name;
+        emblem.append(image);
         const details = document.createElement("div");
         const name = document.createElement("strong");
         name.textContent = building.name;
@@ -241,7 +301,8 @@ export class UnitInput {
         health.textContent = `Health ${building.health} / ${building.maxHealth}`;
         const allegiance = document.createElement("span");
         allegiance.textContent = building.friendly ? "Friendly building" : "Enemy building";
-        details.append(name, health, allegiance);
+        details.append(name, health, healthMeter(building.health, building.maxHealth));
+        if (!building.friendly) details.append(allegiance);
         if (building.lifecycle === "active" && building.weapon) {
           const attackDamage = document.createElement("span");
           attackDamage.textContent = formatAttackDamage(building.weapon.damage);
@@ -260,16 +321,37 @@ export class UnitInput {
         card.append(emblem, details);
         return card;
       });
-      this.roster.replaceChildren(...unitCards, ...buildingCards);
+      const depositCards = deposits.map(deposit => {
+        const card = document.createElement("article");
+        card.className = "unit-card resource-card";
+        const emblem = document.createElement("div");
+        emblem.className = "resource-emblem";
+        emblem.textContent = "Ti";
+        emblem.setAttribute("aria-hidden", "true");
+        const details = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = "Titanium deposit";
+        const amount = document.createElement("span");
+        amount.textContent = `${deposit.amount.toLocaleString()} remaining`;
+        const hint = document.createElement("span");
+        hint.textContent = deposit.amount > 0 ? "Scout Drones carry ore to a Command Center" : "Deposit exhausted";
+        details.append(name, amount, hint);
+        card.append(emblem, details);
+        return card;
+      });
+      this.roster.replaceChildren(...unitCards, ...buildingCards, ...depositCards);
       this.rosterSignature = signature;
     }
 
-    const attacks = new Set(groups.map((group) => group.attack));
+    const attacks = new Set(commandable.map((unit) => UNIT_CATALOG[unit.kind].attack));
     const commandCenter = system?.selectedCommandCenter();
+    if (this.targetMode && (this.targetMode === "rally" ? !commandCenter : !commandable.length)) {
+      this.setTargetMode();
+    }
     this.buttons.attack.hidden = !attacks.has("direct");
     this.buttons["attack-ground"].hidden = !attacks.has("ground");
-    this.buttons.move.hidden = units.length === 0;
-    this.buttons.stop.hidden = units.length === 0;
+    this.buttons.move.hidden = commandable.length === 0;
+    this.buttons.stop.hidden = commandable.length === 0;
     const hasScout = system?.canSelectedBuild() ?? false;
     if (!hasScout && (this.placementKind || this.buildMenuOpen)) this.cancelBuild();
     this.buttons.build.hidden = !hasScout;
@@ -286,24 +368,23 @@ export class UnitInput {
     }
     this.rallyButton.hidden = !commandCenter;
     this.rallyButton.setAttribute("aria-pressed", String(this.targetMode === "rally"));
-    this.productionQueue.hidden = !commandCenter;
+    this.productionQueue.hidden = !commandCenter?.productionQueue?.length;
     if (commandCenter) {
       const queue = commandCenter.productionQueue ?? [];
-      const slots = Array.from({ length: MAX_PRODUCTION_QUEUE }, (_, index) => {
-        const item = queue[index];
-        const slot = document.createElement(item ? "button" : "span");
-        slot.className = `production-slot${item ? " is-filled" : ""}`;
-        if (!item) {
-          slot.textContent = `${index + 1} · Empty`;
-          return slot;
-        }
+      const slots = queue.map((item, index) => {
+        const slot = document.createElement("button");
+        slot.className = "production-slot";
         const progress = Math.round(item.progressTicks / item.totalTicks * 100);
+        slot.style.setProperty("--progress", `${progress}%`);
         const waitingForExit = index === 0 && item.progressTicks === item.totalTicks;
-        slot.textContent = `${index + 1} · ${UNIT_CATALOG[item.kind].name} · ${progress}%${
-          waitingForExit ? " · Waiting for exit" : ""
-        }`;
+        const image = document.createElement("img");
+        image.src = UNIT_CATALOG[item.kind].portrait;
+        image.alt = "";
+        const label = document.createElement("span");
+        label.textContent = waitingForExit ? "Exit" : index === 0 ? `${progress}%` : String(index + 1);
+        slot.append(image, label);
         slot.setAttribute("aria-label", `Cancel ${UNIT_CATALOG[item.kind].name}`);
-        slot.setAttribute("title", `Cancel ${UNIT_CATALOG[item.kind].name}`);
+        slot.title = `${UNIT_CATALOG[item.kind].name} · ${waitingForExit ? "Waiting for exit" : `${progress}%`} · Click to cancel`;
         slot.addEventListener("click", () => {
           system?.cancelTrainingSelected(item.id);
           this.update();
@@ -314,10 +395,19 @@ export class UnitInput {
     } else {
       this.productionQueue.replaceChildren();
     }
-    this.actionGrid.hidden = units.length === 0 && !commandCenter;
+    this.actionGrid.hidden = !commandable.length && !commandCenter;
     const attacking = units.filter((unit) => unit.attacking).length;
     const moving = units.filter((unit) => unit.moving).length;
     const constructing = units.filter((unit) => unit.order === "build" && !unit.moving).length;
+    const harvestActivities: [number, string][] = [
+      [units.filter(unit => unit.harvest?.phase === "extracting").length, "mining"],
+      [units.filter(unit => unit.harvest?.phase === "to-dropoff").length, "returning titanium"],
+      [units.filter(unit => unit.harvest?.phase === "to-deposit").length, "approaching ore"],
+      [units.filter(unit => unit.harvest?.phase === "waiting-dropoff").length, "awaiting a reachable Command Center"],
+      [units.filter(unit => unit.harvest?.phase === "waiting-deposit").length, "waiting for access to ore"],
+    ];
+    const harvestStatus = harvestActivities.filter(([count]) => count > 0)
+      .map(([count, activity]) => `${count} ${activity}`).join(" · ");
     this.status.textContent = this.buildPending
       ? "Submitting construction order"
       : this.placementKind
@@ -328,21 +418,24 @@ export class UnitInput {
         : this.targetMode === "rally"
           ? "Choose a terrain rally point"
           : "Choose a target"
+      : units.length && !commandable.length
+        ? "Enemy units"
       : attacking
         ? `${attacking} attacking`
+        : harvestStatus
+          ? harvestStatus
         : moving
           ? `${moving} moving`
           : constructing
             ? `${constructing} constructing`
-          : units.length
-            ? `${units.length} ready`
-            : buildings.length === 1
-              ? buildings[0]!.friendly ? "Building ready" : "Enemy structure"
-              : `${buildings.length} buildings selected`;
+          : "";
+    // Status changes must not resize the selection panel when orders start or finish.
+    this.status.hidden = false;
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.target instanceof HTMLElement && event.target.closest("input, select, textarea, #minimap")) return;
     if (this.matchResolved()) return;
     if (event.code === "Escape" && this.targetMode) {
       this.setTargetMode();
@@ -353,7 +446,7 @@ export class UnitInput {
       return;
     }
     const system = this.unitSystem();
-    if (!system?.selectedUnits().length) return;
+    if (!system?.selectedCommandableUnits().length) return;
     const unitAction = Object.values(UNIT_ACTIONS)
       .some((action) => action.hotkey === event.code);
     const buildChoice = this.buildMenuOpen && (event.code === "KeyT" || event.code === "KeyC");
@@ -370,7 +463,7 @@ export class UnitInput {
     if (this.buildMenuOpen && event.code === "KeyT") this.setPlacementKind("turret");
     if (this.buildMenuOpen && event.code === "KeyC") this.setPlacementKind("command-center");
     if (event.code === UNIT_ACTIONS.attack.hotkey) {
-      const attacks = new Set(system.selectedGroups().map((group) => group.attack));
+      const attacks = new Set(system.selectedCommandableUnits().map((unit) => UNIT_CATALOG[unit.kind].attack));
       if (attacks.has("direct") && attacks.has("ground")) this.setTargetMode("attack-any");
       else if (attacks.has("direct")) this.setTargetMode("attack");
       else if (attacks.has("ground")) this.setTargetMode("attack-ground");
@@ -458,24 +551,28 @@ export class UnitInput {
     this.setTargetMode();
     const system = this.unitSystem();
     const terrain = this.world?.userData.terrain as THREE.Object3D | undefined;
-    if (!system?.selectedUnits().length || !terrain) return;
+    if (!system?.selectedCommandableUnits().length || !terrain) return;
     const selectable = this.pick(system.selectables, event.clientX, event.clientY);
     const selectableId = selectableEntityId(selectable?.object);
     if (selectableId && system.resumeConstructionSelected(selectableId)) {
       this.update();
       return;
     }
+    if (selectableId && system.gatherSelected(selectableId)) {
+      this.update();
+      return;
+    }
     const target = this.pickAttackTarget(system, event.clientX, event.clientY);
+    const hit = this.pick([terrain], event.clientX, event.clientY);
     if (target && resolveAttackTarget(
       system,
       "attack-any",
       target.id,
-      target.point,
+      hit?.point,
     )) {
       this.update();
       return;
     }
-    const hit = this.pick([terrain], event.clientX, event.clientY);
     if (hit) system.moveSelected(hit.point.x, hit.point.z);
     this.update();
   };
@@ -487,7 +584,8 @@ export class UnitInput {
     if (!system || !terrain || !mode) return;
     const building = this.pickAttackTarget(system, clientX, clientY);
     const terrainHit = this.pick([terrain], clientX, clientY);
-    const point = building?.point ?? terrainHit?.point;
+    // Ground attacks always use terrain, even when the ray also hits an enemy.
+    const point = terrainHit?.point;
     if (mode === "move" && terrainHit) system.moveSelected(terrainHit.point.x, terrainHit.point.z);
     if (mode === "rally" && terrainHit) {
       system.setRallyPointSelected(terrainHit.point.x, terrainHit.point.z);
@@ -518,6 +616,7 @@ export class UnitInput {
 
   private setPlacementKind(kind: BuildingKind) {
     this.targetMode = undefined;
+    this.canvas.classList.remove("is-attacking");
     this.placementKind = kind;
     this.buildMenuOpen = true;
     this.canvas.classList.add("is-targeting");
@@ -561,6 +660,7 @@ export class UnitInput {
       this.unitSystem()?.hideConstructionPreview();
     }
     this.targetMode = mode;
+    this.canvas.classList.toggle("is-attacking", Boolean(mode?.startsWith("attack")));
     this.canvas.classList.toggle("is-targeting", Boolean(mode));
     this.buttons && Object.entries(this.buttons).forEach(([action, button]) => {
       const active = mode === action || mode === "attack-any" && action.includes("attack");
@@ -607,8 +707,7 @@ export class UnitInput {
     const system = this.unitSystem();
     const terrain = this.world?.userData.terrain as THREE.Object3D | undefined;
     if (!system || !terrain) return;
-    return this.pickAttackTarget(system, clientX, clientY)?.point
-      ?? this.pick([terrain], clientX, clientY)?.point;
+    return this.pick([terrain], clientX, clientY)?.point;
   }
 
   private pick(objects: THREE.Object3D[], clientX: number, clientY: number) {
@@ -618,7 +717,7 @@ export class UnitInput {
       -(clientY - bounds.top) / bounds.height * 2 + 1,
     );
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    return this.raycaster.intersectObjects(objects, true)[0];
+    return pickSurface(this.raycaster.intersectObjects(objects, true));
   }
 
   private showSelectionBox(clientX: number, clientY: number) {

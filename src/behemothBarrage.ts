@@ -29,6 +29,8 @@ const MAX_SCORCH_SCALE = 7.8;
 const SCORCH_SURFACE_OFFSET = 0.035;
 const SMOKE_INTERVAL = 0.022;
 const LAUNCH_FLASH_DURATION = 0.28;
+type EffectAttributes = Record<string, THREE.BufferAttribute>;
+
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const EXPLOSION_FIREBALL_OFFSETS = [
   [-0.45, 0.18, 0],
@@ -363,7 +365,7 @@ export class BehemothBarrage {
   private readonly smokeAlphas = new Float32Array(MAX_SMOKE_PARTICLES);
   private readonly smokeRotations = new Float32Array(MAX_SMOKE_PARTICLES);
   private readonly smokeColors = new Float32Array(MAX_SMOKE_PARTICLES * 3);
-  private readonly smokeGeometry = new THREE.BufferGeometry();
+  private readonly smokeGeometry = new THREE.BufferGeometry<EffectAttributes>();
   private readonly smokeMaterial = createSmokeMaterial(this.cloudTexture);
   private readonly smoke = new THREE.Points(this.smokeGeometry, this.smokeMaterial);
   private readonly smokeParticles = Array.from({ length: MAX_SMOKE_PARTICLES }, (): SmokeParticle => ({
@@ -378,7 +380,7 @@ export class BehemothBarrage {
   }));
   private readonly sparkPositions = new Float32Array(MAX_SPARKS * 6);
   private readonly sparkColors = new Float32Array(MAX_SPARKS * 6);
-  private readonly sparkGeometry = new THREE.BufferGeometry();
+  private readonly sparkGeometry = new THREE.BufferGeometry<EffectAttributes>();
   private readonly sparkMaterial = new THREE.LineBasicMaterial({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -401,7 +403,7 @@ export class BehemothBarrage {
   private readonly scorchUvs: Float32Array;
   private readonly scorchColors: Float32Array;
   private readonly scorchIndices: Uint32Array;
-  private readonly scorchGeometry: THREE.BufferGeometry;
+  private readonly scorchGeometry: THREE.BufferGeometry<EffectAttributes>;
   private readonly scorchMaterial = new THREE.MeshBasicMaterial({
     color: 0x17100c,
     depthWrite: false,
@@ -457,7 +459,7 @@ export class BehemothBarrage {
     this.scorchUvs = new Float32Array(MAX_SCORCH_MARKS * this.scorchVerticesPerMark * 2);
     this.scorchColors = new Float32Array(MAX_SCORCH_MARKS * this.scorchVerticesPerMark * 4);
     this.scorchIndices = new Uint32Array(MAX_SCORCH_MARKS * this.scorchIndicesPerMark);
-    this.scorchGeometry = new THREE.BufferGeometry();
+    this.scorchGeometry = new THREE.BufferGeometry<EffectAttributes>();
     this.scorchMarks = new THREE.Mesh(this.scorchGeometry, this.scorchMaterial);
 
     this.smokeGeometry.setAttribute(
@@ -519,6 +521,14 @@ export class BehemothBarrage {
     for (let index = 0; index < 2; index += 1) {
       this.launchFlashPool.push(this.createLaunchFlash());
     }
+  }
+
+  prepareRendering() {
+    const warmup = new THREE.Group();
+    const rocket = this.createRocket();
+    this.rocketPool.push(rocket);
+    warmup.add(rocket.group, this.explosionPool[0]!.root, this.launchFlashPool[0]!.root);
+    return warmup;
   }
 
   fire(
@@ -758,11 +768,13 @@ export class BehemothBarrage {
   }
 
   private updateSmoke(deltaSeconds: number) {
+    let changed = false;
     let drawCount = 0;
     for (let index = 0; index < this.smokeParticles.length; index += 1) {
       const particle = this.smokeParticles[index]!;
       const positionOffset = index * 3;
       if (!particle.active) continue;
+      changed = true;
       particle.age += deltaSeconds;
       if (particle.age >= particle.lifetime) {
         particle.active = false;
@@ -788,8 +800,13 @@ export class BehemothBarrage {
       this.smokeColors[positionOffset + 1] = shade * 0.94;
       this.smokeColors[positionOffset + 2] = shade * 0.78;
     }
+    if (!changed) return;
     this.smokeGeometry.setDrawRange(0, drawCount);
-    for (const attribute of Object.values(this.smokeGeometry.attributes)) attribute.needsUpdate = true;
+    if (drawCount === 0) return;
+    for (const attribute of Object.values(this.smokeGeometry.attributes)) {
+      attribute.addUpdateRange(0, drawCount * attribute.itemSize);
+      attribute.needsUpdate = true;
+    }
   }
 
   private explode(position: THREE.Vector3, phase: number) {
@@ -900,11 +917,13 @@ export class BehemothBarrage {
   }
 
   private updateSparks(deltaSeconds: number) {
+    let changed = false;
     let drawCount = 0;
     for (let index = 0; index < this.sparkParticles.length; index += 1) {
       const spark = this.sparkParticles[index]!;
       const offset = index * 6;
       if (!spark.active) continue;
+      changed = true;
       spark.age += deltaSeconds;
       if (spark.age >= spark.lifetime) {
         spark.active = false;
@@ -933,8 +952,13 @@ export class BehemothBarrage {
         this.sparkColors[colorOffset + 2] = strength * tail * 0.12;
       }
     }
+    if (!changed) return;
     this.sparkGeometry.setDrawRange(0, drawCount);
-    for (const attribute of Object.values(this.sparkGeometry.attributes)) attribute.needsUpdate = true;
+    if (drawCount === 0) return;
+    for (const attribute of Object.values(this.sparkGeometry.attributes)) {
+      attribute.addUpdateRange(0, drawCount * attribute.itemSize);
+      attribute.needsUpdate = true;
+    }
   }
 
   private prepareScorchGeometry() {
@@ -969,13 +993,18 @@ export class BehemothBarrage {
       "position",
       new THREE.BufferAttribute(this.scorchPositions, 3).setUsage(THREE.DynamicDrawUsage),
     );
-    this.scorchGeometry.setAttribute("uv", new THREE.BufferAttribute(this.scorchUvs, 2));
+    this.scorchGeometry.setAttribute("uv", new THREE.BufferAttribute(this.scorchUvs, 2).setUsage(THREE.DynamicDrawUsage));
     this.scorchGeometry.setIndex(new THREE.BufferAttribute(this.scorchIndices, 1));
+    this.scorchGeometry.setDrawRange(0, 0);
   }
 
   private addScorchMark(position: THREE.Vector3, phase: number) {
     const index = this.scorchCursor;
     this.scorchCursor = (this.scorchCursor + 1) % MAX_SCORCH_MARKS;
+    this.scorchGeometry.setDrawRange(0, Math.max(
+      this.scorchGeometry.drawRange.count,
+      (index + 1) * this.scorchIndicesPerMark,
+    ));
     const mark = this.scorchStates[index]!;
     mark.active = true;
     mark.age = 0;
@@ -1019,32 +1048,42 @@ export class BehemothBarrage {
         this.scorchUvs[vertex * 2 + 1] = localZ / mark.scale + 0.5;
       }
     }
-    (this.scorchGeometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
-    (this.scorchGeometry.getAttribute("uv") as THREE.BufferAttribute).needsUpdate = true;
+    for (const name of ["position", "uv"]) {
+      const attribute = this.scorchGeometry.getAttribute(name);
+      attribute.addUpdateRange(vertexStart * attribute.itemSize, this.scorchVerticesPerMark * attribute.itemSize);
+      attribute.needsUpdate = true;
+    }
   }
 
   private setScorchAlpha(markIndex: number, alpha: number) {
     const vertexStart = markIndex * this.scorchVerticesPerMark;
+    if (this.scorchColors[vertexStart * 4 + 3] === Math.fround(alpha)) return false;
     for (let vertex = vertexStart; vertex < vertexStart + this.scorchVerticesPerMark; vertex += 1) {
       this.scorchColors[vertex * 4 + 3] = alpha;
     }
+    this.scorchGeometry.getAttribute("color").addUpdateRange(vertexStart * 4, this.scorchVerticesPerMark * 4);
+    return true;
   }
 
   private updateScorchMarks(deltaSeconds: number) {
+    let changed = false;
+    let drawCount = 0;
     for (let index = 0; index < this.scorchStates.length; index += 1) {
       const mark = this.scorchStates[index]!;
       if (!mark.active) continue;
       mark.age += deltaSeconds;
       if (mark.age >= mark.lifetime) {
         mark.active = false;
-        this.setScorchAlpha(index, 0);
+        changed = this.setScorchAlpha(index, 0) || changed;
         continue;
       }
       const fadeIn = Math.min(1, mark.age / 0.12);
       const fadeOut = Math.min(1, (mark.lifetime - mark.age) / 12);
-      this.setScorchAlpha(index, fadeIn * fadeOut);
+      changed = this.setScorchAlpha(index, fadeIn * fadeOut) || changed;
+      drawCount = (index + 1) * this.scorchIndicesPerMark;
     }
-    (this.scorchGeometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
+    this.scorchGeometry.setDrawRange(0, drawCount);
+    if (changed) this.scorchGeometry.getAttribute("color").needsUpdate = true;
   }
 
   private flashLaunch(position: THREE.Vector3) {

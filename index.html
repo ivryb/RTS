@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#c79b45" />
-    <title>Dune77 — Combat Proof</title>
+    <meta name="theme-color" content="#101010" />
+    <title>Dune77</title>
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -15,41 +15,35 @@
       <p id="match-outcome-detail"></p>
       <button id="restart-match" type="button">Restart encounter <kbd>R</kbd></button>
     </section>
-    <aside class="view-status" aria-label="View status">
-      <span>Zoom</span>
-      <output id="zoom-level">1.00×</output>
+    <header class="match-bar">
+      <strong class="wordmark">DUNE<span>77</span></strong>
+      <span class="match-mode">Combat encounter</span>
+      <time id="match-clock">00:00</time>
+      <span class="titanium-stockpile" title="Titanium delivered to your Command Centers"><span aria-hidden="true">Ti</span><strong id="titanium-count">0</strong><span class="titanium-label">Titanium</span></span>
+      <span class="force-count"><strong id="force-count">0</strong> units</span>
+      <details class="help"><summary>Controls <kbd>?</kbd></summary><p>Click or drag to select · Shift to add<br>Right click to move, attack or gather titanium<br>A Attack · M Move · S Stop · B Build<br>Middle drag or arrow keys to pan · Wheel to zoom<br>Esc Cancel order · R Restart encounter</p></details>
+      <details class="settings">
+        <summary>Settings</summary>
+        <div class="settings-panel">
+          <strong>Terrain settings</strong>
+          <div class="ground-controls">
+            <label>Base <select id="ground-texture"></select></label>
+            <label>Patches <select id="ground-secondary-texture"></select></label>
+            <label><input id="ground-smooth-borders" type="checkbox" /> Smooth texture borders</label>
+            <label>Tint <input id="ground-tint" type="color" /><output id="ground-tint-value"></output></label>
+          </div>
+          <small id="seed"></small>
+          <button id="new-map" type="button">Generate new map</button>
+        </div>
+      </details>
+    </header>
+    <aside class="objective"><span class="objective-mark" aria-hidden="true">◇</span><div><strong>Destroy the enemy Command Center</strong><span>Gather titanium with Scout Drones. Build and defend your base.</span></div></aside>
+    <aside class="minimap-panel" aria-label="Tactical map">
+      <div class="minimap-heading"><strong>Battlefield</strong></div>
+      <canvas id="minimap" width="512" height="512" tabindex="0" aria-label="Tactical map. Click or drag to move the camera. Use arrow keys to pan. Right click to send selected units."></canvas>
+      <div class="minimap-legend"><span>● Friendly</span><span class="minimap-hostile">◆ Hostile</span><output id="zoom-level">1.00×</output></div>
     </aside>
-    <aside class="hud">
-      <div>
-        <strong>Dune77</strong>
-        <span>Combat proof</span>
-        <small class="objective">
-          Train a Scout Drone. Build a Turret and another Command Center. Destroy the enemy
-          Command Center.
-        </small>
-      </div>
-      <button id="new-map" type="button">New map</button>
-      <div class="ground-controls">
-        <label>
-          Base
-          <select id="ground-texture"></select>
-        </label>
-        <label>
-          Patches
-          <select id="ground-secondary-texture"></select>
-        </label>
-        <label>
-          <input id="ground-smooth-borders" type="checkbox" />
-          Adaptive texture smoothing
-        </label>
-        <label>
-          Tint
-          <input id="ground-tint" type="color" />
-          <output id="ground-tint-value"></output>
-        </label>
-      </div>
-      <small id="seed"></small>
-    </aside>
+    <aside class="empty-selection"><span class="empty-reticle" aria-hidden="true">⌖</span><div><strong>Awaiting orders</strong><p>Select a unit or building</p></div></aside>
     <aside id="unit-panel" class="unit-panel" hidden>
       <section class="action-grid" aria-label="Selection actions">
         <button type="button" data-action="attack" aria-pressed="false">
@@ -92,13 +86,9 @@
       <section class="selection-summary" aria-label="Selection">
         <div id="unit-roster" class="unit-roster"></div>
         <div id="production-queue" class="production-queue" hidden></div>
-        <p id="unit-status">Ready</p>
+        <p id="unit-status" role="status">Ready</p>
       </section>
     </aside>
-    <div class="help">
-      Left click / drag: select · Shift: add · Right click: move / attack ·
-      A: attack · B: build · M: move · S: stop · R: restart · Middle drag: pan · Wheel: zoom
-    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

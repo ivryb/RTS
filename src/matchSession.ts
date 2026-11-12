@@ -10,6 +10,7 @@ import {
   type GameSimulation,
   type UnitState,
 } from "./sim/units";
+import type { TitaniumDepositState } from "./sim/harvesting";
 import type { ConstructionTerrain } from "./sim/construction";
 
 export interface MatchFrame {
@@ -18,6 +19,8 @@ export interface MatchFrame {
   full: boolean;
   units: readonly UnitState[];
   buildings: readonly BuildingState[];
+  titaniumDeposits?: readonly TitaniumDepositState[];
+  playerTitanium?: Readonly<Record<string, number>>;
   removedUnitIds?: readonly string[];
   removedBuildingIds?: readonly string[];
   events: readonly SimulationEvent[];
@@ -83,6 +86,8 @@ export class LocalMatchSession implements MatchSession {
         full: true,
         units: this.simulation.snapshot(),
         buildings: this.simulation.buildingSnapshot(),
+        titaniumDeposits: this.simulation.depositSnapshot(),
+        playerTitanium: this.simulation.titaniumSnapshot(),
         events: this.simulation.drainEvents(),
         matchResult: this.simulation.matchResult,
       };
@@ -169,7 +174,11 @@ export class WorkerMatchSession implements MatchSession {
     terrain?: ConstructionTerrain,
     options?: SimulationOptions,
   ) {
-    this.frames = [{ version: 1, tick: 0, full: true, units, buildings, events: [] }];
+    this.frames = [{
+      version: 1, tick: 0, full: true, units, buildings, events: [],
+      titaniumDeposits: options?.titaniumDeposits ?? [],
+      playerTitanium: {},
+    }];
     this.worker.onmessage = ({ data }: MessageEvent<ServerMatchMessage>) => {
       if (data.type === "frame" && data.frame.version > this.latestVersion) {
         this.latestVersion = data.frame.version;

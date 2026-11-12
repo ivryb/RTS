@@ -1,0 +1,43 @@
+{
+  "tool": "Built-in image_gen",
+  "license": "CC BY-SA 4.0, to the extent copyright applies",
+  "portraits": [
+    {
+      "name": "ghostrunner",
+      "reference": "assets/ui/ghostrunner-portrait.webp",
+      "prompt": "Use case: stylized-concept. Generate ONE square production RTS HUD portrait of hooded faceless ivory-armored infantry robot; head and upper torso portrait. Reference image is identity reference: preserve silhouette, proportions, defining armor panels and machinery. Unified Dune77 portrait collection: restrained realistic 3D studio render, neutral ivory ceramic armor and charcoal mechanical parts, strictly neutral lighting with no blue or colored glow, soft large key light upper left, subtle white rim right, charcoal #181818 seamless background with barely perceptible neutral vignette. Center the subject, three-quarter view from slightly above, front facing lower left, generous 12 percent safe margin, subject fills about 76 percent of square. Strong readable silhouette at 64 pixels. Same restrained contrast and lighting for every asset in collection. No scenery, floor horizon, terrain, text, labels, frames, HUD, logos, watermarks, dramatic effects. Produce just this single icon portrait, not a contact sheet.",
+      "source": "ghostrunner.png"
+    },
+    {
+      "name": "scout-drone",
+      "reference": "assets/ui/scout-drone-portrait.webp",
+      "prompt": "Use case: stylized-concept. Generate ONE square production RTS HUD portrait of rounded unarmed reconnaissance drone; show the entire drone. Reference image is identity reference: preserve silhouette, proportions, defining armor panels and machinery. Unified Dune77 portrait collection: restrained realistic 3D studio render, neutral ivory ceramic armor and charcoal mechanical parts, strictly neutral lighting with no blue or colored glow, soft large key light upper left, subtle white rim right, charcoal #181818 seamless background with barely perceptible neutral vignette. Center the subject, three-quarter view from slightly above, front facing lower left, generous 12 percent safe margin, subject fills about 76 percent of square. Strong readable silhouette at 64 pixels. Same restrained contrast and lighting for every asset in collection. No scenery, floor horizon, terrain, text, labels, frames, HUD, logos, watermarks, dramatic effects. Produce just this single icon portrait, not a contact sheet.",
+      "source": "scout-drone.png"
+    },
+    {
+      "name": "hornet",
+      "reference": "assets/ui/hornet-portrait.webp",
+      "prompt": "Use case: stylized-concept. Generate ONE square production RTS HUD portrait of twin-engine narrow gunship drone; show the entire drone. Reference image is identity reference: preserve silhouette, proportions, defining armor panels and machinery. Unified Dune77 portrait collection: restrained realistic 3D studio render, neutral ivory ceramic armor and charcoal mechanical parts, strictly neutral lighting with no blue or colored glow, soft large key light upper left, subtle white rim right, charcoal #181818 seamless background with barely perceptible neutral vignette. Center the subject, three-quarter view from slightly above, front facing lower left, generous 12 percent safe margin, subject fills about 76 percent of square. Strong readable silhouette at 64 pixels. Same restrained contrast and lighting for every asset in collection. No scenery, floor horizon, terrain, text, labels, frames, HUD, logos, watermarks, dramatic effects. Produce just this single icon portrait, not a contact sheet.",
+      "source": "hornet.png"
+    },
+    {
+      "name": "behemoth",
+      "reference": "assets/ui/behemoth-portrait.webp",
+      "prompt": "Use case: stylized-concept. Generate ONE square production RTS HUD portrait of tracked armored missile launcher with raised rectangular rocket pod; show entire vehicle; ignore screenshot UI and desert in reference. Reference image is identity reference: preserve silhouette, proportions, defining armor panels and machinery. Unified Dune77 portrait collection: restrained realistic 3D studio render, neutral ivory ceramic armor and charcoal mechanical parts, strictly neutral lighting with no blue or colored glow, soft large key light upper left, subtle white rim right, charcoal #181818 seamless background with barely perceptible neutral vignette. Center the subject, three-quarter view from slightly above, front facing lower left, generous 12 percent safe margin, subject fills about 76 percent of square. Strong readable silhouette at 64 pixels. Same restrained contrast and lighting for every asset in collection. No scenery, floor horizon, terrain, text, labels, frames, HUD, logos, watermarks, dramatic effects. Produce just this single icon portrait, not a contact sheet.",
+      "source": "behemoth.png"
+    },
+    {
+      "name": "command-center",
+      "reference": "art/command_center/command-building-isometric-grounded.png",
+      "prompt": "Use case: stylized-concept. Generate ONE square production RTS HUD portrait of octagonal command bunker with radar dish and entrance ramp; show entire building. Reference image is identity reference: preserve silhouette, proportions, defining armor panels and machinery. Unified Dune77 portrait collection: restrained realistic 3D studio render, neutral ivory ceramic armor and charcoal mechanical parts, strictly neutral lighting with no blue or colored glow, soft large key light upper left, subtle white rim right, charcoal #181818 seamless background with barely perceptible neutral vignette. Center the subject, three-quarter view from slightly above, front facing lower left, generous 12 percent safe margin, subject fills about 76 percent of square. Strong readable silhouette at 64 pixels. Same restrained contrast and lighting for every asset in collection. No scenery, floor horizon, terrain, text, labels, frames, HUD, logos, watermarks, dramatic effects. Produce just this single icon portrait, not a contact sheet.",
+      "source": "command-center.png"
+    },
+    {
+      "name": "turret",
+      "reference": "art/turret/modular-turret-isometric.png",
+      "prompt": "Use case: stylized-concept. Generate ONE square production RTS HUD portrait of octagonal armored turret with twin gun barrels; show entire building. Reference image is identity reference: preserve silhouette, proportions, defining armor panels and machinery. Unified Dune77 portrait collection: restrained realistic 3D studio render, neutral ivory ceramic armor and charcoal mechanical parts, strictly neutral lighting with no blue or colored glow, soft large key light upper left, subtle white rim right, charcoal #181818 seamless background with barely perceptible neutral vignette. Center the subject, three-quarter view from slightly above, front facing lower left, generous 12 percent safe margin, subject fills about 76 percent of square. Strong readable silhouette at 64 pixels. Same restrained contrast and lighting for every asset in collection. No scenery, floor horizon, terrain, text, labels, frames, HUD, logos, watermarks, dramatic effects. Produce just this single icon portrait, not a contact sheet.",
+      "source": "turret.png"
+    }
+  ],
+  "referenceRevision": "bf642c6850dd512f628b033c144629c815fc49e4"
+}

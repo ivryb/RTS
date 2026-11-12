@@ -1,3 +1,4 @@
+import { TERRAIN_RENDER_ORDER } from "./groundOverlay";
 import * as THREE from "three";
 import { createMapTerrainGeometry } from "./terrainRendering";
 import { createEnvironmentMaterial } from "./terrainRendering/environmentMaterial";
@@ -87,7 +88,7 @@ export const createTerrain = (map: GeneratedMap) => {
   const terrain = new THREE.Mesh(geometry, material);
   terrain.receiveShadow = true;
   terrain.castShadow = true;
-  terrain.renderOrder = -100;
+  terrain.renderOrder = TERRAIN_RENDER_ORDER;
   const skirt = new THREE.Mesh(
     createTerrainSkirtGeometry(map, map.segments),
     new THREE.MeshStandardMaterial({ color: 0x86684b, roughness: 1 }),

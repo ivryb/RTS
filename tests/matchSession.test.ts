@@ -48,6 +48,34 @@ const commandCenter = (id: string, ownerId: string, x: number, health = 2_500): 
 beforeAll(() => initializeNavigation());
 
 describe("match sessions", () => {
+  test("publishes authoritative ore, cargo and delivered titanium through the session", () => {
+    const scout: UnitState = { ...unit(), kind: "scout-drone", radius: 306 };
+    scout.position = toSimPoint(8, 0);
+    scout.target = { ...scout.position };
+    const deposit = {
+      id: "ore", position: toSimPoint(0, 0), radius: 3000, amount: 7, initialAmount: 7,
+    };
+    const simulation = new LocalUnitSimulation([scout], [commandCenter("home", "player-1", 20)],
+      undefined, { titaniumDeposits: [deposit] });
+    const session = new LocalMatchSession("player-1", simulation);
+    const remote = new RemoteMatchSession(() => {});
+    try {
+      const initial = session.readFrame(0)!;
+      expect(initial.titaniumDeposits).toEqual([deposit]);
+      expect(initial.playerTitanium).toEqual({});
+      expect(session.submit({ type: "gather", unitIds: [scout.id], depositId: deposit.id }).status).toBe("accepted");
+      session.advance(8);
+      const final = session.readFrame(initial.version)!;
+      expect(final.titaniumDeposits?.[0]?.amount).toBe(0);
+      expect(final.units[0]?.cargoTitanium).toBe(0);
+      expect(final.playerTitanium).toEqual({ "player-1": 7 });
+      remote.receive({ type: "frame", frame: final });
+      expect(remote.readFrame(0)).toEqual(final);
+    } finally {
+      session.dispose();
+    }
+  });
+
   test("local sessions own ticking and only publish changed frames", () => {
     const session = new LocalMatchSession("player-1", new LocalUnitSimulation([unit()]));
     const initial = session.readFrame(0)!;

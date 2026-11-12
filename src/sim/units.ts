@@ -4,6 +4,13 @@ import { directProjectileImpactDelayTicks } from "../directProjectile";
 import { RecastNavigation } from "./navigation";
 import { POSITION_SCALE, SIMULATION_TICK_SECONDS } from "./simulationConstants";
 import {
+  EXTRACTION_INTERVAL_TICKS,
+  SCOUT_TITANIUM_CAPACITY,
+  TITANIUM_PER_EXTRACTION,
+  type HarvestState,
+  type TitaniumDepositState,
+} from "./harvesting";
+import {
   advanceTraining,
   canQueueTraining,
   cancelTraining,
@@ -65,7 +72,7 @@ export interface BuildingState {
   rallyPoint?: SimPoint;
 }
 
-export type UnitOrder = "idle" | "move" | "attack" | "attack-ground" | "build";
+export type UnitOrder = "idle" | "move" | "attack" | "attack-ground" | "build" | "gather";
 
 export interface UnitState {
   id: string;
@@ -94,6 +101,8 @@ export interface UnitState {
   constructionTargetId?: string;
   formationPosition?: SimPoint;
   guardMode?: "hold-position";
+  cargoTitanium?: number;
+  harvest?: HarvestState;
 }
 
 export interface MoveCommand {
@@ -121,6 +130,13 @@ export interface StopCommand {
   type: "stop";
   commandId?: string;
   unitIds: string[];
+}
+
+export interface GatherCommand {
+  type: "gather";
+  commandId?: string;
+  unitIds: string[];
+  depositId: string;
 }
 
 export interface BuildCommand {
@@ -162,7 +178,7 @@ export interface SetRallyPointCommand {
 
 export type PlayerCommand = MoveCommand | AttackCommand | AttackGroundCommand | StopCommand
   | BuildCommand | ResumeConstructionCommand | TrainCommand | CancelTrainingCommand
-  | SetRallyPointCommand;
+  | SetRallyPointCommand | GatherCommand;
 
 export interface DispatchResult {
   commandId?: string;
@@ -180,6 +196,7 @@ export interface MatchResult {
 
 export interface SimulationOptions {
   commandCenterElimination?: readonly string[];
+  titaniumDeposits?: readonly TitaniumDepositState[];
 }
 
 export interface AcceptedCommand {
@@ -229,6 +246,8 @@ export interface GameSimulation {
   step(): void;
   snapshot(): readonly UnitState[];
   buildingSnapshot(): readonly BuildingState[];
+  depositSnapshot(): readonly TitaniumDepositState[];
+  titaniumSnapshot(): Readonly<Record<string, number>>;
   drainEvents(): readonly SimulationEvent[];
   drainAcceptedCommands(): readonly AcceptedCommand[];
   dispose(): void;
@@ -239,6 +258,8 @@ export const toSimPoint = (x: number, z: number): SimPoint => ({
   z: Math.round(z * POSITION_SCALE),
 });
 
+const HARVEST_REACH = 1.5 * POSITION_SCALE;
+const HARVEST_APPROACH = 1 * POSITION_SCALE;
 const PATH_CLEARANCE = 0.15 * POSITION_SCALE;
 const MELEE_REACH = 0.55 * POSITION_SCALE;
 const PATH_SAMPLES = 16;
@@ -327,11 +348,18 @@ const selectHostileUnit = (
   );
   const current = currentTargetId ? units.get(currentTargetId) : undefined;
   if (eligible(current)) return current;
-  return [...units.values()].filter(eligible).sort((first, second) => {
-    const distanceDifference = distance(attacker.position, first.position)
-      - distance(attacker.position, second.position);
-    return distanceDifference || compareIds(first, second);
-  })[0];
+  let nearest: UnitState | undefined;
+  let nearestDistance = Infinity;
+  for (const unit of units.values()) {
+    if (!eligible(unit)) continue;
+    const candidateDistance = distance(attacker.position, unit.position);
+    if (candidateDistance < nearestDistance
+      || (candidateDistance === nearestDistance && nearest && compareIds(unit, nearest) < 0)) {
+      nearest = unit;
+      nearestDistance = candidateDistance;
+    }
+  }
+  return nearest;
 };
 
 const segmentIsClear = (
@@ -673,7 +701,7 @@ const ringSlotCount = (radius: number, spacing: number) => Math.max(
   )),
 );
 
-const planAttackRing = (
+const planApproachRing = (
   unit: UnitState,
   target: SimPoint,
   radius: number,
@@ -699,7 +727,8 @@ const planAttackRing = (
     const path = planner.plan(unit.position, approach);
     if (!path) continue;
     const endpoint = path.at(-1) ?? unit.position;
-    if (distance(endpoint, target) > maximumRange) continue;
+    if (distance(endpoint, target) > maximumRange
+      || !attackSpotIsFree(unit, endpoint, reservations)) continue;
     const length = pathLength(unit.position, path);
     if (length < shortestLength) {
       shortest = path;
@@ -753,7 +782,7 @@ const planWaitingRings = (
 ) => {
   const spacing = unit.radius * 2 + ATTACK_SEPARATION_GAP;
   for (let ring = 1; ring <= 4; ring += 1) {
-    const path = planAttackRing(
+    const path = planApproachRing(
       unit,
       target,
       attackRadius + spacing * ring,
@@ -807,6 +836,8 @@ class MinQueue {
 export class LocalUnitSimulation implements GameSimulation {
   private readonly units = new Map<string, UnitState>();
   private readonly buildings = new Map<string, BuildingState>();
+  private readonly deposits = new Map<string, TitaniumDepositState>();
+  private readonly playerTitanium = new Map<string, number>();
   private readonly commands = new Map<string, DispatchResult>();
   private readonly groundNavigation: RecastNavigation;
   private readonly attackStalls = new Map<string, {
@@ -834,6 +865,9 @@ export class LocalUnitSimulation implements GameSimulation {
   ) {
     this.eliminationPlayerIds = [...new Set(options.commandCenterElimination ?? [])];
     this.groundNavigation = new RecastNavigation(terrain);
+    for (const deposit of options.titaniumDeposits ?? []) {
+      this.deposits.set(deposit.id, structuredClone(deposit));
+    }
     for (const unit of units) this.units.set(unit.id, structuredClone(unit));
     for (const building of buildings) {
       const authoritative = structuredClone(building);
@@ -909,6 +943,7 @@ export class LocalUnitSimulation implements GameSimulation {
       command.target,
       this.pathingBuildings(),
       [...this.units.values()],
+      [...this.deposits.values()],
     )) return false;
 
     let sequence = this.buildingSequence + 1;
@@ -1004,6 +1039,7 @@ export class LocalUnitSimulation implements GameSimulation {
     const previousBuilder = site.builderId && this.units.get(site.builderId);
     if (previousBuilder && previousBuilder.id !== builder.id) this.stop(previousBuilder);
     this.releaseConstruction(builder);
+    builder.harvest = undefined;
     site.builderId = builder.id;
     builder.path = path;
     builder.order = "build";
@@ -1018,7 +1054,7 @@ export class LocalUnitSimulation implements GameSimulation {
 
   private planConstructionPath(builder: UnitState, site: BuildingState) {
     if (distance(builder.position, site.position) <= directMaximumRange(builder, site)) return [];
-    return planAttackRing(
+    return planApproachRing(
       builder,
       site.position,
       directApproachRadius(builder, site),
@@ -1028,6 +1064,150 @@ export class LocalUnitSimulation implements GameSimulation {
       // Reject that endpoint instead of repeatedly walking to the same unusable spot.
       directMaximumRange(builder, site) + POSITION_ROUNDING_TOLERANCE,
     );
+  }
+
+  private startGathering(playerId: string, command: GatherCommand) {
+    const deposit = this.deposits.get(command.depositId);
+    if (!deposit) return false;
+    const scouts = [...new Set(command.unitIds)].flatMap((id) => {
+      const unit = this.units.get(id);
+      return unit?.ownerId === playerId && unit.health > 0 && unit.kind === "scout-drone"
+        && (deposit.amount > 0 || (unit.cargoTitanium ?? 0) > 0) ? [unit] : [];
+    }).sort(compareIds);
+    for (const scout of scouts) this.stop(scout);
+    for (const scout of scouts) {
+      if (scout.cargoTitanium) this.routeToDropoff(scout, deposit);
+      else this.routeToDeposit(scout, deposit);
+    }
+    return scouts.length > 0;
+  }
+
+  private harvestApproach(unit: UnitState, target: CircularObstacle, planner: PathPlanner) {
+    const reservations = [...this.units.values()].flatMap((other) => {
+      if (other.id === unit.id || other.health <= 0 || !other.harvest) return [];
+      return [{
+        position: reservedPosition(other),
+        radius: other.radius + UNIT_SEPARATION_GAP - ATTACK_SEPARATION_GAP,
+      }];
+    });
+    return planApproachRing(
+      unit,
+      target.position,
+      target.radius + unit.radius + HARVEST_APPROACH,
+      reservations,
+      planner,
+      target.radius + unit.radius + HARVEST_REACH,
+    );
+  }
+
+  private assignHarvestRoute(unit: UnitState, harvest: HarvestState, path: SimPoint[] = []) {
+    unit.order = "gather";
+    unit.harvest = harvest;
+    unit.path = path;
+    unit.moving = path.length > 0;
+    unit.attacking = false;
+    unit.formationPosition = { ...(path.at(-1) ?? unit.position) };
+    unit.target = { ...(path[0] ?? unit.position) };
+  }
+
+  private routeToDeposit(unit: UnitState, deposit: TitaniumDepositState) {
+    if (!deposit.amount) {
+      if (unit.cargoTitanium) this.routeToDropoff(unit, deposit);
+      else this.stop(unit);
+      return;
+    }
+    const path = this.harvestApproach(unit, deposit, this.createPathPlanner(unit));
+    this.assignHarvestRoute(unit, path ? {
+      phase: "to-deposit",
+      depositId: deposit.id,
+      workPosition: { ...(path.at(-1) ?? unit.position) },
+    } : { phase: "waiting-deposit", depositId: deposit.id }, path);
+  }
+
+  private isDropoffFor(building: BuildingState | undefined, unit: UnitState) {
+    return building?.kind === "command-center" && building.lifecycle === "active"
+      && building.health > 0 && building.ownerId === unit.ownerId;
+  }
+
+  private routeToDropoff(unit: UnitState, deposit: TitaniumDepositState) {
+    const planner = this.createPathPlanner(unit);
+    let nearest: { building: BuildingState; path: SimPoint[]; distance: number } | undefined;
+    for (const building of [...this.buildings.values()].sort(compareIds)) {
+      if (!this.isDropoffFor(building, unit)) continue;
+      const path = this.harvestApproach(unit, building, planner);
+      if (!path) continue;
+      const length = pathLength(unit.position, path);
+      if (!nearest || length < nearest.distance) nearest = { building, path, distance: length };
+    }
+    this.assignHarvestRoute(unit, nearest ? {
+      phase: "to-dropoff",
+      depositId: deposit.id,
+      dropoffId: nearest.building.id,
+      workPosition: { ...(nearest.path.at(-1) ?? unit.position) },
+    } : { phase: "waiting-dropoff", depositId: deposit.id }, nearest?.path);
+  }
+
+  private stepHarvesting(unit: UnitState) {
+    const harvest = unit.harvest;
+    if (unit.order !== "gather" || !harvest) return;
+    const deposit = this.deposits.get(harvest.depositId);
+    if (!deposit) {
+      this.stop(unit);
+      return;
+    }
+    if (harvest.phase === "waiting-deposit" || harvest.phase === "waiting-dropoff") {
+      // Stagger expensive path retries while a building is unfinished or an approach is blocked.
+      if (this.tick % ATTACK_RETRY_TICKS !== retrySlot(unit.id)) return;
+      if (harvest.phase === "waiting-dropoff") this.routeToDropoff(unit, deposit);
+      else this.routeToDeposit(unit, deposit);
+      return;
+    }
+    const dropoff = harvest.phase === "to-dropoff"
+      ? this.buildings.get(harvest.dropoffId) : undefined;
+    if (harvest.phase === "to-dropoff" && !this.isDropoffFor(dropoff, unit)) {
+      this.routeToDropoff(unit, deposit);
+      return;
+    }
+    if (harvest.phase !== "to-dropoff" && !deposit.amount) {
+      if (unit.cargoTitanium) this.routeToDropoff(unit, deposit);
+      else this.stop(unit);
+      return;
+    }
+    if (unit.moving) {
+      // New construction can cross an existing route; never march a loaded Scout through it.
+      if (!routeIsClear(unit.position, unit.path, this.pathingObstacles(new Set([unit.id])), unit.radius)) {
+        if (harvest.phase === "to-dropoff") this.routeToDropoff(unit, deposit);
+        else this.routeToDeposit(unit, deposit);
+      }
+      return;
+    }
+    if (dropoff) {
+      if (distance(unit.position, dropoff.position) > dropoff.radius + unit.radius + HARVEST_REACH) {
+        this.routeToDropoff(unit, deposit);
+        return;
+      }
+      this.playerTitanium.set(unit.ownerId,
+        (this.playerTitanium.get(unit.ownerId) ?? 0) + (unit.cargoTitanium ?? 0));
+      unit.cargoTitanium = 0;
+      this.routeToDeposit(unit, deposit);
+      return;
+    }
+    if (distance(unit.position, deposit.position) > deposit.radius + unit.radius + HARVEST_REACH) {
+      this.routeToDeposit(unit, deposit);
+      return;
+    }
+    unit.harvest = {
+      phase: "extracting", depositId: deposit.id, workPosition: { ...unit.position },
+    };
+    unit.target = { ...deposit.position };
+    if (this.tick % EXTRACTION_INTERVAL_TICKS !== 0) return;
+    const cargo = unit.cargoTitanium ?? 0;
+    const extracted = Math.min(TITANIUM_PER_EXTRACTION, SCOUT_TITANIUM_CAPACITY - cargo, deposit.amount);
+    deposit.amount -= extracted;
+    unit.cargoTitanium = cargo + extracted;
+    if (unit.cargoTitanium >= SCOUT_TITANIUM_CAPACITY || !deposit.amount) {
+      this.routeToDropoff(unit, deposit);
+    }
   }
 
   dispose() {
@@ -1064,6 +1244,9 @@ export class LocalUnitSimulation implements GameSimulation {
     };
     if (this.result) return finish(false);
     const attackTarget = command.type === "attack" ? this.directTarget(command.targetId) : undefined;
+    if (command.type === "gather") {
+      return finish(this.startGathering(playerId, command));
+    }
     if (command.type === "build") {
       return finish(this.startConstruction(playerId, command));
     }
@@ -1121,6 +1304,7 @@ export class LocalUnitSimulation implements GameSimulation {
       : undefined;
     for (const unit of units) {
       this.releaseConstruction(unit);
+      unit.harvest = undefined;
       this.attackStalls.delete(unit.id);
       this.attackWaitingUntil.delete(unit.id);
       unit.order = "idle";
@@ -1217,6 +1401,7 @@ export class LocalUnitSimulation implements GameSimulation {
       if (unit.health <= 0) continue;
       if (unit.attackCooldownTicks > 0) unit.attackCooldownTicks -= 1;
       this.updateStationaryGuard(unit);
+      this.stepHarvesting(unit);
       if (unit.moving) {
         let remaining = Math.round(unit.speed * SIMULATION_TICK_SECONDS);
 
@@ -1263,6 +1448,14 @@ export class LocalUnitSimulation implements GameSimulation {
     return [...this.buildings.values()].map((building) => structuredClone(building));
   }
 
+  depositSnapshot() {
+    return [...this.deposits.values()].sort(compareIds).map((deposit) => structuredClone(deposit));
+  }
+
+  titaniumSnapshot(): Readonly<Record<string, number>> {
+    return Object.fromEntries([...this.playerTitanium].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+  }
+
   drainEvents() {
     const events = this.events;
     this.events = [];
@@ -1280,6 +1473,8 @@ export class LocalUnitSimulation implements GameSimulation {
       tick: this.tick,
       units: [...this.units.values()].sort(compareIds),
       buildings: [...this.buildings.values()].sort(compareIds),
+      deposits: this.depositSnapshot(),
+      playerTitanium: this.titaniumSnapshot(),
       pendingDirectImpacts: this.pendingDirectImpacts,
       pendingGroundImpacts: this.pendingGroundImpacts,
       buildingSequence: this.buildingSequence,
@@ -1447,6 +1642,7 @@ export class LocalUnitSimulation implements GameSimulation {
   ) {
     const spacing = unit.radius * 2 + UNIT_SEPARATION_GAP;
     const blockers: CircularObstacle[] = [
+      ...this.deposits.values(),
       ...[...this.units.values()].filter((other) => other.health > 0),
       ...[...this.buildings.values()].filter((building) =>
         building.id !== commandCenter.id && building.health > 0),
@@ -1496,6 +1692,7 @@ export class LocalUnitSimulation implements GameSimulation {
   ) {
     return [
       ...buildings,
+      ...this.deposits.values(),
       ...[...this.units.values()]
         .filter((unit) => unit.health > 0 && !unit.pushable && !excludedIds.has(unit.id))
         .sort(compareIds),
@@ -1563,7 +1760,7 @@ export class LocalUnitSimulation implements GameSimulation {
       approachRadius,
       unit.radius * 2 + ATTACK_SEPARATION_GAP,
     )) return undefined;
-    return planAttackRing(unit, target.position, approachRadius, reservations, planner);
+    return planApproachRing(unit, target.position, approachRadius, reservations, planner);
   }
 
   private planAttackGroundPath(
@@ -1603,7 +1800,7 @@ export class LocalUnitSimulation implements GameSimulation {
       && attackSpotIsFree(unit, unit.position, reservations)) {
       return [];
     }
-    return planAttackRing(unit, target, approachRange, reservations, planner);
+    return planApproachRing(unit, target, approachRange, reservations, planner);
   }
 
   private planDirectWaitingPath(
@@ -1903,6 +2100,7 @@ export class LocalUnitSimulation implements GameSimulation {
     });
     if (health > 0) return;
     this.stop(target);
+    target.cargoTitanium = 0;
     this.events.push({ type: "unit-died", tick: this.tick, id: target.id, attackerId: attacker.id });
   }
 
@@ -1934,6 +2132,7 @@ export class LocalUnitSimulation implements GameSimulation {
 
   private stop(unit: UnitState) {
     this.releaseConstruction(unit);
+    unit.harvest = undefined;
     this.attackStalls.delete(unit.id);
     this.attackWaitingUntil.delete(unit.id);
     unit.path = [];
@@ -2008,7 +2207,7 @@ export class LocalUnitSimulation implements GameSimulation {
   }
 
   private setNavigationObstacles(buildings: readonly BuildingState[]) {
-    this.groundNavigation.setObstacles(buildings);
+    this.groundNavigation.setObstacles([...buildings, ...this.deposits.values()]);
   }
 
   private updateAttackStalls() {
@@ -2065,7 +2264,7 @@ export class LocalUnitSimulation implements GameSimulation {
 
   private resolveUnitCollisions() {
     const units = [...this.units.values()].filter((unit) => unit.health > 0).sort(compareIds);
-    const buildings = [...this.buildings.values()].sort(compareIds);
+    const buildings: CircularObstacle[] = [...this.pathingBuildings(), ...this.deposits.values()];
     const cellSize = Math.max(...units.map((unit) => unit.radius)) * 2
       + UNIT_SEPARATION_GAP;
     if (!Number.isFinite(cellSize) || cellSize <= 0) return;
@@ -2091,6 +2290,7 @@ export class LocalUnitSimulation implements GameSimulation {
   }
 
   private collisionPriority(unit: UnitState) {
+    if (unit.harvest?.phase === "extracting") return 2;
     if (unit.attacking) return 2;
     const slot = unit.formationPosition;
     if (!slot) return 0;
@@ -2108,7 +2308,7 @@ export class LocalUnitSimulation implements GameSimulation {
   private separate(
     first: UnitState,
     second: UnitState,
-    buildings: readonly BuildingState[],
+    buildings: readonly CircularObstacle[],
   ) {
     let dx = second.position.x - first.position.x;
     let dz = second.position.z - first.position.z;

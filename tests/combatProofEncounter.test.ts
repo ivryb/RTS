@@ -22,6 +22,7 @@ describe("combat proof encounter", () => {
       ownerId,
       guardMode,
     }))).toEqual([
+      { kind: "scout-drone", ownerId: "local-player", guardMode: undefined },
       { kind: "ghostrunner", ownerId: "local-player", guardMode: undefined },
       { kind: "ghostrunner", ownerId: "local-player", guardMode: undefined },
       { kind: "ghostrunner", ownerId: "local-player", guardMode: undefined },

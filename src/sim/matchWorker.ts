@@ -27,6 +27,8 @@ const publishFrame = () => {
     full: true,
     units: simulation.snapshot(),
     buildings: simulation.buildingSnapshot(),
+    titaniumDeposits: simulation.depositSnapshot(),
+    playerTitanium: simulation.titaniumSnapshot(),
     events: simulation.drainEvents(),
     matchResult: simulation.matchResult,
   };

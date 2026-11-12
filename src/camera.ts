@@ -11,6 +11,8 @@ export class MapCamera {
 
   private readonly target = new THREE.Vector3();
   private readonly offset = new THREE.Vector3(46, 58, 46);
+  private readonly forward = new THREE.Vector3(-this.offset.x, 0, -this.offset.z).normalize();
+  private readonly right = new THREE.Vector3().crossVectors(this.forward, THREE.Object3D.DEFAULT_UP).normalize();
   private readonly keys = new Set<string>();
   private dragging = false;
   private pointerX = 0;
@@ -29,14 +31,13 @@ export class MapCamera {
   }
 
   update(deltaSeconds: number) {
-    const forward = new THREE.Vector3(-this.offset.x, 0, -this.offset.z).normalize();
-    const right = new THREE.Vector3().crossVectors(forward, THREE.Object3D.DEFAULT_UP).normalize();
+    if (this.keys.size === 0 && !this.dragging) return;
     const speed = (34 / this.camera.zoom) * deltaSeconds;
 
-    if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) this.target.addScaledVector(forward, speed);
-    if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) this.target.addScaledVector(forward, -speed);
-    if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) this.target.addScaledVector(right, -speed);
-    if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) this.target.addScaledVector(right, speed);
+    if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) this.target.addScaledVector(this.forward, speed);
+    if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) this.target.addScaledVector(this.forward, -speed);
+    if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) this.target.addScaledVector(this.right, -speed);
+    if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) this.target.addScaledVector(this.right, speed);
 
     this.clampTarget();
     this.updatePosition();
@@ -47,6 +48,12 @@ export class MapCamera {
     this.clampTarget();
     this.camera.zoom = DEFAULT_ZOOM;
     this.camera.updateProjectionMatrix();
+    this.updatePosition();
+  }
+
+  panTo(point: { x: number; z: number }) {
+    this.target.set(point.x, 0, point.z);
+    this.clampTarget();
     this.updatePosition();
   }
 
@@ -98,11 +105,10 @@ export class MapCamera {
       this.pointerY = event.clientY;
 
       const unitsPerPixel = VIEW_HEIGHT / this.camera.zoom / window.innerHeight;
-      const forward = new THREE.Vector3(-this.offset.x, 0, -this.offset.z).normalize();
-      const right = new THREE.Vector3().crossVectors(forward, THREE.Object3D.DEFAULT_UP).normalize();
-      this.target.addScaledVector(right, -dx * unitsPerPixel);
-      this.target.addScaledVector(forward, dy * unitsPerPixel);
+      this.target.addScaledVector(this.right, -dx * unitsPerPixel);
+      this.target.addScaledVector(this.forward, dy * unitsPerPixel);
       this.clampTarget();
+      this.updatePosition();
     });
     this.canvas.addEventListener("pointerup", (event) => {
       if (event.button !== 1 || !this.dragging) return;
@@ -127,7 +133,11 @@ export class MapCamera {
       },
       { passive: false },
     );
-    window.addEventListener("keydown", (event) => this.keys.add(event.code));
+    window.addEventListener("keydown", (event) => {
+      if (event.target instanceof HTMLElement && event.target.closest("input, select, textarea, #minimap")) return;
+      this.keys.add(event.code);
+    });
+    window.addEventListener("blur", () => this.keys.clear());
     window.addEventListener("keyup", (event) => this.keys.delete(event.code));
     window.addEventListener("resize", this.resize);
   }

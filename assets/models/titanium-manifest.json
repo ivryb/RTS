@@ -1,0 +1,65 @@
+{
+  "generator": "tools/assets/build_titanium_ore.py",
+  "source": "authored fractured solids; no scan geometry",
+  "texture_sources": "assets/source/polyhaven/titanium/source.json",
+  "references": "art/workbench/terrain-composite/ore-designs-v2",
+  "license": "CC BY-SA 4.0",
+  "format": "1 mesh, 1 standard PBR material, 1024px WebP color/normal/roughness-metallic",
+  "coordinates": "Y-up, centered X/Z, ground pivot Y=0; exposed workface local +Z",
+  "assets": [
+    {
+      "id": "three-knuckles",
+      "path": "assets/models/titanium-three-knuckles.glb",
+      "bytes": 845928,
+      "sha256": "a3f8b91bdfd6f465d3469407bb74a4cf7c3a05aaeb4925c64dcffdc2d29079a8",
+      "triangles": 8892,
+      "radius": 5.334596600275228,
+      "bounds_min": [
+        -4.958119869232178,
+        -2.695571856747847e-05,
+        -3.2218847274780273
+      ],
+      "bounds_max": [
+        4.958225727081299,
+        3.299999952316284,
+        3.221719741821289
+      ]
+    },
+    {
+      "id": "split-lens",
+      "path": "assets/models/titanium-split-lens.glb",
+      "bytes": 823232,
+      "sha256": "c7c7d0ce9670fbae9269463108cdc87ad4e5ab958df0c3d67c21a588dbe7726f",
+      "triangles": 9030,
+      "radius": 5.350046578099134,
+      "bounds_min": [
+        -4.715089797973633,
+        -0.000391209265217185,
+        -3.457397222518921
+      ],
+      "bounds_max": [
+        4.715089797973633,
+        2.971155881881714,
+        3.4574129581451416
+      ]
+    },
+    {
+      "id": "eroded-window",
+      "path": "assets/models/titanium-eroded-window.glb",
+      "bytes": 923756,
+      "sha256": "dca9119e9b6120560d0e2ef18be7a7a1512a182ed5cbb05d5f137ce304c606fc",
+      "triangles": 10044,
+      "radius": 5.201218747018756,
+      "bounds_min": [
+        -4.999988079071045,
+        -2.2504079879581695e-06,
+        -3.1386139392852783
+      ],
+      "bounds_max": [
+        5.0,
+        2.9090070724487305,
+        3.1386096477508545
+      ]
+    }
+  ]
+}

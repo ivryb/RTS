@@ -110,6 +110,13 @@ export const createCombatProofEncounter = (map: GeneratedMap): CombatProofEncoun
       ),
     ],
     units: [
+      unitAt(
+        "scout-drone-1",
+        "scout-drone",
+        "local-player",
+        pointAt(player, towardEnemy, -3.2, 7.8),
+        playerFacing,
+      ),
       ...[-1.2, 0, 1.2].map((side, index) => unitAt(
         `ghostrunner-${index + 1}`,
         "ghostrunner",

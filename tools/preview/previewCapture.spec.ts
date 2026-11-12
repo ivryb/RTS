@@ -54,3 +54,22 @@ test("capture units Behemoth barrage", async ({ page }) => {
   });
   console.log(`Behemoth barrage: ${Date.now() - started}ms`);
 });
+
+
+test("capture unit order feedback", async ({ page }) => {
+  await page.goto('/tools/preview/?scene=units&seed=77&effect=orders');
+  await page.waitForFunction(() => window.__previewReady === true);
+  await page.screenshot({ path: `${outputDirectory}/unit-orders.jpg`, type: 'jpeg', quality: 92 });
+  await page.evaluate(() => window.__previewStepEffect?.(.5));
+  await page.screenshot({ path: `${outputDirectory}/unit-orders-pulse.jpg`, type: 'jpeg', quality: 92 });
+  await page.evaluate(() => window.__previewStepEffect?.(.85));
+  await page.screenshot({ path: `${outputDirectory}/unit-orders-settled.jpg`, type: 'jpeg', quality: 92 });
+});
+
+for (const effect of ["orders-hill", "orders-mountain", "attack-target", "health-bars", "ground-target", "range-terrain"]) {
+  test(`capture ${effect} feedback`, async ({ page }) => {
+    await page.goto(`/tools/preview/?scene=units&seed=77&effect=${effect}`);
+    await page.waitForFunction(() => window.__previewReady === true);
+    await page.screenshot({ path: `${outputDirectory}/${effect}.jpg`, type: 'jpeg', quality: 92 });
+  });
+}

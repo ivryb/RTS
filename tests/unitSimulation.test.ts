@@ -134,12 +134,12 @@ describe("unit simulation", () => {
       kind: "ghostrunner",
     }).accepted).toBe(true);
     expect(simulation.buildingSnapshot()[0]!.productionQueue).toEqual([
-      expect.objectContaining({ kind: "ghostrunner", progressTicks: 0, totalTicks: 120 }),
+      expect.objectContaining({ kind: "ghostrunner", progressTicks: 0, totalTicks: 20 }),
     ]);
 
-    for (let tick = 0; tick < 119; tick += 1) simulation.step();
+    for (let tick = 0; tick < 19; tick += 1) simulation.step();
     expect(simulation.snapshot()).toEqual([]);
-    expect(simulation.buildingSnapshot()[0]!.productionQueue?.[0]?.progressTicks).toBe(119);
+    expect(simulation.buildingSnapshot()[0]!.productionQueue?.[0]?.progressTicks).toBe(19);
 
     simulation.step();
     expect(simulation.buildingSnapshot()[0]!.productionQueue).toEqual([]);
@@ -178,7 +178,7 @@ describe("unit simulation", () => {
 
     const queued = simulation.buildingSnapshot()[0]!.productionQueue!;
     expect(queued).toHaveLength(5);
-    expect(queued.map((item) => item.totalTicks)).toEqual([120, 200, 350, 120, 200]);
+    expect(queued.map((item) => item.totalTicks)).toEqual([20, 30, 40, 20, 30]);
     simulation.step();
     expect(simulation.buildingSnapshot()[0]!.productionQueue?.map((item) => item.progressTicks))
       .toEqual([1, 0, 0, 0, 0]);
@@ -333,7 +333,7 @@ describe("unit simulation", () => {
       buildingId: commandCenter.id,
       kind: "ghostrunner",
     });
-    for (let tick = 0; tick < 120; tick += 1) simulation.step();
+    for (let tick = 0; tick < 20; tick += 1) simulation.step();
 
     const trained = simulation.snapshot().find((unit) => unit.id !== preferredExit.id)!;
     expect(trained).toMatchObject({ kind: "ghostrunner", order: "move", moving: true });
@@ -356,11 +356,11 @@ describe("unit simulation", () => {
       kind: "ghostrunner",
     });
 
-    for (let tick = 0; tick < 140; tick += 1) simulation.step();
+    for (let tick = 0; tick < 40; tick += 1) simulation.step();
 
     expect(simulation.snapshot()).toEqual([]);
     expect(simulation.buildingSnapshot()[0]!.productionQueue).toEqual([
-      expect.objectContaining({ kind: "ghostrunner", progressTicks: 120, totalTicks: 120 }),
+      expect.objectContaining({ kind: "ghostrunner", progressTicks: 20, totalTicks: 20 }),
     ]);
   });
 
@@ -383,12 +383,12 @@ describe("unit simulation", () => {
       kind: "ghostrunner",
     });
 
-    for (let tick = 0; tick < 140; tick += 1) simulation.step();
+    for (let tick = 0; tick < 40; tick += 1) simulation.step();
 
     expect(simulation.snapshot()).toHaveLength(blockers.length);
     expect(simulation.buildingSnapshot()[0]!.productionQueue?.[0]).toMatchObject({
-      progressTicks: 120,
-      totalTicks: 120,
+      progressTicks: 20,
+      totalTicks: 20,
     });
   });
 
@@ -402,12 +402,12 @@ describe("unit simulation", () => {
       kind: "behemoth",
     });
 
-    for (let tick = 0; tick < 370; tick += 1) simulation.step();
+    for (let tick = 0; tick < 60; tick += 1) simulation.step();
 
     expect(simulation.snapshot()).toEqual([]);
     expect(simulation.buildingSnapshot()[0]!.productionQueue?.[0]).toMatchObject({
-      progressTicks: 350,
-      totalTicks: 350,
+      progressTicks: 40,
+      totalTicks: 40,
     });
   });
 

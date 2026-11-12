@@ -74,6 +74,7 @@ export const constructionPlacementIsValid = (
   position: SimPoint,
   buildings: readonly Pick<BuildingState, "position" | "radius" | "health">[],
   units: readonly Pick<UnitState, "position" | "radius" | "health">[],
+  deposits: readonly Pick<BuildingState, "position" | "radius">[] = [],
 ) => {
   const definition: BuildingDefinition | undefined = (
     BUILDING_DEFINITIONS as Partial<Record<string, BuildingDefinition>>
@@ -96,6 +97,9 @@ export const constructionPlacementIsValid = (
   }
   if (buildings.some((building) => building.health > 0
     && distance(building.position, position) < building.radius + radius)) return false;
+  if (deposits.some((deposit) => distance(deposit.position, position) < deposit.radius + radius)) {
+    return false;
+  }
   return !units.some((unit) => unit.health > 0
     && distance(unit.position, position) < unit.radius + radius);
 };

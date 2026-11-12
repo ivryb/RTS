@@ -28,7 +28,7 @@ test("game camera keeps tall foreground terrain inside its depth range", async (
     let visible = 0;
     const point = new THREE.Vector3();
     for (const start of [...map.startingLocations, ...[-1, 1].flatMap(x => [-1, 1].map(z => ({ x: x * map.size / 2, z: z * map.size / 2 })))]) {
-      controller.focus(start);
+      controller.panTo(start);
       for (const zoom of [DEFAULT_ZOOM * .6, DEFAULT_ZOOM, DEFAULT_ZOOM * 3]) {
         camera.zoom = zoom;
         camera.updateProjectionMatrix();

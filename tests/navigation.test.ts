@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { generateMap, type TerrainSurface } from "../src/map";
+
 import { initializeNavigation, RecastNavigation } from "../src/sim/navigation";
 
 beforeAll(() => initializeNavigation());

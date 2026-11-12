@@ -1,4 +1,9 @@
+import { AttackAreaMarker } from "./attackAreaMarker";
+import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import * as THREE from "three";
+import { OrderMarker } from "./orderMarker";
+import { OrePresentation, ScoutHarvestPresentation, type OreModelLoader } from "./orePresentation";
+import { SCOUT_TITANIUM_CAPACITY, type TitaniumDepositState } from "./sim/harvesting";
 import {
   BehemothBarrage,
   BEHEMOTH_LAUNCH_OFFSETS,
@@ -40,7 +45,6 @@ const LOCAL_PLAYER_ID = "local-player";
 const BEHEMOTH_TRACK_SCROLL_SCALE = 0.75;
 const MAX_TERRAIN_TILT = THREE.MathUtils.degToRad(20);
 const TERRAIN_TILT_RESPONSIVENESS = 10;
-const SELECTION_RING_ELEVATION = 0.045;
 const TURRET_IDLE_SWEEP_ANGLE = THREE.MathUtils.degToRad(32);
 const TURRET_IDLE_SWEEP_SPEED = 0.55;
 const TURRET_IDLE_TURN_RESPONSIVENESS = 4.5;
@@ -134,7 +138,10 @@ interface UnitFrame {
   moving: boolean;
   attacking: boolean;
   attackTargetId?: string;
+  attackGroundTarget?: UnitState["attackGroundTarget"];
   constructionTargetId?: string;
+  cargoTitanium: number;
+  harvest?: UnitState["harvest"];
 }
 
 type SelectedUnitGroup = UnitPresentationDefinition & {
@@ -143,6 +150,8 @@ type SelectedUnitGroup = UnitPresentationDefinition & {
   health: number;
   attackMinRange?: number;
   attackRange?: number;
+  cargoTitanium: number;
+  cargoCapacity: number;
 };
 
 export type SelectedBuilding = BuildingState & {
@@ -187,6 +196,8 @@ interface UnitPresentation {
   selectionHitbox: THREE.Mesh;
   healthBar: HealthBarPresentation;
   constructionBeam?: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  harvesting?: ScoutHarvestPresentation;
+  miningContact?: { depositId: string; x: number; z: number; point: THREE.Vector3 };
   state: "idle" | "move" | "attack" | "death";
   death?: {
     elapsed: number;
@@ -267,7 +278,10 @@ const toFrame = (unit: UnitState): UnitFrame => ({
   moving: unit.moving,
   attacking: unit.attacking,
   attackTargetId: unit.attackTargetId,
+  attackGroundTarget: unit.attackGroundTarget && { ...unit.attackGroundTarget },
   constructionTargetId: unit.constructionTargetId,
+  cargoTitanium: unit.cargoTitanium ?? 0,
+  harvest: unit.harvest,
 });
 
 interface LaserProjectile {
@@ -281,7 +295,7 @@ interface LaserProjectile {
 
 interface MuzzleFlash {
   sprite: THREE.Sprite;
-  light: THREE.PointLight;
+  light?: THREE.PointLight;
   remaining: number;
   scale: number;
 }
@@ -302,13 +316,14 @@ const createGlowTexture = () => {
   return texture;
 };
 
-const createSelectionRing = ({ radius, offset }: UnitPresentationOptions["selectionRing"]) => {
-  const geometry = new THREE.RingGeometry(radius, radius + 0.14, 48);
+export const createSelectionRing = ({ radius, offset }: UnitPresentationOptions["selectionRing"], color = UI_SELECTION_COLOR) => {
+  const geometry = new THREE.RingGeometry(radius, radius + 0.10, 48);
   geometry.rotateX(-Math.PI / 2);
   const ring = new THREE.Mesh(
     geometry,
     new THREE.MeshBasicMaterial({
-      color: UI_SELECTION_COLOR,
+      color,
+      toneMapped: false,
       depthWrite: false,
       opacity: 0.9,
       polygonOffset: true,
@@ -320,7 +335,8 @@ const createSelectionRing = ({ radius, offset }: UnitPresentationOptions["select
   );
   ring.position.set(offset.x, 0, offset.z);
   ring.name = "Selection ring";
-  ring.renderOrder = 2;
+  ring.userData.selectionOverlay = true;
+  prepareGroundOverlay(ring);
   ring.visible = false;
   return ring;
 };
@@ -332,18 +348,20 @@ const healthBarMaterial = (color: number) => new THREE.SpriteMaterial({
   toneMapped: false,
 });
 
-const createHealthBar = (height: number, width = 1) => {
+export const createHealthBar = (height: number, width = 1) => {
   const root = new THREE.Group();
   root.name = "Health bar";
+  root.userData.selectionOverlay = true;
   root.position.y = height;
   root.scale.x = width;
   root.renderOrder = 10;
 
-  const background = new THREE.Sprite(healthBarMaterial(0x160f0d));
+  const background = new THREE.Sprite(healthBarMaterial(0x101010));
   background.name = "Health bar background";
   background.renderOrder = 10;
-  background.scale.set(1.08, 0.16, 1);
-  const fill = new THREE.Sprite(healthBarMaterial(0x63d36f));
+  // Keep all four borders equally thin; horizontal padding must not grow with bar width.
+  background.scale.set(1 + 0.06 / width, 0.16, 1);
+  const fill = new THREE.Sprite(healthBarMaterial(0xf1f1ef));
   fill.name = "Health bar fill";
   fill.renderOrder = 11;
   fill.scale.set(1, 0.1, 1);
@@ -352,18 +370,21 @@ const createHealthBar = (height: number, width = 1) => {
   return { root, fill };
 };
 
-const updateHealthBar = (
+export const updateHealthBar = (
   presentation: HealthBarPresentation,
   health: number,
   maxHealth: number,
   visible: boolean,
+  friendly = true,
 ) => {
   const fraction = THREE.MathUtils.clamp(health / maxHealth, 0, 1);
   presentation.root.visible = visible && health > 0;
   presentation.fill.scale.x = fraction;
-  presentation.fill.position.x = (fraction - 1) / 2;
+  // Sprite anchors are camera-aligned; a local X offset rotates with the unit
+  // and pulls a damaged bar's fill away from its backing.
+  presentation.fill.center.x = fraction > 0 ? .5 / fraction : .5;
   presentation.fill.material.color.setHex(
-    fraction > 0.6 ? 0x63d36f : fraction > 0.3 ? 0xf1c75b : 0xe3564a,
+    friendly ? (fraction > 0.3 ? 0xf1f1ef : 0x909090) : UI_ATTACK_COLOR,
   );
 };
 
@@ -442,6 +463,7 @@ const createSelectionHitbox = ({
     new THREE.CylinderGeometry(radius, radius, height, 8),
     new THREE.MeshBasicMaterial({ visible: false }),
   );
+  hitbox.userData.selectionProxy = true;
   hitbox.position.set(offset.x, offset.y, offset.z);
   return hitbox;
 };
@@ -466,39 +488,6 @@ const createConstructionBeam = () => {
   beam.renderOrder = 4;
   beam.visible = false;
   return beam;
-};
-
-const createDestinationFlag = () => {
-  const marker = new THREE.Group();
-  const amber = new THREE.MeshBasicMaterial({
-    color: UI_SELECTION_COLOR,
-    side: THREE.DoubleSide,
-  });
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.72, 6), amber);
-  pole.position.y = 0.36;
-  const flagGeometry = new THREE.BufferGeometry();
-  flagGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
-    0, 0.68, 0,
-    0, 1.02, 0,
-    0.46, 0.86, 0,
-  ], 3));
-  flagGeometry.computeVertexNormals();
-  const flag = new THREE.Mesh(flagGeometry, amber);
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.2, 0.32, 28),
-    new THREE.MeshBasicMaterial({
-      color: UI_SELECTION_COLOR,
-      depthWrite: false,
-      opacity: 0.8,
-      side: THREE.DoubleSide,
-      transparent: true,
-    }),
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.025;
-  marker.add(pole, flag, ring);
-  marker.visible = false;
-  return marker;
 };
 
 const dashedRingAngles = (radius: number, dashLength: number, gapLength: number) => {
@@ -577,20 +566,51 @@ const createGroundDisc = (
     outlineGeometry,
     material(outlineOpacity),
   );
-  fill.renderOrder = outline.renderOrder = 2;
+  prepareGroundOverlay(fill);
+  prepareGroundOverlay(outline);
   marker.add(fill, outline);
   marker.visible = false;
-  marker.renderOrder = 2;
+  marker.renderOrder = 0;
   return marker;
 };
 
-const RANGE_HALF_WIDTH = 0.055;
-const RANGE_DASH_LENGTH = 0.18;
-const RANGE_GAP_LENGTH = 1.2;
-const createRangeMaterial = () => new THREE.MeshBasicMaterial({
-  color: UI_SELECTION_COLOR,
+export const createAttackGroundIndicator = () => {
+  const marker = createGroundDisc(4, .045, .65);
+  marker.name = "Ground attack target";
+  for (const rotation of [0, Math.PI / 2]) {
+    const geometry = new THREE.PlaneGeometry(.085, .85);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.rotateY(rotation);
+    marker.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      color: UI_ATTACK_COLOR, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+    })));
+  }
+  return marker;
+};
+
+const createConstructionPreview = () => {
+  const preview = createGroundDisc(1, 0.08, 0.8, UI_SELECTION_COLOR);
+  const blocked = new THREE.Group();
+  blocked.name = "Blocked placement";
+  for (const angle of [-Math.PI / 4, Math.PI / 4]) {
+    const geometry = new THREE.PlaneGeometry(.1, 1.3);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.rotateY(angle);
+    const stroke = new THREE.Mesh(geometry, createRangeMaterial());
+    blocked.add(stroke);
+  }
+  preview.add(blocked);
+  return preview;
+};
+
+const RANGE_HALF_WIDTH = 0.075;
+const RANGE_DASH_LENGTH = 0.15;
+const RANGE_GAP_LENGTH = 1.05;
+const createRangeMaterial = (color = UI_SELECTION_COLOR) => new THREE.MeshBasicMaterial({
+  color,
   depthWrite: false,
-  opacity: 0.55,
+  opacity: 0.4,
+  toneMapped: false,
   side: THREE.DoubleSide,
   transparent: true,
 });
@@ -617,12 +637,14 @@ const createDashedRangeGeometry = (radius: number) => {
   );
 };
 
-const createRangeIndicator = (minRange: number, maxRange: number) => {
+export const createRangeIndicator = (minRange: number, maxRange: number, color = UI_SELECTION_COLOR) => {
   const group = new THREE.Group();
   group.name = "Attack range";
+  group.userData.rangeIndicator = true;
+  group.userData.selectionOverlay = true;
   const circle = (radius: number) => {
-    const result = new THREE.Mesh(createDashedRangeGeometry(radius), createRangeMaterial());
-    result.renderOrder = 1;
+    const result = new THREE.Mesh(createDashedRangeGeometry(radius), createRangeMaterial(color));
+    prepareGroundOverlay(result);
     return result;
   };
   if (minRange > 0) group.add(circle(minRange));
@@ -650,10 +672,8 @@ const updateUnionRange = (
 
   const values = position.array as Float32Array;
   let offset = 0;
-  const write = (x: number, z: number) => {
-    values[offset++] = x;
-    values[offset++] = sampleHeight(map, x, z) + 0.07;
-    values[offset++] = z;
+  const write = (point: readonly [number, number, number]) => {
+    for (const value of point) values[offset++] = value;
   };
   for (let centerIndex = 0; centerIndex < centers.length; centerIndex += 1) {
     const center = centers[centerIndex]!;
@@ -665,34 +685,25 @@ const updateUnionRange = (
         && Math.hypot(boundaryX - other.x, boundaryZ - other.z) < radius - 0.001);
       if (covered) continue;
 
-      const points = rangeQuad(center, radius, start, end);
-      for (const index of [0, 1, 2, 0, 2, 3]) write(points[index]![0]!, points[index]![1]!);
+      const height = sampleHeight(map, center.x, center.z) + .1;
+      const points = rangeQuad(center, radius, start, end).map(([x, z]) => [x, height, z] as const);
+      for (const index of [0, 1, 2, 0, 2, 3]) write(points[index]!);
     }
   }
   position.needsUpdate = true;
   mesh.geometry.setDrawRange(0, offset / 3);
+  mesh.geometry.computeBoundingSphere();
 };
 
-const conformGroundOverlay = (
+const placeGroundOverlay = (
   overlay: THREE.Group,
   map: GeneratedMap,
   origin: { x: number; y: number; z: number },
-  rotation = 0,
-  elevation = 0.07,
 ) => {
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
   for (const child of overlay.children) {
     if (!(child instanceof THREE.Mesh)) continue;
-    const positions = child.geometry.attributes.position;
-    for (let index = 0; index < positions.count; index += 1) {
-      const localX = positions.getX(index);
-      const localZ = positions.getZ(index);
-      const worldX = origin.x + localX * cos + localZ * sin;
-      const worldZ = origin.z - localX * sin + localZ * cos;
-      positions.setY(index, sampleHeight(map, worldX, worldZ) - origin.y + elevation);
-    }
-    positions.needsUpdate = true;
+    prepareGroundOverlay(child);
+    placeGroundGeometry(child.geometry, sampleHeight(map, origin.x, origin.z) - origin.y);
   }
 };
 
@@ -701,6 +712,10 @@ export class UnitSystem {
   readonly attackables: THREE.Object3D[] = [];
 
   private readonly session: MatchSession;
+  private readonly ore: OrePresentation;
+  private readonly oreReady: Promise<void>;
+  private readonly currentDeposits = new Map<string, TitaniumDepositState>();
+  private playerTitanium: Readonly<Record<string, number>> = {};
   private readonly buildingById = new Map<string, BuildingPresentation>();
   private readonly currentBuildings = new Map<string, BuildingState>();
   private readonly pendingBuildings = new Map<string, Promise<THREE.Group>>();
@@ -709,11 +724,15 @@ export class UnitSystem {
   private readonly presentations = new Map<string, UnitPresentation>();
   private readonly previous = new Map<string, UnitFrame>();
   private readonly current = new Map<string, UnitFrame>();
-  private readonly marker = createDestinationFlag();
-  private readonly rallyMarker = createDestinationFlag();
-  private readonly attackGroundPreview = createGroundDisc(4, 0.055, 0.55);
-  private readonly attackGroundMarker = createGroundDisc(4, 0.04, 0.42);
-  private readonly constructionPreview = createGroundDisc(1, 0.08, 0.8, UI_SELECTION_COLOR);
+  private readonly marker = new OrderMarker("destination", (x, z) => sampleHeight(this.map, x, z));
+  private readonly attackFeedback = new OrderMarker("attack", (x, z) => sampleHeight(this.map, x, z));
+  private feedbackTargetId?: string;
+  private feedbackAge = 0;
+  private readonly rallyMarker = new OrderMarker("destination", (x, z) => sampleHeight(this.map, x, z));
+  private readonly attackGroundPreview = createAttackGroundIndicator();
+  private readonly attackGroundMarker = new AttackAreaMarker();
+  private groundFeedbackGrace = 0;
+  private readonly constructionPreview = createConstructionPreview();
   private readonly combinedRangeIndicator = new THREE.Group();
   private readonly selectedIds = new Set<string>();
   private selectedUnitFrames: readonly UnitFrame[] = [];
@@ -735,6 +754,15 @@ export class UnitSystem {
   private readonly glowTexture = createGlowTexture();
   private readonly laserProjectiles: LaserProjectile[] = [];
   private readonly laserPool: LaserProjectile[] = [];
+  // Reuse a bounded set of lights, but hide inactive ones to avoid per-pixel work.
+  // prepareRendering warms every light-count variant before combat starts.
+  private readonly muzzleLights = Array.from({ length: 8 }, () => {
+    const light = new THREE.PointLight(0xff4058, 0, 3.5, 2);
+    light.name = "Muzzle flash light";
+    light.visible = false;
+    return light;
+  });
+  private readonly availableMuzzleLights = [...this.muzzleLights];
   private readonly muzzleFlashes: MuzzleFlash[] = [];
   private readonly muzzleFlashPool: MuzzleFlash[] = [];
   private readonly pendingDirectShots = new Map<string, PendingDirectShot>();
@@ -755,6 +783,7 @@ export class UnitSystem {
   private readonly turretOrigin = new THREE.Vector3();
   private readonly turretTarget = new THREE.Vector3();
   private readonly targetBounds = new THREE.Box3();
+  private readonly preparedFadeMaterials = new Set<THREE.Material>();
   private frameVersion = 0;
   private frameTick = 0;
   private interpolationAge = SIMULATION_TICK_SECONDS;
@@ -770,8 +799,17 @@ export class UnitSystem {
     session?: MatchSession,
     private readonly createBuildingPresentation?: BuildingPresentationFactory,
     private readonly createUnitPresentation?: UnitPresentationFactory,
+    loadOreModels?: OreModelLoader,
   ) {
     this.behemothBarrage = new BehemothBarrage(world, map);
+    for (const deposit of map.titaniumDeposits ?? []) this.currentDeposits.set(deposit.id, deposit);
+    this.ore = new OrePresentation(world, map, [...this.currentDeposits.values()], loadOreModels);
+    this.oreReady = this.ore.ready.then(() => {
+      if (this.disposed) return;
+      this.selectables.push(...this.ore.selectables);
+      this.ore.update([...this.currentDeposits.values()], this.selectedIds);
+    });
+    this.world.add(...this.muzzleLights);
     const buildingStates: BuildingState[] = buildings.map((building) => {
       const position = toSimPoint(building.x, building.z);
       const radius = Math.round(building.radius * POSITION_SCALE);
@@ -833,18 +871,22 @@ export class UnitSystem {
         segments: map.segments,
         heights: map.heights,
         mountainMask: map.mountainMask,
+        trianglePattern: map.trianglePattern,
         placement: map.placement,
       },
-      commandCenterPlayers.length > 1
-        ? { commandCenterElimination: commandCenterPlayers }
-        : undefined,
+      {
+        titaniumDeposits: [...this.currentDeposits.values()],
+        ...(commandCenterPlayers.length > 1 ? { commandCenterElimination: commandCenterPlayers } : {}),
+      },
     );
     this.combinedRangeIndicator.name = "Combined attack range";
     this.combinedRangeIndicator.visible = false;
     this.constructionPreview.name = "Construction placement";
+    this.attackGroundPreview.name = "Ground attack preview";
     this.rallyMarker.name = "Rally point";
     this.world.add(
       this.marker,
+      this.attackFeedback,
       this.rallyMarker,
       this.attackGroundPreview,
       this.attackGroundMarker,
@@ -852,6 +894,69 @@ export class UnitSystem {
       this.combinedRangeIndicator,
     );
     this.syncSessionFrame();
+  }
+
+  /** Compile hidden effects and fade variants during loading, before the first fight. */
+  async prepareRendering(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+    await this.oreReady;
+    await Promise.allSettled([...this.pendingUnits.values(), ...this.pendingBuildings.values()]);
+    if (this.disposed) return;
+    const warmup = new THREE.Group();
+    warmup.name = "Prepared combat materials";
+    warmup.visible = false;
+    const flash = this.createMuzzleFlash();
+    this.muzzleFlashPool.push(flash);
+    warmup.add(new THREE.Mesh(this.laserGeometry, this.laserMaterial), flash.sprite);
+    warmup.add(this.behemothBarrage.prepareRendering());
+    const presentation = this.presentations.values().next().value;
+    if (presentation) {
+      const healthBar = presentation.healthBar.root.clone(true);
+      healthBar.visible = true;
+      warmup.add(healthBar);
+    }
+    // Keep these material variants alive for later deaths. They share geometry
+    // and textures with the models; only the fading material is different.
+    for (const presentation of [...this.presentations.values(), ...this.buildingById.values()]) {
+      warmup.add(presentation.visualRoot.clone(true));
+      const faded = presentation.visualRoot.clone(true);
+      faded.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const fade = (material: THREE.Material) => {
+          const copy = material.clone();
+          copy.transparent = true;
+          copy.depthWrite = false;
+          this.preparedFadeMaterials.add(copy);
+          return copy;
+        };
+        object.material = Array.isArray(object.material)
+          ? object.material.map(fade) : fade(object.material);
+      });
+      warmup.add(faded);
+    }
+    this.world.add(warmup);
+    // Drivers can defer pipeline setup until the first draw. Prepare each light
+    // count in one startup task, submitting effect/model variants below the terrain.
+    // No animation frame can observe a partially prepared lighting configuration.
+    warmup.position.y = -10_000;
+    warmup.visible = true;
+    const culling = new Map<THREE.Object3D, boolean>();
+    warmup.traverse((object) => {
+      culling.set(object, object.frustumCulled);
+      object.frustumCulled = false;
+    });
+    try {
+      for (let count = 0; count <= this.muzzleLights.length; count += 1) {
+        for (let index = 0; index < this.muzzleLights.length; index += 1) {
+          this.muzzleLights[index]!.visible = index < count;
+        }
+        renderer.compile(scene, camera);
+        renderer.render(scene, camera);
+      }
+    } finally {
+      for (const light of this.muzzleLights) light.visible = light.intensity > 0;
+      for (const [object, frustumCulled] of culling) object.frustumCulled = frustumCulled;
+      warmup.removeFromParent();
+    }
   }
 
   attachGhostrunner(
@@ -918,6 +1023,7 @@ export class UnitSystem {
       },
       attack: "none",
       constructionBeam,
+      harvesting: new ScoutHarvestPresentation(root, this.world),
     });
   }
 
@@ -989,22 +1095,23 @@ export class UnitSystem {
     behavior: Pick<
       UnitPresentation,
       "mixer" | "actions" | "hover" | "tracks" | "laser" | "barrage" | "attack"
-        | "constructionBeam"
+        | "constructionBeam" | "harvesting"
     >,
   ) {
     const visualRoot = new THREE.Group();
     visualRoot.name = `${root.name || id} Terrain Tilt`;
     for (const child of [...root.children]) visualRoot.add(child);
     root.add(visualRoot);
-    const selectionRing = createSelectionRing(options.selectionRing);
+    const unit = this.current.get(id);
+    const color = unit?.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
+    const selectionRing = createSelectionRing(options.selectionRing, color);
     const healthBar = createHealthBar(
       options.selectionHitbox.offset.y + options.selectionHitbox.height / 2 + 0.3,
       Math.max(1, options.selectionRing.radius * 1.5),
     );
     const selectionHitbox = createSelectionHitbox(options.selectionHitbox);
-    const unit = this.current.get(id);
     const rangeIndicator = unit?.attackRange
-      ? createRangeIndicator(unit.attackMinRange ?? 0, unit.attackRange)
+      ? createRangeIndicator(unit.attackMinRange ?? 0, unit.attackRange, color)
       : undefined;
     root.add(
       selectionRing,
@@ -1049,11 +1156,12 @@ export class UnitSystem {
     visualRoot.name = "Building visual";
     for (const child of [...root.children]) visualRoot.add(child);
     root.add(visualRoot);
+    const color = building.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
     const selectionRadius = (building.attackRadius ?? building.radius) / POSITION_SCALE;
     const selectionRing = createSelectionRing({
       radius: selectionRadius,
       offset: { x: 0, z: 0 },
-    });
+    }, color);
     const healthBar = createHealthBar(height + 0.65, Math.max(1.8, selectionRadius * 1.25));
     const selectionHitbox = createSelectionHitbox({
       radius: selectionRadius,
@@ -1064,7 +1172,7 @@ export class UnitSystem {
     const weaponRange = building.weapon?.range
       ?? (weaponDefinition ? weaponDefinition.range * POSITION_SCALE : undefined);
     const rangeIndicator = weaponRange
-      ? createRangeIndicator(0, weaponRange / POSITION_SCALE)
+      ? createRangeIndicator(0, weaponRange / POSITION_SCALE, color)
       : undefined;
     if (rangeIndicator) rangeIndicator.name = "Turret attack range";
     const turretHead = building.kind === "turret"
@@ -1125,7 +1233,9 @@ export class UnitSystem {
     const previousIds = new Set(this.selectedIds);
     if (mode === "replace") this.selectedIds.clear();
     for (const id of ids) {
-      if (!this.presentations.has(id) && !this.buildingById.has(id)) continue;
+      const resource = this.currentDeposits.has(id) && this.ore.has(id);
+      if (!resource && (this.current.get(id)?.health ?? this.currentBuildings.get(id)?.health ?? 0) <= 0) continue;
+      if (!resource && !this.presentations.has(id) && !this.buildingById.has(id)) continue;
       if (mode === "toggle" && this.selectedIds.has(id)) this.selectedIds.delete(id);
       else this.selectedIds.add(id);
     }
@@ -1139,6 +1249,7 @@ export class UnitSystem {
     for (const [buildingId, presentation] of this.buildingById) {
       presentation.selectionRing.visible = this.selectedIds.has(buildingId);
     }
+    this.ore.update([...this.currentDeposits.values()], this.selectedIds);
     this.refreshSelectionCache();
     this.refreshRangeSelection();
     this.refreshHealthBars();
@@ -1146,7 +1257,7 @@ export class UnitSystem {
   }
 
   moveSelected(x: number, z: number) {
-    const unitIds = [...this.selectedIds].filter((id) => this.presentations.has(id));
+    const unitIds = this.selectedCommandableUnits().map((unit) => unit.id);
     if (!unitIds.length) return false;
     const accepted = this.submit({
       type: "move",
@@ -1154,10 +1265,40 @@ export class UnitSystem {
       target: toSimPoint(x, z),
     });
     if (!accepted) return false;
-    this.marker.position.set(x, sampleHeight(this.map, x, z), z);
-    this.marker.visible = true;
+    this.feedbackTargetId = undefined;
+    this.attackFeedback.visible = false;
+    this.attackGroundMarker.visible = false;
+    this.groundFeedbackGrace = 0;
+    this.marker.show(x, sampleHeight(this.map, x, z), z);
     this.markerTime = 0;
     return true;
+  }
+
+  gatherSelected(depositId: string) {
+    const deposit = this.currentDeposits.get(depositId);
+    if (!deposit) return false;
+    const scouts = this.selectedCommandableUnits().filter(unit => unit.kind === "scout-drone");
+    if (deposit.amount <= 0 && !scouts.some(unit => unit.cargoTitanium > 0)) return false;
+    const unitIds = scouts.map(unit => unit.id);
+    if (!unitIds.length || !this.submit({ type: "gather", unitIds, depositId })) return false;
+    const x = deposit.position.x / POSITION_SCALE;
+    const z = deposit.position.z / POSITION_SCALE;
+    this.marker.show(x, sampleHeight(this.map, x, z), z);
+    this.markerTime = 0;
+    this.feedbackTargetId = undefined;
+    this.attackFeedback.visible = false;
+    return true;
+  }
+
+  selectedDeposits() {
+    return [...this.selectedIds].flatMap(id => {
+      const deposit = this.currentDeposits.get(id);
+      return deposit ? [deposit] : [];
+    });
+  }
+
+  get titanium() {
+    return this.playerTitanium[LOCAL_PLAYER_ID] ?? 0;
   }
 
   previewConstruction(kind: BuildingKind, x: number, z: number) {
@@ -1167,13 +1308,19 @@ export class UnitSystem {
     }
     const valid = this.constructionPlacementValid(kind, x, z);
     const definition = BUILDING_DEFINITIONS[kind];
-    this.constructionPreview.position.set(x, sampleHeight(this.map, x, z) + 0.08, z);
-    this.constructionPreview.scale.setScalar(definition.radius);
+    this.constructionPreview.position.set(x, 0, z);
+    this.constructionPreview.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        prepareGroundOverlay(child);
+        placeGroundGeometry(child.geometry, sampleHeight(this.map, x, z), definition.radius);
+      }
+    });
     for (const child of this.constructionPreview.children) {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
         child.material.color.setHex(valid ? UI_SELECTION_COLOR : UI_ATTACK_COLOR);
       }
     }
+    this.constructionPreview.getObjectByName("Blocked placement")!.visible = !valid;
     this.constructionPreview.visible = true;
     return valid;
   }
@@ -1231,8 +1378,9 @@ export class UnitSystem {
   }
 
   attackSelected(targetId: string) {
-    const attackers = [...this.selectedIds]
-      .filter((id) => this.presentations.get(id)?.attack === "direct");
+    const attackers = this.selectedCommandableUnits()
+      .filter((unit) => this.presentations.get(unit.id)?.attack === "direct")
+      .map((unit) => unit.id);
     if (!attackers.length) return false;
     const accepted = this.submit({
       type: "attack",
@@ -1241,12 +1389,21 @@ export class UnitSystem {
     });
     if (!accepted) return false;
     this.marker.visible = false;
+    const target = this.current.get(targetId);
+    const building = this.currentBuildings.get(targetId);
+    const x = target?.x ?? (building ? building.position.x / POSITION_SCALE : undefined);
+    const z = target?.z ?? (building ? building.position.z / POSITION_SCALE : undefined);
+    this.feedbackTargetId = targetId;
+    this.feedbackAge = 0;
+    const radius = target ? target.radius + .35 : building ? building.radius / POSITION_SCALE + .35 : 1;
+    if (x !== undefined && z !== undefined) this.attackFeedback.show(x, sampleHeight(this.map, x, z), z, radius);
     return true;
   }
 
   attackGroundSelected(x: number, z: number) {
-    const attackers = [...this.selectedIds]
-      .filter((id) => this.presentations.get(id)?.attack === "ground");
+    const attackers = this.selectedCommandableUnits()
+      .filter((unit) => this.presentations.get(unit.id)?.attack === "ground")
+      .map((unit) => unit.id);
     if (!attackers.length) return false;
     const accepted = this.submit({
       type: "attack-ground",
@@ -1256,15 +1413,19 @@ export class UnitSystem {
     if (!accepted) return false;
     this.marker.visible = false;
     this.attackGroundPreview.visible = false;
+    this.feedbackTargetId = undefined;
+    this.feedbackAge = 0;
+    this.attackFeedback.visible = false;
+    this.groundFeedbackGrace = .7;
     this.attackGroundMarker.position.set(x, 0, z);
-    conformGroundOverlay(this.attackGroundMarker, this.map, { x, y: 0, z }, 0, 0.11);
+    placeGroundOverlay(this.attackGroundMarker, this.map, { x, y: 0, z });
     this.attackGroundMarker.visible = true;
     return true;
   }
 
   previewAttackGround(x: number, z: number) {
     this.attackGroundPreview.position.set(x, 0, z);
-    conformGroundOverlay(this.attackGroundPreview, this.map, { x, y: 0, z }, 0, 0.11);
+    placeGroundOverlay(this.attackGroundPreview, this.map, { x, y: 0, z });
     this.attackGroundPreview.visible = true;
   }
 
@@ -1273,7 +1434,7 @@ export class UnitSystem {
   }
 
   stopSelected() {
-    const unitIds = [...this.selectedIds].filter((id) => this.presentations.has(id));
+    const unitIds = this.selectedCommandableUnits().map((unit) => unit.id);
     if (!unitIds.length) return false;
     const accepted = this.submit({
       type: "stop",
@@ -1283,11 +1444,22 @@ export class UnitSystem {
     this.marker.visible = false;
     this.attackGroundPreview.visible = false;
     this.attackGroundMarker.visible = false;
+    this.groundFeedbackGrace = 0;
+    this.feedbackTargetId = undefined;
+    this.attackFeedback.visible = false;
     return true;
   }
 
   selectedUnits() {
     return this.selectedUnitFrames;
+  }
+
+  selectedCommandableUnits() {
+    return [...this.selectedIds].flatMap((id) => {
+      const unit = this.current.get(id);
+      return unit && unit.ownerId === LOCAL_PLAYER_ID && unit.health > 0
+        ? [{ id, ...unit }] : [];
+    });
   }
 
   selectedGroups() {
@@ -1358,6 +1530,7 @@ export class UnitSystem {
         radius: Math.round(unit.radius * POSITION_SCALE),
         health: unit.health,
       })),
+      [...this.currentDeposits.values()],
     );
   }
 
@@ -1375,11 +1548,32 @@ export class UnitSystem {
     return this.result.winnerId === LOCAL_PLAYER_ID ? "victory" : "defeat";
   }
 
+  tacticalState() {
+    return {
+      seconds: this.frameTick * SIMULATION_TICK_SECONDS,
+      entities: [
+        ...[...this.current].filter(([, unit]) => unit.health > 0).map(([id, unit]) => ({
+          x: unit.x, z: unit.z, building: false,
+          friendly: unit.ownerId === LOCAL_PLAYER_ID, selected: this.selectedIds.has(id),
+        })),
+        ...[...this.currentBuildings.values()].filter((building) => building.health > 0).map((building) => ({
+          x: building.position.x / POSITION_SCALE, z: building.position.z / POSITION_SCALE,
+          building: true, friendly: building.ownerId === LOCAL_PLAYER_ID,
+          selected: this.selectedIds.has(building.id),
+        })),
+      ],
+    };
+  }
+
   /** Read-only diagnostics snapshot for verification tooling; gameplay never reads it. */
   inspect() {
     return {
       tick: this.frameTick,
       outcome: this.matchOutcome,
+      titanium: this.titanium,
+      titaniumDeposits: [...this.currentDeposits.values()].map(deposit => ({
+        ...deposit, x: deposit.position.x / POSITION_SCALE, z: deposit.position.z / POSITION_SCALE,
+      })),
       units: [...this.current].map(([id, frame]) => ({ id, ...frame })),
       buildings: [...this.currentBuildings.values()].map((building) => ({
         id: building.id,
@@ -1397,6 +1591,7 @@ export class UnitSystem {
       selected: {
         unitIds: [...this.selectedIds].filter((id) => this.current.has(id)),
         buildingIds: this.selectedBuildingFrames.map((building) => building.id),
+        depositIds: this.selectedDeposits().map(deposit => deposit.id),
       },
     };
   }
@@ -1418,6 +1613,8 @@ export class UnitSystem {
       attackDamage: units[0]!.attackDamage ?? UNIT_CATALOG[kind].attackDamage,
       attackMinRange: units[0]!.attackMinRange,
       attackRange: units[0]!.attackRange,
+      cargoTitanium: units.reduce((total, unit) => total + unit.cargoTitanium, 0),
+      cargoCapacity: kind === "scout-drone" ? units.length * SCOUT_TITANIUM_CAPACITY : 0,
     }));
   }
 
@@ -1454,22 +1651,67 @@ export class UnitSystem {
 
     if (this.marker.visible) {
       this.markerTime += deltaSeconds;
-      const pulse = 1 + Math.sin(this.markerTime * 7) * 0.07;
-      this.marker.scale.setScalar(pulse);
-      if (!this.selectedUnits().some((unit) => unit.moving)) this.marker.visible = false;
+      this.marker.animate(deltaSeconds);
+      // Worker acknowledgement can arrive after the first rendered frame.
+      if (this.markerTime > .7 && !this.selectedUnits().some((unit) => unit.moving)) this.marker.visible = false;
     }
-    if (this.attackGroundMarker.visible) {
-      if (!this.selectedUnits().some((unit) => unit.order === "attack-ground")) {
-        this.attackGroundMarker.visible = false;
+    this.rallyMarker.animate(deltaSeconds);
+    this.feedbackAge += deltaSeconds;
+    if (this.feedbackTargetId) {
+      const target = this.current.get(this.feedbackTargetId);
+      const building = this.currentBuildings.get(this.feedbackTargetId);
+      const living = (target?.health ?? building?.health ?? 0) > 0;
+      const ordered = this.selectedUnits().some((unit) => unit.attackTargetId === this.feedbackTargetId);
+      if (!living || this.feedbackAge > .7 && !ordered) {
+        this.attackFeedback.visible = false;
+        this.feedbackTargetId = undefined;
+      } else if (target) {
+        const position = this.presentations.get(this.feedbackTargetId)?.root.position;
+        const x = position?.x ?? target.x;
+        const z = position?.z ?? target.z;
+        this.attackFeedback.place(x, sampleHeight(this.map, x, z), z);
       }
+    } else if (this.feedbackAge > .8) {
+      this.attackFeedback.visible = false;
+    }
+    this.attackFeedback.animate(deltaSeconds);
+    this.updateGroundAttackIndicator(deltaSeconds);
+    this.attackGroundMarker.animate(deltaSeconds);
+  }
+
+  private updateGroundAttackIndicator(deltaSeconds: number) {
+    if (this.result) {
+      this.groundFeedbackGrace = 0;
+      this.attackGroundMarker.visible = false;
+      return;
+    }
+    const order = this.selectedCommandableUnits().find((unit) =>
+      unit.order === "attack-ground" && unit.attackGroundTarget);
+    if (order?.attackGroundTarget) {
+      this.groundFeedbackGrace = 0;
+      const x = order.attackGroundTarget.x / POSITION_SCALE;
+      const z = order.attackGroundTarget.z / POSITION_SCALE;
+      if (!this.attackGroundMarker.visible || this.attackGroundMarker.position.x !== x
+        || this.attackGroundMarker.position.z !== z) {
+        this.attackGroundMarker.position.set(x, 0, z);
+        placeGroundOverlay(this.attackGroundMarker, this.map, { x, y: 0, z });
+      }
+      this.attackGroundMarker.visible = true;
+    } else if (this.groundFeedbackGrace > 0) {
+      this.groundFeedbackGrace = Math.max(0, this.groundFeedbackGrace - deltaSeconds);
+      this.attackGroundMarker.visible = this.groundFeedbackGrace > 0;
+    } else {
+      this.attackGroundMarker.visible = false;
     }
   }
 
   dispose() {
     this.disposed = true;
     this.session.dispose?.();
+    this.ore.dispose();
     for (const presentation of this.presentations.values()) {
       presentation.mixer?.stopAllAction();
+      presentation.harvesting?.dispose();
       disposeEntityOverlays(presentation);
       if (presentation.constructionBeam) {
         presentation.constructionBeam.geometry.dispose();
@@ -1487,12 +1729,15 @@ export class UnitSystem {
       flash.sprite.material.dispose();
     }
     this.muzzleFlashes.length = 0;
+    for (const light of this.muzzleLights) light.removeFromParent();
     for (const flash of this.muzzleFlashPool) flash.sprite.material.dispose();
     this.muzzleFlashPool.length = 0;
     this.laserPool.length = 0;
     this.laserGeometry.dispose();
     this.laserMaterial.dispose();
     this.glowTexture.dispose();
+    for (const material of this.preparedFadeMaterials) material.dispose();
+    this.preparedFadeMaterials.clear();
     this.behemothBarrage.dispose();
   }
 
@@ -1517,7 +1762,9 @@ export class UnitSystem {
     if (rallyPoint) {
       const x = rallyPoint.x / POSITION_SCALE;
       const z = rallyPoint.z / POSITION_SCALE;
-      this.rallyMarker.position.set(x, sampleHeight(this.map, x, z), z);
+      if (this.rallyMarker.position.x !== x || this.rallyMarker.position.z !== z) {
+        this.rallyMarker.show(x, sampleHeight(this.map, x, z), z);
+      }
     }
   }
 
@@ -1530,6 +1777,7 @@ export class UnitSystem {
         unit.health,
         unit.maxHealth,
         this.shouldShowHealth(id, unit.health, unit.maxHealth),
+        unit.ownerId === LOCAL_PLAYER_ID,
       );
     }
     const building = this.currentBuildings.get(id);
@@ -1540,6 +1788,7 @@ export class UnitSystem {
         building.health,
         building.maxHealth,
         this.shouldShowHealth(id, building.health, building.maxHealth),
+        building.ownerId === LOCAL_PLAYER_ID,
       );
     }
   }
@@ -1579,7 +1828,7 @@ export class UnitSystem {
       const presentation = this.presentations.get(id);
       return unit?.attackRange && presentation ? [{ id, unit, presentation }] : [];
     });
-    if (new Set(ranged.map(({ unit }) => unit.kind)).size !== 1) {
+    if (new Set(ranged.map(({ unit }) => `${unit.ownerId}:${unit.kind}`)).size !== 1) {
       this.combinedRangeIndicator.visible = false;
       this.selectedRangeIds = [];
       return;
@@ -1594,7 +1843,7 @@ export class UnitSystem {
     const unit = ranged[0]!.unit;
     const ranges = [unit.attackMinRange, unit.attackRange]
       .filter((range): range is number => Boolean(range));
-    const key = `${unit.kind}:${ranges.join(",")}`;
+    const key = `${unit.ownerId}:${unit.kind}:${ranges.join(",")}`;
     if (key !== this.combinedRangeKey) {
       for (const child of [...this.combinedRangeIndicator.children]) {
         if (child instanceof THREE.Mesh) {
@@ -1604,9 +1853,9 @@ export class UnitSystem {
       }
       this.combinedRangeIndicator.clear();
       for (const range of ranges) {
-        const mesh = new THREE.Mesh(new THREE.BufferGeometry(), createRangeMaterial());
+        const mesh = new THREE.Mesh(new THREE.BufferGeometry(), createRangeMaterial(unit.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR));
         mesh.frustumCulled = false;
-        mesh.renderOrder = 1;
+        prepareGroundOverlay(mesh);
         mesh.userData.range = range;
         this.combinedRangeIndicator.add(mesh);
       }
@@ -1677,6 +1926,15 @@ export class UnitSystem {
     if (frame.matchResult) this.result = structuredClone(frame.matchResult);
     let selectionChanged = false;
     let rangeChanged = false;
+    if (frame.playerTitanium) this.playerTitanium = frame.playerTitanium;
+    if (frame.titaniumDeposits) {
+      for (const deposit of frame.titaniumDeposits) {
+        selectionChanged ||= this.selectedIds.has(deposit.id)
+          && this.currentDeposits.get(deposit.id)?.amount !== deposit.amount;
+        this.currentDeposits.set(deposit.id, deposit);
+      }
+      this.ore.update([...this.currentDeposits.values()], this.selectedIds);
+    }
     const unitDeaths = new Map(frame.events.flatMap((event) =>
       event.type === "unit-died" ? [[event.id, event.attackerId] as const] : []
     ));
@@ -1715,6 +1973,13 @@ export class UnitSystem {
         this.pendingGroundShots.delete(unit.id);
       }
       if (unit.health <= 0) {
+        // Corpse animation keeps the model visible, never its living-unit overlays.
+        const presentation = this.presentations.get(unit.id);
+        if (presentation) {
+          presentation.selectionRing.visible = false;
+          presentation.healthBar.root.visible = false;
+          if (presentation.rangeIndicator) presentation.rangeIndicator.visible = false;
+        }
         const wasSelected = this.selectedIds.delete(unit.id);
         selectionChanged ||= wasSelected;
         rangeChanged ||= wasSelected;
@@ -1761,6 +2026,7 @@ export class UnitSystem {
       this.select();
       this.marker.visible = false;
       this.rallyMarker.visible = false;
+      this.attackFeedback.visible = false;
       this.attackGroundPreview.visible = false;
       this.attackGroundMarker.visible = false;
       this.constructionPreview.visible = false;
@@ -1959,12 +2225,12 @@ export class UnitSystem {
       presentation.visualRoot.scale.y = building.lifecycle === "active"
         ? 1
         : 0.15 + building.constructionProgress * 0.85;
+      placeGroundGeometry(presentation.selectionRing.geometry, 0);
       if (presentation.rangeIndicator) {
-        conformGroundOverlay(
+        placeGroundOverlay(
           presentation.rangeIndicator,
           this.map,
           root.position,
-          root.rotation.y,
         );
       }
     }
@@ -2118,6 +2384,7 @@ export class UnitSystem {
     if (!presentation) return;
     presentation.root.visible = visible;
     if (!visible && presentation.constructionBeam) presentation.constructionBeam.visible = false;
+    if (!visible) presentation.harvesting?.hide();
     const frame = this.current.get(id);
     if (frame?.ownerId === LOCAL_PLAYER_ID) return;
     const index = this.attackables.indexOf(presentation.root);
@@ -2224,10 +2491,12 @@ export class UnitSystem {
     const pendingGroundShot = this.pendingGroundShots.get(id);
     const pendingShot = pendingDirectShot ?? pendingGroundShot;
     const turningToAttack = current.attacking || pendingShot !== undefined;
+    const miningDeposit = current.harvest?.phase === "extracting"
+      ? this.currentDeposits.get(current.harvest.depositId) : undefined;
     let facingTarget = !turningToAttack;
-    if (current.moving || turningToAttack) {
-      const targetX = pendingShot?.targetX ?? current.targetX;
-      const targetZ = pendingShot?.targetZ ?? current.targetZ;
+    if (current.moving || turningToAttack || miningDeposit) {
+      const targetX = miningDeposit ? miningDeposit.position.x / POSITION_SCALE : pendingShot?.targetX ?? current.targetX;
+      const targetZ = miningDeposit ? miningDeposit.position.z / POSITION_SCALE : pendingShot?.targetZ ?? current.targetZ;
       const desired = Math.atan2(targetX - x, targetZ - z);
       const difference = Math.atan2(
         Math.sin(desired - presentation.root.rotation.y),
@@ -2257,6 +2526,15 @@ export class UnitSystem {
     }
     const { y, normal } = presentation.ground;
     presentation.root.position.set(x, y, z);
+    if (miningDeposit) {
+      const contact = presentation.miningContact;
+      if (!contact || contact.depositId !== miningDeposit.id || contact.x !== x || contact.z !== z) {
+        const point = this.ore.workface(miningDeposit.id, new THREE.Vector3(x, y + 0.95, z));
+        presentation.miningContact = point ? { depositId: miningDeposit.id, x, z, point } : undefined;
+      }
+    } else presentation.miningContact = undefined;
+    presentation.harvesting?.update(current.health > 0 ? current.cargoTitanium : 0, current.health > 0 && Boolean(miningDeposit),
+      x, y, z, presentation.miningContact?.point, deltaSeconds);
     const constructionSite = current.constructionTargetId
       ? this.currentBuildings.get(current.constructionTargetId)
       : undefined;
@@ -2285,20 +2563,7 @@ export class UnitSystem {
       const rotation = presentation.root.rotation.y;
       const previous = presentation.selectionGround;
       if (!previous || previous.x !== x || previous.z !== z || previous.rotation !== rotation) {
-        const positions = presentation.selectionRing.geometry.attributes.position;
-        const cos = Math.cos(rotation);
-        const sin = Math.sin(rotation);
-        for (let index = 0; index < positions.count; index += 1) {
-          const localX = positions.getX(index) + presentation.selectionRing.position.x;
-          const localZ = positions.getZ(index) + presentation.selectionRing.position.z;
-          const worldX = x + localX * cos + localZ * sin;
-          const worldZ = z - localX * sin + localZ * cos;
-          positions.setY(
-            index,
-            sampleHeight(this.map, worldX, worldZ) - y + SELECTION_RING_ELEVATION,
-          );
-        }
-        positions.needsUpdate = true;
+        placeGroundGeometry(presentation.selectionRing.geometry, 0);
         presentation.selectionGround = { x, z, rotation };
       }
     }
@@ -2306,7 +2571,7 @@ export class UnitSystem {
       presentation.rangeIndicator.rotation.y = -presentation.root.rotation.y;
       const previous = presentation.rangeGround;
       if (!previous || previous.x !== x || previous.z !== z) {
-        conformGroundOverlay(
+        placeGroundOverlay(
           presentation.rangeIndicator,
           this.map,
           { x, y, z },
@@ -2480,29 +2745,34 @@ export class UnitSystem {
     return true;
   }
 
+  private createMuzzleFlash(): MuzzleFlash {
+    const material = new THREE.SpriteMaterial({
+      blending: THREE.AdditiveBlending,
+      color: 0xff4058,
+      depthWrite: false,
+      map: this.glowTexture,
+      opacity: 0.95,
+      toneMapped: false,
+      transparent: true,
+    });
+    const sprite = new THREE.Sprite(material);
+    return { sprite, remaining: 0, scale: 1 };
+  }
+
   private flashMuzzle(position: THREE.Vector3, scale: number) {
-    const flash = this.muzzleFlashPool.pop() ?? (() => {
-      const material = new THREE.SpriteMaterial({
-        blending: THREE.AdditiveBlending,
-        color: 0xff4058,
-        depthWrite: false,
-        map: this.glowTexture,
-        opacity: 0.95,
-        toneMapped: false,
-        transparent: true,
-      });
-      const sprite = new THREE.Sprite(material);
-      const light = new THREE.PointLight(0xff4058, 3.5, 3.5, 2);
-      sprite.add(light);
-      return { sprite, light, remaining: 0, scale: 1 };
-    })();
-    const { sprite, light } = flash;
+    const flash = this.muzzleFlashPool.pop() ?? this.createMuzzleFlash();
+    const { sprite } = flash;
+    flash.light = this.availableMuzzleLights.pop();
     flash.scale = scale;
     sprite.position.copy(position);
     sprite.scale.setScalar(0.55 * scale);
     sprite.material.opacity = 0.95;
     sprite.renderOrder = 4;
-    light.intensity = 3.5 * scale;
+    if (flash.light) {
+      flash.light.visible = true;
+      flash.light.position.copy(position);
+      flash.light.intensity = 3.5 * scale;
+    }
     this.world.add(sprite);
     flash.remaining = 0.13;
     this.muzzleFlashes.push(flash);
@@ -2543,9 +2813,14 @@ export class UnitSystem {
       const strength = Math.max(0, flash.remaining / 0.13);
       flash.sprite.material.opacity = strength * 0.95;
       flash.sprite.scale.setScalar((0.55 + (1 - strength) * 0.45) * flash.scale);
-      flash.light.intensity = strength * 3.5 * flash.scale;
+      if (flash.light) flash.light.intensity = strength * 3.5 * flash.scale;
       if (flash.remaining > 0) continue;
       flash.sprite.removeFromParent();
+      if (flash.light) {
+        flash.light.visible = false;
+        this.availableMuzzleLights.push(flash.light);
+        flash.light = undefined;
+      }
       this.muzzleFlashes.splice(index, 1);
       this.muzzleFlashPool.push(flash);
     }

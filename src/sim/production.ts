@@ -14,10 +14,10 @@ export interface TrainingQueueItem {
 }
 
 export const TRAINING_SECONDS: Record<UnitKind, number> = {
-  "scout-drone": 8,
-  ghostrunner: 12,
-  hornet: 20,
-  behemoth: 35,
+  "scout-drone": 1,
+  ghostrunner: 2,
+  hornet: 3,
+  behemoth: 4,
 };
 
 export const trainingTicks = (kind: UnitKind) =>

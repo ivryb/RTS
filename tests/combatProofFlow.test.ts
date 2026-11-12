@@ -37,6 +37,12 @@ const createUnitPresentation: UnitPresentationFactory = (unit): LoadedUnitPresen
   };
 };
 
+const loadOreModels = async () => {
+  const root = new THREE.Group();
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(5, 2, 5), new THREE.MeshStandardMaterial()));
+  return [root];
+};
+
 const settlePresentations = async (system: UnitSystem) => {
   await Promise.resolve();
   await Promise.resolve();
@@ -89,6 +95,7 @@ const createProof = async () => {
     undefined,
     () => new THREE.Group(),
     createUnitPresentation,
+    loadOreModels,
   );
   await settlePresentations(system);
   return { encounter, system };
@@ -126,6 +133,7 @@ describe("assembled combat proof", () => {
         return root;
       },
       createUnitPresentation,
+      loadOreModels,
     );
     await settlePresentations(system);
     expect(system.select([ghostrunner.id])).toBe(1);

@@ -16,7 +16,7 @@ test('six-player combat proof has usable nearby bases and a route around their b
   const navigation=new RecastNavigation(map);
   try{
    for(const site of map.layout.sites)expect(navigation.plan(units[0].position,toSimPoint(site.x,site.z),1524),`${seed} ${site.label}`).toBeDefined();
-   navigation.setObstacles(buildings);
+   navigation.setObstacles([...buildings, ...map.titaniumDeposits]);
    for(const [i,b] of encounter.buildings.entries())expect(constructionPlacementIsValid(map,b.kind,buildings[i].position,buildings.filter((_,j)=>i!==j),units),`${seed} ${b.id}`).toBe(true);
    const start=units[0].position,goal=units[encounter.units.findIndex(unit=>unit.id==='enemy-ghostrunner-1')].position;
    expect(navigation.plan(start,goal,450),`${seed} combat route`).toBeDefined();

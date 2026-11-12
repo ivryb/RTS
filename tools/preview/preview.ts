@@ -1,4 +1,8 @@
+import { AttackAreaMarker } from "../../src/attackAreaMarker";
+import { placeGroundGeometry } from "../../src/groundOverlay";
 import * as THREE from "three";
+import { createHealthBar, updateHealthBar, createRangeIndicator, createSelectionRing } from "../../src/unitSystem";
+import { OrderMarker } from "../../src/orderMarker";
 import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import type { UnitKind } from "../../src/sim/unitDefinitions";
 import { BehemothBarrage, BEHEMOTH_LAUNCH_OFFSETS } from "../../src/behemothBarrage";
@@ -154,11 +158,99 @@ if (previewScene === "units" && requestedEffect === "behemoth-barrage") {
   effectFocus = effectTime < 0.3 ? effectOrigin : effectMidpoint;
 }
 
+const orderMarkers: OrderMarker[] = [];
+if (previewScene === "units" && requestedEffect === "orders") {
+  for (const [index, kind] of (["destination", "attack"] as const).entries()) {
+    const marker = new OrderMarker(kind, (x, z) => sampleHeight(map, x, z));
+    const x = focus.x + index * 3;
+    const z = focus.z + 4;
+    marker.show(x, sampleHeight(map, x, z), z);
+    marker.animate(.2);
+    scene.add(marker);
+    orderMarkers.push(marker);
+  }
+  previewEffectTime = .2;
+}
+
+if (previewScene === "units" && (requestedEffect === "orders-hill" || requestedEffect === "orders-mountain")) {
+  let slope = 0;
+  let hillside = { ...focus };
+  for (let x = -80; x <= 80; x += 2) {
+    for (let z = -80; z <= 80; z += 2) {
+      const difference = sampleHeight(map, x - 1, z - 1) - sampleHeight(map, x + 1, z + 1);
+      if (difference > slope && (requestedEffect === "orders-mountain" || (difference < 1 && sampleHeight(map, x, z) < 4))) {
+        slope = difference;
+        hillside = { x, z };
+      }
+    }
+  }
+  if (requestedEffect === "orders-mountain") {
+    const scout = scene.getObjectByName("Scout Drone preview 1")!;
+    scout.position.set(hillside.x, sampleHeight(map, hillside.x, hillside.z), hillside.z);
+    const ring = createSelectionRing({ radius: 1, offset: { x: 0, z: 0 } });
+    placeGroundGeometry(ring.geometry, 0);
+    ring.visible = true;
+    scout.add(ring);
+  }
+  const marker = new OrderMarker("destination", (x, z) => sampleHeight(map, x, z));
+  marker.show(hillside.x, sampleHeight(map, hillside.x, hillside.z), hillside.z);
+  marker.animate(.3);
+  scene.add(marker);
+  orderMarkers.push(marker);
+  effectFocus = hillside;
+  previewEffectTime = .3;
+}
+if (previewScene === "units" && requestedEffect === "attack-target") {
+  const target = scene.getObjectByName("Ghostrunner preview 2")!;
+  const marker = new OrderMarker("attack", (x, z) => sampleHeight(map, x, z));
+  marker.show(target.position.x, target.position.y, target.position.z, .9);
+  marker.animate(.2);
+  scene.add(marker);
+  orderMarkers.push(marker);
+  effectFocus = { x: target.position.x, z: target.position.z };
+  previewEffectTime = .2;
+}
+
+if (previewScene === "units" && requestedEffect === "health-bars") {
+  for (const [index, name] of ["Behemoth preview 1", "Ghostrunner preview 2", "Hornet preview 1"].entries()) {
+    const target = scene.getObjectByName(name)!;
+    const health = createHealthBar(index === 0 ? 3.5 : 2.8, 1.8);
+    updateHealthBar(health, [65, 25, 90][index]!, 100, true);
+    target.add(health.root);
+    target.rotation.y += index * .8;
+  }
+}
+if (previewScene === "units" && requestedEffect === "ground-target") {
+  const target = new AttackAreaMarker();
+  const x = focus.x + 2;
+  const z = focus.z + 5;
+  target.position.set(x, 0, z);
+  for (const child of target.children) {
+    if (child instanceof THREE.Mesh) placeGroundGeometry(child.geometry, sampleHeight(map, x, z));
+  }
+  target.visible = true;
+  scene.add(target);
+  effectFocus = { x, z };
+}
+
+if (previewScene === "units" && requestedEffect === "range-terrain") {
+  const target = createRangeIndicator(7, 22);
+  const x = terrainFocus.x + 15;
+  const z = terrainFocus.z + 8;
+  target.position.set(x, 0, z);
+  for (const child of target.children) {
+    if (child instanceof THREE.Mesh) placeGroundGeometry(child.geometry, sampleHeight(map, x, z));
+  }
+  target.visible = true;
+  scene.add(target);
+  effectFocus = { x, z };
+}
+
 const viewHeights = previewScene === "terrain"
   ? [300, 80, 24]
   : previewScene === "buildings"
     ? [76, 40, 32]
-    : requestedEffect === "behemoth-barrage" ? [28, 14, 7] : [34, 17, 10];
+    : requestedEffect === "range-terrain" ? [70, 42, 20] : requestedEffect === "behemoth-barrage" ? [28, 14, 7] : [34, 17, 10];
 const cameraFocus = previewScene === "buildings"
   ? { x: focus.x - 13.5, z: focus.z - 5 }
   : previewScene === "units"
@@ -182,8 +274,10 @@ const cameras = viewHeights.map((viewHeight, index) => {
     0.1,
     360,
   );
-  camera.position.set(target.x + 46, 58, target.z + 46);
-  camera.lookAt(target.x, 0, target.z);
+  const elevation = requestedEffect === "orders-hill" || requestedEffect === "attack-target"
+    ? sampleHeight(map, target.x, target.z) + 1 : 0;
+  camera.position.set(target.x + 46, 58 + elevation, target.z + 46);
+  camera.lookAt(target.x, elevation, target.z);
   return camera;
 });
 
@@ -199,6 +293,12 @@ const render = () => {
 };
 
 window.__previewStepEffect = (seconds: number) => {
+  if (orderMarkers.length && seconds > previewEffectTime) {
+    for (const marker of orderMarkers) marker.animate(seconds - previewEffectTime);
+    previewEffectTime = seconds;
+    render();
+    return;
+  }
   if (!previewBarrage || !effectOrigin || !effectMidpoint || seconds <= previewEffectTime) return;
   for (let elapsed = previewEffectTime; elapsed < seconds; elapsed += 1 / 60) {
     previewBarrage.update(1 / 60);
