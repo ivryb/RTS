@@ -35,14 +35,14 @@ const vertexShader = /* glsl */ `
   varying float vLife;
   varying float vAlong;
 
-  const float BEAM_HALF_WIDTH = 0.11;
-  const float TRAIL_HALF_WIDTH = 0.085;
+  const float BEAM_HALF_WIDTH = 0.065;
+  const float TRAIL_HALF_WIDTH = 0.06;
   const float TRAIL_SECONDS = ${MINING_TRAIL_SECONDS.toFixed(3)};
-  const float CONTACT_RADIUS = 0.36;
-  const float BLOOM_RADIUS = 0.8;
-  const float EMITTER_RADIUS = 0.24;
-  const float SPARK_HALF_LENGTH = 0.13;
-  const float SPARK_HALF_WIDTH = 0.04;
+  const float CONTACT_RADIUS = 0.24;
+  const float BLOOM_RADIUS = 0.5;
+  const float EMITTER_RADIUS = 0.15;
+  const float SPARK_HALF_LENGTH = 0.1;
+  const float SPARK_HALF_WIDTH = 0.03;
   const float SPARK_GRAVITY = 5.5;
   // Glows on the rock are drawn this much nearer the camera, so its surface does not slice them.
   const float SURFACE_LIFT = 0.28;
@@ -136,7 +136,7 @@ const fragmentShader = /* glsl */ `
     if (vPart < 0.5) {
       float across = 1.0 - abs(vCorner.x);
       float heat = vCorner.y * 0.5 + 0.5;
-      light = mix(EMBER, MOLTEN, heat) * across * across * heat * heat * heat * 1.4;
+      light = mix(EMBER, MOLTEN, heat) * across * across * heat * heat * heat * 1.0;
     } else if (vPart < 1.5) {
       float across = abs(vCorner.x);
       float core = 1.0 - smoothstep(0.18, 0.4, across);
@@ -148,19 +148,19 @@ const fragmentShader = /* glsl */ `
       // and a sheath that covers it fully reads as a solid rod.
       cover = max(core * 0.9, sheath * 0.5);
     } else if (vPart < 2.5) {
-      light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.45;
+      light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.22;
     } else if (vPart < 4.5) {
       float radius = length(vCorner);
       float glow = pow(max(0.0, 1.0 - radius), 2.2);
-      float center = 1.0 - smoothstep(0.1, 0.32, radius);
+      float center = 1.0 - smoothstep(0.08, 0.3, radius);
       light = vPart < 3.5
-        ? MOLTEN * glow * 1.25 + WHITE_HOT * center
+        ? MOLTEN * glow * 0.75 + WHITE_HOT * center * 0.8
         : BEAM * glow + BEAM_CORE * center * 0.9;
-      cover = vPart < 3.5 ? center * 0.8 : max(center * 0.8, glow * 0.5);
+      cover = vPart < 3.5 ? center * 0.6 : max(center * 0.8, glow * 0.5);
     } else {
       float across = 1.0 - abs(vCorner.x);
       float body = across * across * (1.0 - abs(vCorner.y));
-      light = mix(WHITE_HOT, MOLTEN, min(1.0, vLife * 1.6)) * body * (1.0 - vLife * vLife) * 2.2;
+      light = mix(WHITE_HOT, MOLTEN, min(1.0, vLife * 1.6)) * body * (1.0 - vLife * vLife) * 1.6;
     }
     gl_FragColor = vec4(light, cover);
     #include <colorspace_fragment>
