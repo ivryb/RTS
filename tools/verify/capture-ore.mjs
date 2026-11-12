@@ -64,11 +64,19 @@ try {
       await page.waitForTimeout(600);
       if ((await inspect()).units.find(unit => unit.id === scout.id)?.harvest) break;
     }
-    // A Scout fills up in a few seconds and leaves, so each shot waits for the start of a fresh load.
-    await capture(mined, `mining-${values.mine}`, () => page.waitForFunction(id => {
+    // A Scout fills up in a few seconds and leaves, so each shot waits for the start of a fresh load,
+    // then for Boat's slow frames to catch up with the simulation.
+    const loading = limit => page.evaluate(([id, limit]) => {
       const unit = window.__dune77.inspect().units.find(unit => unit.id === id);
-      return unit?.harvest?.phase === "extracting" && unit.cargoTitanium <= 6;
-    }, scout.id, { timeout: 120_000 }));
+      return unit?.harvest?.phase === "extracting" && unit.cargoTitanium <= limit;
+    }, [scout.id, limit]);
+    await capture(mined, `mining-${values.mine}`, async () => {
+      for (let attempt = 0; attempt < 12; attempt++) {
+        while (!await loading(2)) await page.waitForTimeout(200);
+        await page.waitForTimeout(1000);
+        if (await loading(12)) return;
+      }
+    });
   }
   console.log(JSON.stringify({ ok: errors.length === 0, deposits: deposits.length, files, errors }));
   if (errors.length) process.exitCode = 1;
