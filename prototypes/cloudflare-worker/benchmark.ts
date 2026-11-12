@@ -161,7 +161,7 @@ const runHybridPathingAndSchema = () => {
       })).byteLength;
     }, 0));
   }
-  const result = {
+  const report = {
     navigation: { setupMs: round(setup.ms), commandMs: round(command.ms), ...summarizeSteps(steps) },
     schema: {
       initialBytesFourViews: [...initial.values()].reduce((sum, frame) => sum + frame.byteLength, 0),
@@ -176,7 +176,7 @@ const runHybridPathingAndSchema = () => {
     movingAfter10Seconds: snapshot.filter((unit) => unit.moving).length,
   };
   setup.value.dispose();
-  return result;
+  return report;
 };
 
 await initializeNavigation();

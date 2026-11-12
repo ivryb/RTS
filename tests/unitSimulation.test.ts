@@ -95,7 +95,8 @@ const commandCenterAt = (id: string, x: number, z: number): BuildingState => ({
 });
 
 // A finished building that never shoots: the command-center kind has no weapon, so a fixture
-// named "turret-1" stays a passive obstacle or target.
+// named "turret-1" stays a passive obstacle or target. It is still a working command center for
+// its owner (drop-off, production, elimination), so give harvesting tests a non-player owner.
 const passiveBuilding = <Fields extends Pick<BuildingState, "id" | "position" | "radius">>(
   fields: Fields & Partial<BuildingState>,
 ) => ({
