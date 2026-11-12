@@ -8,10 +8,9 @@ import type { UnitKind } from "../../src/sim/unitDefinitions";
 import { BehemothBarrage, BEHEMOTH_LAUNCH_OFFSETS } from "../../src/behemothBarrage";
 import { findSceneCenter } from "./demoModels";
 import { generateMap, sampleHeight } from "../../src/map";
-import { demoAssets, loadDemoAsset } from "../../src/modelAssets";
+import { createUnitModelFactory, demoAssets, loadDemoAsset } from "../../src/modelAssets";
 import { createTerrain } from "../../src/terrain";
 import { createEnvironmentProps } from "../../src/environmentProps";
-import { createUnitModelFactory } from "../../src/modelAssets";
 import type { MatchFrame, MatchSession } from "../../src/matchSession";
 import { createTrainedUnitState } from "../../src/sim/production";
 import { POSITION_SCALE } from "../../src/sim/simulationConstants";
@@ -167,13 +166,14 @@ if (previewScene === "units" && requestedEffect === "behemoth-barrage") {
 
 // Scout Drones parked around one Titanium Deposit, drawn by the production UnitSystem from a
 // scripted frame. ?drones=N sets the crowd, ?mining=0 leaves them idle as the cost baseline, and
-// ?deposit=N picks the Nth nearest deposit, which steps through the rock models.
+// ?deposit=N uses the map's Nth deposit instead of the nearest; 0, 1 and 2 show the three rock models.
 let miningSystem: UnitSystem | undefined;
 if (previewScene === "mining") {
-  const deposit = [...map.titaniumDeposits].sort((a, b) =>
-    Math.hypot(a.position.x / POSITION_SCALE - focus.x, a.position.z / POSITION_SCALE - focus.z)
-    - Math.hypot(b.position.x / POSITION_SCALE - focus.x, b.position.z / POSITION_SCALE - focus.z))
-    [Number(params.get("deposit")) || 0];
+  const deposit = params.has("deposit")
+    ? map.titaniumDeposits[Number(params.get("deposit"))]
+    : [...map.titaniumDeposits].sort((a, b) =>
+      Math.hypot(a.position.x / POSITION_SCALE - focus.x, a.position.z / POSITION_SCALE - focus.z)
+      - Math.hypot(b.position.x / POSITION_SCALE - focus.x, b.position.z / POSITION_SCALE - focus.z))[0];
   if (!deposit) throw new Error("This map has no Titanium Deposit");
   const count = Math.max(1, Number(params.get("drones")) || 3);
   const extracting = params.get("mining") !== "0";

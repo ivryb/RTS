@@ -9,15 +9,34 @@ import { POSITION_SCALE } from "./sim/simulationConstants";
 import { MINING_TRAIL_SECONDS, type MiningLasers } from "./miningLaser";
 import { UI_SELECTION_COLOR } from "./uiColors";
 
-const WORKFACE_SAMPLES = 16;
+const WORKFACE_SAMPLES = 32;
 /** Neighbouring samples further apart than this lie on different rocks, not one face. */
-const WORKFACE_MAX_STEP = 0.6;
-/** A drone may drift this far before its workface is traced again. */
+const WORKFACE_MAX_STEP = 0.4;
+/**
+ * A drone may drift this far before its workface is traced again. It has to exceed the hover bob
+ * (0.07 either way) plus the drift of the nose as the drone settles its facing, or every hovering
+ * drone would trace again on each bob.
+ */
 const WORKFACE_REUSE_DISTANCE = 0.2;
 /** The face starts this far above the ground, clear of the sand the rock stands in. */
 const WORKFACE_GROUND_CLEARANCE = 0.12;
-/** Where a beam aims, in footprint radii to the side of the deposit's centre: a centre that is a gap between rocks needs the others. */
-const WORKFACE_AIMS = [0, 0.35, -0.35];
+/**
+ * Where a beam aims, in footprint radii to the side of the deposit's centre. The centre comes
+ * first; the others are tried when it shows a gap between rocks or only a sliver of face. They stay
+ * close to the centre because the drone faces the centre, and a beam should leave its nose
+ * nearly straight.
+ */
+const WORKFACE_AIMS = [0, 0.2, -0.2];
+/** A face this tall is worth sweeping, so no other aim is tried. */
+const WORKFACE_TALL_ENOUGH = 0.5;
+/**
+ * How steeply a beam may leave the nose, as rise over run. A beam aimed sharply down at the foot of
+ * a near rock points along the camera's line of sight and shrinks to a dot on the drone.
+ */
+const WORKFACE_LOWEST_PITCH = -0.4;
+const WORKFACE_HIGHEST_PITCH = 1.2;
+/** The sweep stops this fraction short of the rock's crest, so the glow stays on the face. */
+const WORKFACE_CREST_INSET = 0.06;
 
 const modelUrls = [
   new URL("../assets/models/titanium-three-knuckles.glb", import.meta.url),
@@ -71,6 +90,7 @@ export class OrePresentation {
   private readonly models: THREE.Group[] = [];
   private readonly deposits = new Map<string, OreDeposit>();
   // Scratch for tracing workfaces, reused from one trace to the next.
+  private readonly candidate = new Workface();
   private readonly slice = new THREE.Plane();
   private readonly localSlice = new THREE.Plane();
   private readonly sliceNormal = new THREE.Vector3();
@@ -81,7 +101,7 @@ export class OrePresentation {
   private segments = new Float32Array(1024);
   private disposed = false;
 
-  constructor(world: THREE.Group, map: TerrainSurface, deposits: readonly TitaniumDepositState[],
+  constructor(world: THREE.Group, private readonly map: TerrainSurface, deposits: readonly TitaniumDepositState[],
     loadModels: OreModelLoader = loadOreModels) {
     this.root.name = "Titanium deposits";
     world.add(this.root);
@@ -173,13 +193,24 @@ export class OrePresentation {
     const acrossX = center.z - origin.z;
     const acrossZ = origin.x - center.x;
     const side = deposit.radius / (Math.hypot(acrossX, acrossZ) || 1);
-    return WORKFACE_AIMS.some(aim =>
-      this.traceSlice(deposit, origin, center.x + acrossX * side * aim, center.z + acrossZ * side * aim, face));
+    let tallest = -1;
+    for (const aim of WORKFACE_AIMS) {
+      const height = this.traceSlice(
+        deposit, origin, center.x + acrossX * side * aim, center.z + acrossZ * side * aim, this.candidate);
+      if (height > tallest) {
+        tallest = height;
+        face.points.set(this.candidate.points);
+        face.count = this.candidate.count;
+      }
+      if (tallest >= WORKFACE_TALL_ENOUGH) break;
+    }
+    return face.count > 0;
   }
 
   // Every ray of a sweep lies in the vertical plane through the origin and the aim, so the rock is
   // cut by that plane once and the rays are then cast against the outline, in 2D. That costs a
-  // fraction of one ray cast against every triangle of the model.
+  // fraction of one ray cast against every triangle of the model. Returns the height the face
+  // spans, or -1 when the plane shows no rock.
   private traceSlice(deposit: OreDeposit, origin: THREE.Vector3, aimX: number, aimZ: number, face: Workface) {
     const reach = Math.hypot(aimX - origin.x, aimZ - origin.z);
     const forwardX = (aimX - origin.x) / reach;
@@ -217,6 +248,9 @@ export class OrePresentation {
         highest = Math.max(highest, endY / endX);
       }
     }
+    lowest = Math.max(lowest, WORKFACE_LOWEST_PITCH);
+    highest = Math.min(highest, WORKFACE_HIGHEST_PITCH);
+    highest -= (highest - lowest) * WORKFACE_CREST_INSET;
     let bestStart = 0;
     let bestLength = 0;
     let runStart = 0;
@@ -239,7 +273,11 @@ export class OrePresentation {
         const across = (startX * directionY - startY * directionX) / denominator;
         if (across >= 0 && across <= 1) nearest = along;
       }
-      if (nearest >= far || nearest * directionY < ground) {
+      const x = origin.x + forwardX * directionX * nearest;
+      const y = origin.y + directionY * nearest;
+      const z = origin.z + forwardZ * directionX * nearest;
+      // Deposits stand on uneven ground: on the uphill side the rock's foot is under the sand.
+      if (nearest >= far || y < sampleHeight(this.map, x, z) + WORKFACE_GROUND_CLEARANCE) {
         runLength = 0;
         continue;
       }
@@ -253,14 +291,14 @@ export class OrePresentation {
         bestStart = runStart;
         bestLength = runLength;
       }
-      face.points[sample * 3] = origin.x + forwardX * directionX * nearest;
-      face.points[sample * 3 + 1] = origin.y + directionY * nearest;
-      face.points[sample * 3 + 2] = origin.z + forwardZ * directionX * nearest;
+      face.points[sample * 3] = x;
+      face.points[sample * 3 + 1] = y;
+      face.points[sample * 3 + 2] = z;
     }
     // The longest unbroken run of hits is the face; shorter runs are other rocks seen past it.
     face.points.copyWithin(0, bestStart * 3, (bestStart + bestLength) * 3);
     face.count = bestLength;
-    return bestLength > 0;
+    return bestLength ? face.points[bestLength * 3 - 2]! - face.points[1]! : -1;
   }
 
   /** Appends the segments where `mesh` crosses the slice plane, as (distance along the aim, height above the origin) pairs. */
@@ -385,7 +423,9 @@ export class ScoutHarvestPresentation {
     root.add(this.cargo);
     // Drones on one deposit must not sweep in step, so each gets its own phase and tempo.
     this.seed = unitSeed(unitId);
-    this.sweepSeconds = SWEEP_SECONDS * (0.82 + 0.36 * ((this.seed * 7.13) % 1));
+    // The tempo comes from other bits of the seed than the phase, so two drones whose phases
+    // happen to match still drift apart.
+    this.sweepSeconds = SWEEP_SECONDS * (0.75 + 0.5 * ((this.seed * 7919.13) % 1));
   }
 
   /**
@@ -414,8 +454,8 @@ export class ScoutHarvestPresentation {
     return 0.5 - 0.5 * Math.cos((time / this.sweepSeconds + this.seed) * Math.PI * 2);
   }
 
+  /** For a Scout that is no longer drawn, and so no longer updated. */
   hide() {
-    this.cargo.visible = false;
     this.firing = false;
   }
 

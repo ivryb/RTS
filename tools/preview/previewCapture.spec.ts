@@ -71,7 +71,7 @@ for (const [name, drones] of [["mining-laser", 3], ["mining-laser-crowd", 20]] a
     await page.goto(`/tools/preview/?scene=mining&seed=77&drones=${drones}`);
     await page.waitForFunction(() => window.__previewReady === true);
     await page.screenshot({ path: `${outputDirectory}/${name}.jpg`, type: "jpeg", quality: 92 });
-    // Half a sweep later, to show the contact has moved up or down the rock.
+    // The scene opens one second in; about half a sweep later the contact has moved along the rock.
     await page.evaluate(() => window.__previewStepEffect?.(1.9));
     await page.screenshot({ path: `${outputDirectory}/${name}-later.jpg`, type: "jpeg", quality: 92 });
   });
