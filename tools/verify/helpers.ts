@@ -18,6 +18,7 @@ export interface BuildingSnapshot {
   kind: string;
   ownerId: string;
   lifecycle: string;
+  constructionProgress: number;
   x: number;
   z: number;
   health: number;
@@ -38,6 +39,8 @@ declare global {
     __dune77?: {
       ready: () => Promise<void>;
       inspect: () => MatchSnapshot | null;
+      view: (x: number, z: number, zoom?: number) => void;
+      programs: () => number;
       project: (x: number, z: number, y?: number) => {
         x: number;
         y: number;

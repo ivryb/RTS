@@ -60,7 +60,8 @@ broke the first time — use them instead of raw Playwright calls:
 - `snapshot(page)` / `waitForSnapshot(page, predicate, timeout?)` — read-only
   match state from the `?verify=1` hook: `tick`, `outcome`, `units[]`
   (`id, kind, ownerId, x, z, health, order, moving, attacking`),
-  `buildings[]` (`id, kind, ownerId, lifecycle, health, productionQueue`),
+  `buildings[]` (`id, kind, ownerId, lifecycle, constructionProgress, health,
+  productionQueue`),
   `selected.unitIds/buildingIds`. Poll, never sleep.
 - `clickEntity(page, id)` — selects an entity by left-clicking its projected
   position through the real canvas raycast path. Click height varies per model,

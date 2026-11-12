@@ -7,6 +7,8 @@ import { loadScaffoldKit, MOST_BREAKS, Scaffolding, type Cage, type ScaffoldKitL
 import { BUILDING_DEFINITIONS } from "./sim/construction";
 import type { BuildingKind } from "./sim/units";
 
+export type { ScaffoldKitLoader };
+
 /** Seconds the scaffold takes to drop into its pad once the building is complete. */
 const RETRACT_SECONDS = 0.5;
 /** Seconds it takes to drop when the site is destroyed before completion. */

@@ -243,6 +243,8 @@ if (verifyEnabled) {
       };
     },
     minimap: (x: number, z: number) => tacticalMap.clientPoint(x, z),
+    // Shader programs compiled so far; one that appears during play stalled a frame to compile.
+    programs: () => renderer.info.programs?.length ?? 0,
   };
 }
 
