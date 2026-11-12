@@ -145,6 +145,7 @@ export class GlowEffects {
     geometry.setAttribute("position", new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
     geometry.setIndex([0, 1, 2, 0, 2, 3]);
     this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
+      name: "Construction glow",
       uniforms: { uTime: { value: 0 }, uViewportHeight: { value: 900 } },
       vertexShader,
       fragmentShader,

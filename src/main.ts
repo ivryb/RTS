@@ -243,8 +243,9 @@ if (verifyEnabled) {
       };
     },
     minimap: (x: number, z: number) => tacticalMap.clientPoint(x, z),
-    // Shader programs compiled so far; one that appears during play stalled a frame to compile.
-    programs: () => renderer.info.programs?.length ?? 0,
+    // Every shader program compiled so far, as its material's name and its variant key. One
+    // that appears during play stalled a frame to compile.
+    programs: () => (renderer.info.programs ?? []).map((program) => `${program.name}|${program.cacheKey}`),
   };
 }
 

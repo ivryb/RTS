@@ -112,6 +112,7 @@ export class Decks {
     // Blended, so a deck can fade with its building; it still writes depth and draws ahead
     // of every other blended thing, exactly as an opaque surface would.
     this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
+      name: "Construction deck",
       uniforms: { uHulls: { value: this.hulls } },
       vertexShader,
       fragmentShader,
