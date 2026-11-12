@@ -1,8 +1,8 @@
 # Construction animation study
 
-A design study for D77-5: how a building looks while Scout Drones construct it. Each candidate look is one file in `options/` that implements the `ConstructionSketch` contract in `sketch.ts`. The harness loads the production Turret and Command Center through `loadBuildingModel`, on the game's terrain, lighting, and camera angle, and drives a candidate with nothing but construction progress and site state.
+The design study behind D77-5: how a building looks while Scout Drones construct it. Ivan approved the scaffold; [Construction animation](../../docs/construction_animation.md) records the design, its cost and what the build still has to do. Each look is one file in `options/` that implements the `ConstructionSketch` contract in `sketch.ts`. The harness loads the production Turret and Command Center through `loadBuildingModel`, on the game's terrain, lighting, and camera angle, and drives a candidate with nothing but construction progress and site state.
 
-`options/current.ts` is the shipped vertical stretch, kept as the "before" reference.
+`options/current.ts` is the shipped vertical stretch, kept as the "before" reference. The two looks that lost, `print` and `assembly`, are in this branch's history at commit `a286359`.
 
 `options/scaffold.ts` stands a scaffold around the site and raises the building inside it. It measures each building kind's outline once (`scaffold/outline.ts`) and lays everything out from that: an eight-sided scaffold that hugs the main hull, stops at its roofline and stays open towards the camera, the deck that closes the rising cut, and the welding points. Its kit of posts, rails, braces, pad plates and lamps comes from `tools/assets/build_scaffold_kit.py`; the study keeps a copy of the exported GLB in `options/scaffold/`, so after changing the generator, rebuild and copy it:
 
