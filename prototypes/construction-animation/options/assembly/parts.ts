@@ -17,7 +17,7 @@ export interface Part {
 }
 
 export interface BuildingParts {
-  /** In build order: lowest first, and around the building's axis within one level. */
+  /** In build order: lowest first, around the building's axis within one level, the top level's largest last. */
   parts: Part[];
   /** For each source mesh, the index into `parts` of every triangle. */
   trianglePart: Uint16Array[];
@@ -306,13 +306,20 @@ export const deriveParts = (sources: readonly PartSource[], limits: PartLimits):
   const centreX = (min[0] + max[0]) / 2;
   const centreZ = (min[2] + max[2]) / 2;
   const reach = Math.hypot(max[0] - min[0], max[2] - min[2]) / 2 || 1;
+  const levelOf = (part: Cluster) => Math.round(part.min[1] / level);
   const sortKey = (part: Cluster) => {
     const x = part.centroid[0] - centreX;
     const z = part.centroid[2] - centreZ;
     const central = Math.hypot(x, z) < reach * 0.12;
-    return Math.round(part.min[1] / level) * 10 + (central ? 0 : 1 + (Math.atan2(z, x) + Math.PI) / (Math.PI * 2));
+    return levelOf(part) * 10 + (central ? 0 : 1 + (Math.atan2(z, x) + Math.PI) / (Math.PI * 2));
   };
   parts.sort((first, second) => sortKey(first) - sortKey(second));
+  // The largest part of the top level goes last, so the piece that completes the building is
+  // one the player can see is missing, not a rim or a bolt.
+  const topLevel = levelOf(parts.at(-1)!);
+  const final = parts.reduce((largest, part) =>
+    levelOf(part) === topLevel && part.area > largest.area ? part : largest, parts.at(-1)!);
+  parts.push(...parts.splice(parts.indexOf(final), 1));
   parts.forEach((part, order) => {
     part.order = order;
   });
