@@ -158,7 +158,7 @@ export const createReveal = (root: THREE.Object3D, visual: THREE.Object3D): Reve
   };
 
   // The shadow pass uses the same cut, so a half-built site casts a half-height shadow.
-  const depth = new THREE.MeshDepthMaterial();
+  const depth = new THREE.MeshDepthMaterial({ name: "Construction cut shadow" });
   depth.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     trackPosition(shader);
@@ -173,6 +173,7 @@ export const createReveal = (root: THREE.Object3D, visual: THREE.Object3D): Reve
     let material = cutMaterials.get(source);
     if (material) return material;
     material = source.clone();
+    material.name = "Construction cut";
     material.side = THREE.DoubleSide;
     material.shadowSide = source.shadowSide ?? THREE.BackSide;
     // Fading keeps writing depth, so the hull fades as one solid and needs no second pass.

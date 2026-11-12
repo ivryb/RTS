@@ -2,7 +2,7 @@
 
 How a building looks while Scout Drones construct it. Ivan approved this design for D77-5 on 2026-11-12 ("C, go with the scaffold"), and the game uses it: `src/constructionSites.ts` owns the look, with its parts in `src/construction/`, and `UnitSystem` drives one site per building under construction. It replaced a vertical stretch of the finished model.
 
-The two looks that lost the study, a layer-by-layer print with a cyan blueprint and a piece-by-piece assembly, are in the repository's history at commit `a286359`.
+The two looks that lost the study, a layer-by-layer print with a cyan blueprint and a piece-by-piece assembly, are in the repository's history: they were removed by the commit "Keep only the approved scaffold option in the construction animation study".
 
 ## The look
 
@@ -39,7 +39,7 @@ A model that failed to load is shown as its translucent placeholder and is never
 
 ## Picking
 
-The site is picked through what is visible. Each site has a pick object under its root that answers click rays for the scaffold as it currently stands, pad included, and the building's own raycast drops hits above the cut. At default zoom a click can hit 4,068 px of a Turret site and 29,340 px of a Command Center site at 0%, against 2,628 px and 24,660 px for the finished buildings. The stretch gave 1,872 px for a Turret site at 0%.
+The site is picked through what is visible. Each site has a pick object under its root that answers click rays for the scaffold as it currently stands, pad included, and the building's own raycast drops hits above the cut. At default zoom a click can hit 4,068 px of a Turret site and 29,304 px of a Command Center site at 0%, against 2,628 px and 24,660 px for the finished buildings. The stretch gave 1,872 px for a Turret site at 0%.
 
 ## Cost
 
@@ -51,10 +51,10 @@ Measured in the construction preview with 5 Command Centers and 5 Turrets under 
 | Triangles, 10 finished buildings | 5,942,803 | 5,942,803 |
 | Draw calls, 10 sites | 196 | 200 |
 | Draw calls, 10 sites, in a browser without `WEBGL_multi_draw` | 196 | 238 |
-| Triangles, 10 sites | 5,978,671 | 6,037,951 |
-| CPU per frame for 10 sites | 0.0017 ms | 0.021 ms |
-| Preparing a site | 0 ms | up to 1.7 ms (Command Center), 0.5 ms (Turret) |
-| Measuring a building kind, once | none | 21 ms |
+| Triangles, 10 sites | 5,978,671 | 6,035,351 |
+| CPU per frame for 10 sites | 0.0017 ms | 0.025 ms |
+| Preparing a site | 0 ms | up to 2.1 ms (Command Center), 0.4 ms (Turret) |
+| Measuring a building kind, once | none | 19 to 21 ms |
 
 A finished building costs nothing extra. The four extra draw calls are shared by every site, so they do not grow with the number of sites: one for all scaffolds, one for their shadow, one for all decks, and one for all sparks, lamps, dust and smoke. The per-frame CPU cost is spark placement.
 

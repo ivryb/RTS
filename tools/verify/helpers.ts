@@ -40,7 +40,7 @@ declare global {
       ready: () => Promise<void>;
       inspect: () => MatchSnapshot | null;
       view: (x: number, z: number, zoom?: number) => void;
-      programs: () => number;
+      programs: () => string[];
       project: (x: number, z: number, y?: number) => {
         x: number;
         y: number;

@@ -114,7 +114,21 @@ const build = async (page: Page, kind: Kind) => {
   mkdirSync(evidenceDir, { recursive: true });
   const frames: Frame[] = [];
   await openGame(page, 77);
-  const compiled = await page.evaluate(() => window.__dune77!.programs());
+  // Every construction material is named "Construction ...", and a program carries that name.
+  const constructionPrograms = async () => (await page.evaluate(() => window.__dune77!.programs()))
+    .filter((program) => program.startsWith("Construction"));
+  const compiled = new Set(await constructionPrograms());
+  expect([...new Set([...compiled].map((program) => program.split("|")[0]))].sort()).toEqual([
+    "Construction cut",
+    "Construction cut shadow",
+    "Construction deck",
+    "Construction glow",
+    "Construction scaffold",
+  ]);
+  /** The construction shader programs compiled since the match was ready. */
+  const compiledSince = async () => (await constructionPrograms())
+    .filter((program) => !compiled.has(program))
+    .map((program) => program.slice(0, 300));
 
   // Just placed: the drone is stopped on its way, so the site waits with nothing built.
   const site = await placeSite(page, kind, 30);
@@ -146,7 +160,7 @@ const build = async (page: Page, kind: Kind) => {
     }
   }
   // Every shader a site needs was compiled at startup, so no frame of the build stops for one.
-  expect(await page.evaluate(() => window.__dune77!.programs())).toBe(compiled);
+  expect(await compiledSince()).toEqual([]);
   const away = await screenPoint(page, site.x + 9, site.z + 9);
   await page.mouse.click(away.x, away.y, { button: "right" });
   await waitForSnapshot(page, (snap) => snap.units.find((unit) => unit.id === SCOUT)!.order !== "build");
@@ -171,7 +185,7 @@ const build = async (page: Page, kind: Kind) => {
   const final = (await siteState(page, site.id)).site!;
   expect(final.lifecycle).toBe("active");
   expect(final.health).toBe(final.maxHealth);
-  expect(await page.evaluate(() => window.__dune77!.programs())).toBe(compiled);
+  expect(await compiledSince()).toEqual([]);
 };
 
 // Boat draws the game in software; a smaller window gives more frames of a ten-second build.

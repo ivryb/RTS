@@ -314,6 +314,7 @@ export class Scaffolding {
     if (!material || !root) throw new Error("Scaffold kit has no root");
     // Only faces turned away from the sun go into the shadow map, or the pad shades itself in stripes.
     material.shadowSide = THREE.BackSide;
+    material.name = "Construction scaffold";
     return new Scaffolding(parent, pieces, material, root.userData as KitSizes);
   }
 
