@@ -1,5 +1,5 @@
 // The game is a static Vite build; `bunx wrangler deploy` serves dist/ at dune77.ivrybn.workers.dev.
-// GitHub Actions deploys every push to main once checks pass (.github/workflows/checks.yml).
+// GitHub Actions deploys every push to main (.github/workflows/deploy.yml).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "dune77",
