@@ -1,6 +1,8 @@
 // Captures Titanium Deposits in the live game at gameplay and close zoom.
-// Usage: bun tools/verify/capture-ore.mjs --out <dir> [--model <glb>] [--seed 77] [--deposits 0,1] [--base http://localhost:5173]
+// Usage: bun tools/verify/capture-ore.mjs --out <dir> [--model <glb>] [--seed 77] [--deposits 0,6,20] [--mine 0] [--base http://localhost:5173]
 // --model serves one candidate GLB in place of every production titanium model, without touching assets/.
+// --mine sends the player's Scout Drone to that deposit through real clicks and captures it at work.
+// On seed 77, deposit 0 sits on sand beside the player's base, 6 among scree rocks and 20 in dry grass.
 import { mkdirSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
@@ -11,7 +13,8 @@ const { values } = parseArgs({
     out: { type: "string" },
     model: { type: "string" },
     seed: { type: "string", default: "77" },
-    deposits: { type: "string", default: "0,1" },
+    deposits: { type: "string", default: "0,6,20" },
+    mine: { type: "string" },
     base: { type: "string", default: "http://localhost:5173" },
   },
 });
@@ -23,24 +26,49 @@ const browser = await chromium.launch({ args: chromiumArgs });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
+  const files = [];
   page.on("pageerror", error => errors.push(String(error)));
   if (values.model) await page.route(/titanium-[a-z-]+\.glb/, route => route.fulfill({ path: values.model, contentType: "model/gltf-binary" }));
-  await page.goto(`${values.base}/?seed=${values.seed}&verify=1`, { timeout: 15_000 });
-  await page.waitForFunction(() => Boolean(window.__dune77?.inspect()?.titaniumDeposits.length), undefined, { timeout: 30_000 });
+  await page.goto(`${values.base}/?seed=${values.seed}&verify=1`, { timeout: 30_000 });
+  await page.waitForFunction(() => Boolean(window.__dune77?.inspect()?.titaniumDeposits.length), undefined, { timeout: 60_000 });
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => window.__dune77.ready());
-  const deposits = await page.evaluate(() => window.__dune77.inspect().titaniumDeposits);
-  const files = [];
-  for (const index of values.deposits.split(",").map(Number)) {
-    const deposit = deposits[index];
-    if (!deposit) continue;
+  const inspect = () => page.evaluate(() => window.__dune77.inspect());
+  const project = (x, z, y) => page.evaluate(([x, z, y]) => window.__dune77.project(x, z, y), [x, z, y]);
+  const deposits = (await inspect()).titaniumDeposits;
+  const capture = async (deposit, prefix, before = async () => {}) => {
     for (const [name, zoom] of views) {
       await page.evaluate(([x, z, zoom]) => window.__dune77.view(x, z, zoom), [deposit.x, deposit.z, zoom]);
-      await page.waitForTimeout(600);
-      const file = `${values.out}/deposit-${index}-${name}.png`;
-      await page.screenshot({ path: file });
+      // Boat renders two to three frames a second; wait for the moved camera and its shadows to draw.
+      await page.waitForTimeout(1200);
+      await before();
+      const file = `${values.out}/${prefix}-${name}.png`;
+      await page.screenshot({ path: file, timeout: 120_000 });
       files.push(file);
     }
+  };
+  for (const index of values.deposits.split(",").filter(Boolean).map(Number)) {
+    if (deposits[index]) await capture(deposits[index], `deposit-${index}`);
+  }
+  const mined = values.mine === undefined ? undefined : deposits[Number(values.mine)];
+  if (mined) {
+    const scout = (await inspect()).units.find(unit => unit.kind === "scout-drone" && unit.ownerId === "local-player");
+    await page.evaluate(([x, z]) => window.__dune77.view(x, z, 1), [(scout.x + mined.x) / 2, (scout.z + mined.z) / 2]);
+    await page.waitForTimeout(1200);
+    const from = await project(scout.x, scout.z, 1.1);
+    await page.mouse.click(from.x, from.y);
+    // A click lands only where the ray meets the rock itself, so try a few heights over its center.
+    for (const height of [1, 0.4, 2, 3]) {
+      const to = await project(mined.x, mined.z, height);
+      await page.mouse.click(to.x, to.y, { button: "right" });
+      await page.waitForTimeout(600);
+      if ((await inspect()).units.find(unit => unit.id === scout.id)?.harvest) break;
+    }
+    // A Scout fills up in a few seconds and leaves, so each shot waits for the start of a fresh load.
+    await capture(mined, `mining-${values.mine}`, () => page.waitForFunction(id => {
+      const unit = window.__dune77.inspect().units.find(unit => unit.id === id);
+      return unit?.harvest?.phase === "extracting" && unit.cargoTitanium <= 6;
+    }, scout.id, { timeout: 120_000 }));
   }
   console.log(JSON.stringify({ ok: errors.length === 0, deposits: deposits.length, files, errors }));
   if (errors.length) process.exitCode = 1;
