@@ -1,52 +1,8 @@
 import type { Page } from "@playwright/test";
+import type { UnitSystem } from "../../src/unitSystem";
 
-export interface UnitSnapshot {
-  id: string;
-  kind: string;
-  ownerId: string;
-  x: number;
-  z: number;
-  health: number;
-  maxHealth: number;
-  order: string;
-  moving: boolean;
-  attacking: boolean;
-  cargoTitanium: number;
-  harvest?: { depositId: string; phase: string };
-  /** World positions of a Scout Drone's mining beam while it is drawn: its nose and the rock. */
-  miningLaser?: { from: [number, number, number]; to: [number, number, number] };
-}
-
-export interface DepositSnapshot {
-  id: string;
-  x: number;
-  z: number;
-  /** Footprint radius in simulation millimetres. */
-  radius: number;
-  amount: number;
-}
-
-export interface BuildingSnapshot {
-  id: string;
-  kind: string;
-  ownerId: string;
-  lifecycle: string;
-  constructionProgress: number;
-  x: number;
-  z: number;
-  health: number;
-  maxHealth: number;
-  productionQueue?: { id: string; kind: string }[];
-}
-
-export interface MatchSnapshot {
-  tick: number;
-  outcome?: string;
-  units: UnitSnapshot[];
-  buildings: BuildingSnapshot[];
-  titaniumDeposits: DepositSnapshot[];
-  selected: { unitIds: string[]; buildingIds: string[] };
-}
+/** The match state the game's `?verify=1` hook reports: whatever `UnitSystem.inspect` returns. */
+export type MatchSnapshot = ReturnType<UnitSystem["inspect"]>;
 
 declare global {
   interface Window {
