@@ -175,7 +175,7 @@ export class TacticalMap {
     return point;
   }
 
-  /** Page coordinates where a pointer lands on the world point (x, z); the inverse of a click. */
+  /** Viewport coordinates of the world point (x, z) on the minimap; the inverse of a click. */
   clientPoint(x: number, z: number) {
     if (!this.map) return;
     const bounds = this.canvas.getBoundingClientRect();

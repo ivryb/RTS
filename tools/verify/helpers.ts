@@ -82,7 +82,7 @@ export async function waitForSnapshot(
 export const screenPoint = (page: Page, x: number, z: number, y = 0) =>
   page.evaluate(([wx, wz, wy]) => window.__dune77!.project(wx, wz, wy), [x, z, y]);
 
-/** Projects world coordinates to page pixels on the minimap, using the map's real size. */
+/** Projects world coordinates to viewport pixels on the minimap, using the map's real size. */
 export async function minimapPoint(page: Page, x: number, z: number) {
   const point = await page.evaluate(([wx, wz]) => window.__dune77!.minimap(wx, wz), [x, z]);
   if (!point) throw new Error("minimapPoint: no map is loaded");
@@ -102,8 +102,8 @@ export async function clickWorld(
 const ENTITY_CLICK_HEIGHTS = [1.1, 2.5, 4, 6, 8];
 
 /** Left-clicks an entity by id through the real canvas input path.
- * The ray must pass through the entity's selection hitbox, whose height varies
- * by model, so it retries from low to tall and confirms via inspect().selected. */
+ * The ray must hit a unit's click cylinder or a building's visible model, and the
+ * nearest hit wins, so it retries from low to tall and confirms via inspect().selected. */
 export async function clickEntity(page: Page, id: string) {
   for (const y of ENTITY_CLICK_HEIGHTS) {
     const point = await page.evaluate(([entityId, height]) => {
@@ -111,7 +111,7 @@ export async function clickEntity(page: Page, id: string) {
       const entity = snap.units.find((unit) => unit.id === entityId)
         ?? snap.buildings.find((building) => building.id === entityId);
       return entity ? window.__dune77!.project(entity.x, entity.z, height) : null;
-    }, [id, y]);
+    }, [id, y] as const);
     if (!point) throw new Error(`clickEntity: unknown entity ${id}`);
     await page.mouse.click(point.x, point.y);
     const selected = await page.evaluate(() => window.__dune77!.inspect()!.selected);
