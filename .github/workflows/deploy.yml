@@ -1,6 +1,6 @@
 name: Deploy
 
-# Every push to main goes live at https://dune77.ivrybn.workers.dev. Agents verify before they
+# Every push to main goes live at https://rts.ivryb.com. Agents verify before they
 # commit, so this only builds and deploys, with no test gate.
 on:
   push:

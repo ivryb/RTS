@@ -6,7 +6,9 @@ The game is still early. The combat foundation works; Titanium harvesting and de
 
 The main game uses the approved New terrain: oxide mountains, sheltered groves and walkable grass. The [terrain hub](prototypes/terrain-playground/README.md) retains Old/New comparisons using the same production generation and rendering.
 
-Play the latest build at https://dune77.ivrybn.workers.dev. Every push to `main` deploys there through GitHub Actions within about a minute.
+Play the latest build at https://rts.ivryb.com. Every push to `main` deploys there through GitHub Actions within about a minute. The old address, https://dune77.ivrybn.workers.dev, serves the same build.
+
+The internal tools deploy with the game, at the same paths as on the dev server: the [terrain hub](https://rts.ivryb.com/prototypes/terrain-playground/), the [building showcase](https://rts.ivryb.com/prototypes/procedural-buildings/), the [preview scenes](https://rts.ivryb.com/tools/preview/) and the [UI review workbench](https://rts.ivryb.com/tools/ui-review/). A new tool page needs an entry in `vite.config.ts` to deploy.
 
 ## Run it locally
 
