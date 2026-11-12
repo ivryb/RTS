@@ -16,7 +16,7 @@ const JOINT = 0.015;
 const PAD_DEPTH = 0.34;
 /** Share of the drop by which the walls have gone into the pad, and after which the pad itself sinks. */
 const WALLS_DOWN = 0.72;
-const PAD_STARTS = 0.6;
+const PAD_STARTS = 0.45;
 /** Most places one damaged scaffold smokes from. */
 export const MOST_BREAKS = 6;
 
@@ -379,6 +379,10 @@ export class Scaffolding {
     };
     root.add(pick);
 
+    /** The loose members in the order they fail, the same at every site of this shape. */
+    const weakest = wallMembers.flatMap(({ piece }, index) => loose[piece] ? [index] : [])
+      .sort((first, second) => chance(first) - chance(second));
+    const failOrder = new Map(weakest.map((index, order) => [index, order]));
     const hung = new THREE.Matrix4();
     let appliedDrop = -1;
     let appliedDamage = -1;
@@ -391,9 +395,11 @@ export class Scaffolding {
         if (damage !== appliedDamage) {
           appliedDamage = damage;
           const failed: THREE.Matrix4[] = [];
+          // At least one member is down whenever the site is damaged at all.
+          const down = damage ? Math.max(1, Math.round(damage * BATTERED * weakest.length)) : 0;
           walls.write(({ piece, matrix }, index) => {
             const failure = loose[piece];
-            if (!failure || chance(index) >= damage * BATTERED) return matrix;
+            if (!failure || failOrder.get(index)! >= down) return matrix;
             failed.push(matrix);
             return failure === "falls" || chance(index + 0.5) < 0.5 ? undefined : hung.multiplyMatrices(matrix, hang);
           });

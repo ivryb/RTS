@@ -3,7 +3,7 @@ import * as THREE from "three";
 /** Floats per glow: position and size, velocity and seed, then kind, strength and age. */
 const STRIDE = 12;
 /** A lamp's glow never draws smaller than this many pixels across, so it reads at any zoom. */
-const LAMP_PIXELS = 34;
+const LAMP_PIXELS = 24;
 
 export const Glow = {
   /** A welding arc: a flickering hot point. */
