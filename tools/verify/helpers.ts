@@ -11,6 +11,19 @@ export interface UnitSnapshot {
   order: string;
   moving: boolean;
   attacking: boolean;
+  cargoTitanium: number;
+  harvest?: { depositId: string; phase: string };
+  /** World positions of a Scout Drone's mining beam while it is drawn: its nose and the rock. */
+  miningLaser?: { from: [number, number, number]; to: [number, number, number] };
+}
+
+export interface DepositSnapshot {
+  id: string;
+  x: number;
+  z: number;
+  /** Footprint radius in simulation millimetres. */
+  radius: number;
+  amount: number;
 }
 
 export interface BuildingSnapshot {
@@ -31,6 +44,7 @@ export interface MatchSnapshot {
   outcome?: string;
   units: UnitSnapshot[];
   buildings: BuildingSnapshot[];
+  titaniumDeposits: DepositSnapshot[];
   selected: { unitIds: string[]; buildingIds: string[] };
 }
 
@@ -39,6 +53,7 @@ declare global {
     __dune77?: {
       ready: () => Promise<void>;
       inspect: () => MatchSnapshot | null;
+      /** Centres the camera on a ground point; zoom 1 is the default view. Framing only, never an order. */
       view: (x: number, z: number, zoom?: number) => void;
       programs: () => string[];
       project: (x: number, z: number, y?: number) => {

@@ -59,9 +59,11 @@ broke the first time — use them instead of raw Playwright calls:
   raycast picking silently miss buildings.
 - `snapshot(page)` / `waitForSnapshot(page, predicate, timeout?)` — read-only
   match state from the `?verify=1` hook: `tick`, `outcome`, `units[]`
-  (`id, kind, ownerId, x, z, health, order, moving, attacking`),
+  (`id, kind, ownerId, x, z, health, order, moving, attacking, cargoTitanium,
+  harvest, miningLaser`),
   `buildings[]` (`id, kind, ownerId, lifecycle, constructionProgress, health,
   productionQueue`),
+  `titaniumDeposits[]` (`id, x, z, radius, amount`),
   `selected.unitIds/buildingIds`. Poll, never sleep.
 - `clickEntity(page, id)` — selects an entity by left-clicking its projected
   position through the real canvas raycast path. Click height varies per model,
@@ -73,6 +75,8 @@ broke the first time — use them instead of raw Playwright calls:
   move/attack order, left = place building / cancel). `y` is height above
   terrain; the default projects onto terrain elevation, not y=0.
 - `screenPoint(page, x, z, y?)` — raw projection for custom gestures.
+- `window.__dune77.view(x, z, zoom?)` in `page.evaluate` — centres the camera
+  on a ground point for a screenshot; zoom 1 is the default view, 3 the closest.
 - `minimapPoint(page, x, z)` — page pixels of a world point on `#minimap`,
   from the minimap's own mapping and the map's real size. Click it with
   `page.mouse`; never recompute the mapping from `mapSizeForPlayerCount`.
