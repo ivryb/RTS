@@ -57,6 +57,8 @@ export const pickSurface = (hits: readonly THREE.Intersection[]) => {
       fallback ??= hit;
       continue;
     }
+    // A scaffold is drawn by one mesh shared by every site, so each site answers its own clicks.
+    if (hit.object.userData.pickSurface) return hit;
     if (!(hit.object instanceof THREE.Mesh)) continue;
     const material = Array.isArray(hit.object.material)
       ? hit.object.material[hit.face?.materialIndex ?? 0]

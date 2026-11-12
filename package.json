@@ -20,6 +20,7 @@
     "preview:capture:terrain": "bun run preview:capture --grep terrain",
     "preview:capture:buildings": "bun run preview:capture --grep buildings",
     "preview:capture:units": "bun run preview:capture --grep units",
+    "preview:capture:construction": "playwright test --config tools/preview/construction/playwright.config.ts --reporter=line",
     "test:terrain": "bun test tests/mapGenerators/*.test.ts",
     "preview:capture:terrain-hub": "bun prototypes/terrain-playground/capture-multiplayer.mjs",
     "preview:capture:mountains": "bun prototypes/terrain-playground/capture-multiplayer.mjs --mountains"

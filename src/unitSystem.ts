@@ -11,6 +11,8 @@ import {
 } from "./behemothBarrage";
 import { BEHEMOTH_DAMAGE_DELAY_SECONDS, behemothVolleySeed } from "./behemothAttack";
 import { BUILDING_CATALOG } from "./buildingCatalog";
+import type { ScaffoldKitLoader } from "./construction/scaffold";
+import { ConstructionSites, type ConstructionSite } from "./constructionSites";
 import { sampleHeight, type GeneratedMap } from "./map";
 import { disposeModel } from "./modelAssets";
 import { createLocalMatchSession, type MatchFrame, type MatchSession } from "./matchSession";
@@ -237,6 +239,15 @@ interface BuildingPresentation {
   };
   /** Set on a placeholder that UnitSystem made itself; loaded models belong to their factory. */
   ownsModel?: true;
+  /** Present from placement until the scaffold has gone, a second after completion. */
+  construction?: {
+    site: ConstructionSite;
+    /** Progress at the previous and the latest simulation tick, blended on every rendered frame. */
+    previousProgress: number;
+    progress: number;
+    /** Seconds since the site completed or was destroyed. */
+    ended: number;
+  };
   destruction?: {
     elapsed: number;
     initialScaleY: number;
@@ -741,6 +752,7 @@ export class UnitSystem {
   private readonly attackGroundMarker = new AttackAreaMarker();
   private groundFeedbackGrace = 0;
   private readonly constructionPreview = createConstructionPreview();
+  private readonly constructionSites: ConstructionSites;
   private readonly combinedRangeIndicator = new THREE.Group();
   private readonly selectedIds = new Set<string>();
   private selectedUnitFrames: readonly UnitFrame[] = [];
@@ -796,6 +808,8 @@ export class UnitSystem {
   private frameTick = 0;
   private interpolationAge = SIMULATION_TICK_SECONDS;
   private markerTime = 0;
+  /** Seconds of presentation so far; drives effects that loop on their own. */
+  private presentationTime = 0;
   private result?: MatchResult;
   private disposed = false;
 
@@ -808,8 +822,10 @@ export class UnitSystem {
     private readonly createBuildingPresentation?: BuildingPresentationFactory,
     private readonly createUnitPresentation?: UnitPresentationFactory,
     loadOreModels?: OreModelLoader,
+    loadScaffoldKit?: ScaffoldKitLoader,
   ) {
     this.behemothBarrage = new BehemothBarrage(world, map);
+    this.constructionSites = new ConstructionSites(world, loadScaffoldKit);
     for (const deposit of map.titaniumDeposits ?? []) this.currentDeposits.set(deposit.id, deposit);
     this.ore = new OrePresentation(world, map, [...this.currentDeposits.values()], loadOreModels);
     this.oreReady = this.ore.ready.then(() => {
@@ -908,6 +924,7 @@ export class UnitSystem {
   async prepareRendering(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
     await this.oreReady;
     await Promise.allSettled([...this.pendingUnits.values(), ...this.pendingBuildings.values()]);
+    await this.constructionSites.load();
     if (this.disposed) return;
     const warmup = new THREE.Group();
     warmup.name = "Prepared combat materials";
@@ -942,6 +959,15 @@ export class UnitSystem {
       warmup.add(faded);
     }
     this.world.add(warmup);
+    // The first site a player places must not stop to compile its scaffold, cut and effects.
+    const siteModels = new Map<BuildingKind, THREE.Object3D>();
+    for (const [id, building] of this.currentBuildings) {
+      const model = this.buildingById.get(id)?.visualRoot;
+      if (model && building.lifecycle === "active") siteModels.set(building.kind, model);
+    }
+    const releaseSites = [...siteModels].map(([kind, model]) =>
+      this.constructionSites.prepareRendering(kind, model));
+    this.constructionSites.flush(this.presentationTime);
     // Drivers can defer pipeline setup until the first draw. Prepare each light
     // count in one startup task, submitting effect/model variants below the terrain.
     // No animation frame can observe a partially prepared lighting configuration.
@@ -964,6 +990,7 @@ export class UnitSystem {
       for (const light of this.muzzleLights) light.visible = light.intensity > 0;
       for (const [object, frustumCulled] of culling) object.frustumCulled = frustumCulled;
       warmup.removeFromParent();
+      for (const release of releaseSites) release();
     }
   }
 
@@ -1150,7 +1177,11 @@ export class UnitSystem {
     this.refreshEntityOverlays(id);
   }
 
-  attachBuilding(id: string, root: THREE.Group) {
+  /**
+   * `placeholder` marks a stand-in that UnitSystem made for a model that failed to load: it is
+   * the only model UnitSystem disposes, and it is never shown being built.
+   */
+  attachBuilding(id: string, root: THREE.Group, placeholder = false) {
     const building = this.currentBuildings.get(id);
     if (!building) return;
     root.userData.buildingId = id;
@@ -1164,6 +1195,11 @@ export class UnitSystem {
     visualRoot.name = "Building visual";
     for (const child of [...root.children]) visualRoot.add(child);
     root.add(visualRoot);
+    // Measured as the model loads and before the Turret head turns, so no site waits for it.
+    if (!placeholder) this.constructionSites.measure(building.kind, root, visualRoot);
+    const site = placeholder || building.lifecycle !== "constructing"
+      ? undefined
+      : this.constructionSites.createSite(building.kind, root, visualRoot);
     const color = building.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
     // Buildings are picked by their visible model, with no invisible click helper: a helper
     // as wide as the footprint and as tall as the model covered units standing behind it.
@@ -1214,6 +1250,15 @@ export class UnitSystem {
       healthBar,
       rangeIndicator,
       muzzle,
+      ...(placeholder ? { ownsModel: true as const } : {}),
+      ...(site ? {
+        construction: {
+          site,
+          previousProgress: building.constructionProgress,
+          progress: building.constructionProgress,
+          ended: 0,
+        },
+      } : {}),
       ...(turretHead ? {
         turretHead: {
           object: turretHead,
@@ -1225,6 +1270,7 @@ export class UnitSystem {
     this.selectables.push(root);
     this.renderBuilding(root, building);
     this.updateTurretHead(id, this.buildingById.get(id)!, 0);
+    this.updateConstruction(id, this.buildingById.get(id)!, 1, 0);
     this.refreshEntityOverlays(id);
   }
 
@@ -1583,6 +1629,7 @@ export class UnitSystem {
         kind: building.kind,
         ownerId: building.ownerId,
         lifecycle: building.lifecycle,
+        constructionProgress: building.constructionProgress,
         x: building.position.x / POSITION_SCALE,
         z: building.position.z / POSITION_SCALE,
         health: building.health,
@@ -1627,6 +1674,11 @@ export class UnitSystem {
     this.syncSessionFrame();
     this.resolvePendingCommandResults();
     const alpha = Math.min(1, this.interpolationAge / SIMULATION_TICK_SECONDS);
+    this.presentationTime += deltaSeconds;
+    // Sites come first: a builder's beam ends at the height its site has reached.
+    for (const [id, presentation] of this.buildingById) {
+      this.updateConstruction(id, presentation, alpha, deltaSeconds);
+    }
     for (const [id, presentation] of this.presentations) {
       if (!presentation.root.visible) continue;
       this.renderUnit(id, alpha, deltaSeconds);
@@ -1640,6 +1692,7 @@ export class UnitSystem {
         this.updateTurretHead(id, presentation, deltaSeconds);
       }
     }
+    this.constructionSites.flush(this.presentationTime);
     for (const [id, death] of this.deferredGroundDeaths) {
       if (death.delay === undefined) continue;
       death.delay -= deltaSeconds;
@@ -1726,7 +1779,9 @@ export class UnitSystem {
     }
     for (const presentation of this.buildingById.values()) {
       if (!presentation.destruction) disposeEntityOverlays(presentation);
+      this.endConstruction(presentation);
     }
+    this.constructionSites.dispose();
     for (const projectile of this.laserProjectiles) projectile.mesh.removeFromParent();
     this.laserProjectiles.length = 0;
     for (const flash of this.muzzleFlashes) {
@@ -2024,6 +2079,10 @@ export class UnitSystem {
       }
       this.currentBuildings.set(building.id, structuredClone(building));
       const presentation = this.buildingById.get(building.id);
+      if (presentation?.construction) {
+        if (advancePrevious) presentation.construction.previousProgress = presentation.construction.progress;
+        presentation.construction.progress = building.constructionProgress;
+      }
       if (presentation) this.renderBuilding(presentation.root, building);
       else this.ensureBuildingPresentation(building);
     }
@@ -2205,8 +2264,7 @@ export class UnitSystem {
     placeholder.name = "Building fallback footprint";
     placeholder.position.y = height / 2;
     fallback.add(placeholder);
-    this.attachBuilding(id, fallback);
-    this.buildingById.get(id)!.ownsModel = true;
+    this.attachBuilding(id, fallback, true);
   }
 
   private renderBuilding(root: THREE.Object3D, building: BuildingState) {
@@ -2227,9 +2285,6 @@ export class UnitSystem {
     root.visible = building.health > 0;
     const presentation = this.buildingById.get(building.id);
     if (presentation) {
-      presentation.visualRoot.scale.y = building.lifecycle === "active"
-        ? 1
-        : 0.15 + building.constructionProgress * 0.85;
       placeGroundGeometry(presentation.selectionRing.geometry, 0);
       if (presentation.rangeIndicator) {
         placeGroundOverlay(
@@ -2323,6 +2378,7 @@ export class UnitSystem {
   }
 
   private removeBuildingPresentation(id: string, animate = false) {
+    const halfBuilt = this.currentBuildings.get(id)?.lifecycle === "constructing";
     this.currentBuildings.delete(id);
     this.pendingDirectShots.delete(id);
     this.recentCombatUntil.delete(id);
@@ -2335,15 +2391,17 @@ export class UnitSystem {
     const selectableIndex = this.selectables.indexOf(root);
     if (selectableIndex >= 0) this.selectables.splice(selectableIndex, 1);
     disposeEntityOverlays(presentation);
+    // A building destroyed while its scaffold is still leaving collapses like any finished one.
+    if (!(animate && halfBuilt)) this.endConstruction(presentation);
     if (animate) {
       presentation.selectionRing.visible = false;
       presentation.healthBar.root.visible = false;
       if (presentation.rangeIndicator) presentation.rangeIndicator.visible = false;
-      // Every building of a kind shares its materials, so the fade runs on this building's own copies.
       presentation.destruction = {
         elapsed: 0,
         initialScaleY: presentation.visualRoot.scale.y,
-        materials: useFadeMaterials(presentation.visualRoot),
+        // A half-built site keeps its cut and its deck, and fades through its construction site.
+        materials: presentation.construction ? [] : useFadeMaterials(presentation.visualRoot),
       };
       return wasSelected;
     }
@@ -2367,12 +2425,49 @@ export class UnitSystem {
     if (!destruction) return;
     destruction.elapsed += deltaSeconds;
     const progress = Math.min(1, destruction.elapsed / BUILDING_DESTRUCTION_SECONDS);
-    presentation.visualRoot.scale.y = destruction.initialScaleY * (1 - progress * 0.85);
+    // A half-built site drops its scaffold and fades as it stands; only a finished building collapses.
+    if (presentation.construction) presentation.construction.site.fadeStump(1 - progress);
+    else presentation.visualRoot.scale.y = destruction.initialScaleY * (1 - progress * 0.85);
     for (const entry of destruction.materials) {
       entry.material.opacity = entry.opacity * (1 - progress);
     }
     if (progress < 1) return;
+    this.endConstruction(presentation);
     this.releaseBuilding(id, presentation);
+  }
+
+  /** Drives a site's scaffold, cut and effects from the latest simulation state, every rendered frame. */
+  private updateConstruction(
+    id: string,
+    presentation: BuildingPresentation,
+    alpha: number,
+    deltaSeconds: number,
+  ) {
+    const construction = presentation.construction;
+    if (!construction) return;
+    const building = this.currentBuildings.get(id);
+    const lifecycle = building?.lifecycle ?? "destroyed";
+    if (lifecycle !== "constructing") construction.ended += deltaSeconds;
+    const builder = building?.builderId ? this.current.get(building.builderId) : undefined;
+    // A site's health grows as it is built, so damage is what the part built so far is missing.
+    const builtHealth = 1 + construction.progress * ((building?.maxHealth ?? 1) - 1);
+    const showing = construction.site.update({
+      // Progress arrives ten times a second; blending it keeps the cut rising smoothly.
+      progress: THREE.MathUtils.lerp(construction.previousProgress, construction.progress, alpha),
+      // The same test that shows the builder's beam.
+      working: lifecycle === "constructing" && builder?.order === "build" && !builder.moving
+        && builder.constructionTargetId === id,
+      health: THREE.MathUtils.clamp((building?.health ?? 0) / builtHealth, 0, 1),
+      lifecycle,
+      sinceLifecycleChange: construction.ended,
+    }, this.presentationTime);
+    if (!showing) this.endConstruction(presentation);
+  }
+
+  /** Hands the building back its own materials; call before its model is disposed. */
+  private endConstruction(presentation: BuildingPresentation) {
+    presentation.construction?.site.dispose();
+    presentation.construction = undefined;
   }
 
   private setUnitVisible(id: string, visible: boolean) {
@@ -2518,7 +2613,10 @@ export class UnitSystem {
         const siteX = constructionSite.position.x / POSITION_SCALE;
         const siteZ = constructionSite.position.z / POSITION_SCALE;
         positions.setXYZ(0, x, y + 1.05, z);
-        positions.setXYZ(1, siteX, sampleHeight(this.map, siteX, siteZ) + 0.8, siteZ);
+        // The beam ends where the building is being built: at the rising cut.
+        const cutY = this.buildingById.get(constructionSite.id)?.construction?.site.beamTargetY
+          ?? sampleHeight(this.map, siteX, siteZ) + 0.8;
+        positions.setXYZ(1, siteX, cutY, siteZ);
         positions.needsUpdate = true;
       }
     }

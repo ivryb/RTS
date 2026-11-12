@@ -10,6 +10,7 @@ import {
   type PlayerCommand,
   type UnitState,
 } from "../src/sim/units";
+import { pickSurface, selectableEntityId } from "../src/unitInput";
 import { UnitSystem, createHealthBar, updateHealthBar, type UnitPresentationOptions, type UnitSpawn } from "../src/unitSystem";
 import { ScoutHarvestPresentation } from "../src/orePresentation";
 
@@ -66,6 +67,47 @@ const activeBuilding = (
   maxHealth: 2_500,
   ...overrides,
 });
+
+/** A stand-in for the scaffold kit model: every piece is a plain box of about the real size. */
+const scaffoldKit = async () => {
+  const kit = new THREE.Group();
+  kit.name = "ScaffoldKit";
+  kit.userData = { bay: 1.6, lift: 1.8, post_top: 1.885, jack_top: 0.25 };
+  const material = new THREE.MeshStandardMaterial();
+  const sizes: Record<string, [number, number, number]> = {
+    Post: [0.15, 1.8, 0.15],
+    Rail: [1.6, 0.1, 0.1],
+    Brace: [1.6, 0.1, 0.1],
+    Foot: [0.36, 0.25, 0.36],
+    Pad: [1.6, 0.06, 1.6],
+    PadCut: [1.6, 0.06, 1.6],
+    Curb: [1.6, 0.26, 0.22],
+    Beacon: [0.17, 0.22, 0.17],
+  };
+  for (const [name, [width, height, depth]] of Object.entries(sizes)) {
+    const geometry = new THREE.BoxGeometry(width, height, depth).translate(width / 2, height / 2, depth / 2);
+    const piece = new THREE.Mesh(geometry, material);
+    piece.name = `Scaffold${name}`;
+    kit.add(piece);
+  }
+  return kit;
+};
+
+/** Resolves once a site placed in this turn has been given its scaffold. */
+const kitLoaded = () => new Promise((resolve) => setTimeout(resolve));
+
+/** What a click straight down onto the world point (x, z) selects. */
+const clickedFromAbove = (system: UnitSystem, world: THREE.Group, x: number, z: number) => {
+  world.updateMatrixWorld(true);
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+  camera.up.set(0, 0, -1);
+  camera.position.set(x, 50, z);
+  camera.lookAt(x, 0, z);
+  camera.updateMatrixWorld();
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2(), camera);
+  return selectableEntityId(pickSurface(ray.intersectObjects(system.selectables, true))?.object);
+};
 
 const createTurretHead = () => {
   const head = new THREE.Group();
@@ -439,10 +481,11 @@ describe("unit presentation timing", () => {
     expect(session.commands).toEqual([]);
   });
 
-  test("previews Scout construction and presents authoritative site progress", () => {
+  test("previews Scout construction and builds the site up from the ground inside a scaffold", async () => {
     const scout = unit("scout-drone");
     const session = new TestSession(frame(1, scout, []));
     const world = new THREE.Group();
+    const finished = new THREE.MeshStandardMaterial();
     const system = new UnitSystem(
       world,
       map,
@@ -452,9 +495,15 @@ describe("unit presentation timing", () => {
       (state) => {
         const root = new THREE.Group();
         root.name = `${state.kind} construction`;
-        root.add(new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2)));
+        // Three metres tall, standing on the ground.
+        const model = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2).translate(0, 1.5, 0), finished);
+        model.name = "Building model mesh";
+        root.add(model);
         return root;
       },
+      undefined,
+      undefined,
+      scaffoldKit,
     );
     const scoutRoot = new THREE.Group();
     system.attachScoutDrone(scout.id, scoutRoot, new THREE.Group(), options);
@@ -473,9 +522,9 @@ describe("unit presentation timing", () => {
 
     const site = activeBuilding("turret-site", "turret", {
       lifecycle: "constructing",
-      constructionProgress: 0.25,
+      constructionProgress: 0,
       ownerId: "local-player",
-      health: 225,
+      health: 1,
       maxHealth: 900,
       builderId: scout.id,
       position: { x: 3 * POSITION_SCALE, z: 0 },
@@ -487,23 +536,44 @@ describe("unit presentation timing", () => {
         facing: 0,
       },
     });
-    const workingScout = structuredClone(scout);
-    workingScout.order = "build";
-    workingScout.attacking = false;
-    workingScout.moving = false;
-    workingScout.constructionTargetId = site.id;
-    workingScout.target = { ...site.position };
-    session.frames.push(frame(2, workingScout, site));
+    const travellingScout = structuredClone(scout);
+    travellingScout.order = "build";
+    travellingScout.attacking = false;
+    travellingScout.moving = true;
+    travellingScout.constructionTargetId = site.id;
+    travellingScout.target = { ...site.position };
+    session.frames.push(frame(2, travellingScout, site));
     system.update(0);
-    const visual = world.getObjectByName("turret construction")!
-      .getObjectByName("Building visual")!;
-    expect(visual.scale.y).toBeCloseTo(0.3625);
-    expect(world.getObjectByName("Construction beam")?.visible).toBe(true);
+    await kitLoaded();
+    system.update(0);
+    const model = world.getObjectByName("turret construction")!.getObjectByName("Building model mesh") as THREE.Mesh;
+    const beam = world.getObjectByName("Construction beam") as THREE.Line;
+    // Nothing is built yet, so the site is clicked through its scaffold and pad alone.
+    expect(beam.visible).toBe(false);
+    expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);
+    expect(clickedFromAbove(system, world, 9, 0.4)).toBeUndefined();
+
+    const workingScout = structuredClone(travellingScout);
+    workingScout.moving = false;
+    const quarterBuilt = { ...structuredClone(site), constructionProgress: 0.25, health: 225 };
+    session.frames.push(frame(3, workingScout, quarterBuilt));
+    system.update(0);
+    session.frames.push(frame(4, workingScout, { ...quarterBuilt, constructionProgress: 0.35, health: 315 }));
+    system.update(0);
+    // The model is never stretched: it is cut off at the height built so far, where the beam ends.
+    expect(model.parent!.scale.y).toBe(1);
+    expect(model.material).not.toBe(finished);
+    expect(beam.visible).toBe(true);
+    expect(beam.geometry.getAttribute("position").getY(1)).toBeCloseTo(0.75);
+    // Between two simulation ticks the cut keeps rising.
+    system.update(0.05);
+    expect(beam.geometry.getAttribute("position").getY(1)).toBeCloseTo(0.9);
+    expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);
     system.select([site.id]);
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(false);
     expect(system.selectedBuildings()[0]).toMatchObject({
       lifecycle: "constructing",
-      constructionProgress: 0.25,
+      constructionProgress: 0.35,
       builderId: scout.id,
     });
     system.select([scout.id]);
@@ -519,12 +589,80 @@ describe("unit presentation timing", () => {
     completed.constructionProgress = 1;
     completed.health = completed.maxHealth;
     completed.builderId = undefined;
-    session.frames.push(frame(3, scout, completed));
+    session.frames.push(frame(5, scout, completed));
     system.update(0);
-    expect(visual.scale.y).toBe(1);
-    expect(world.getObjectByName("Construction beam")?.visible).toBe(false);
+    // Complete: the untouched model from the first frame, while the scaffold is still leaving.
+    expect(model.material).toBe(finished);
+    expect(beam.visible).toBe(false);
+    expect(clickedFromAbove(system, world, 4.08, 0.4)).toBe(site.id);
+    system.update(1);
+    // A second later nothing of the site is left around the building.
+    expect(clickedFromAbove(system, world, 4.08, 0.4)).toBeUndefined();
+    expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);
     system.select([completed.id]);
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(true);
+  });
+
+  test("drops the scaffold and fades a half-built site destroyed before completion", async () => {
+    const ghostrunner = unit("ghostrunner");
+    const session = new TestSession(frame(1, ghostrunner, []));
+    const world = new THREE.Group();
+    const finished = new THREE.MeshStandardMaterial();
+    let finishedDisposed = false;
+    finished.addEventListener("dispose", () => {
+      finishedDisposed = true;
+    });
+    const system = new UnitSystem(
+      world,
+      map,
+      [spawn(ghostrunner)],
+      [],
+      session,
+      () => {
+        const root = new THREE.Group();
+        root.name = "site model";
+        const model = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2).translate(0, 1.5, 0), finished);
+        model.name = "Building model mesh";
+        root.add(model);
+        return root;
+      },
+      undefined,
+      undefined,
+      scaffoldKit,
+    );
+    const site = activeBuilding("turret-site", "turret", {
+      lifecycle: "constructing",
+      constructionProgress: 0.4,
+      health: 200,
+      maxHealth: 900,
+    });
+    session.frames.push(frame(2, ghostrunner, site));
+    system.update(0);
+    await kitLoaded();
+    system.update(0);
+    const root = world.getObjectByName("site model")!;
+    const model = root.getObjectByName("Building model mesh") as THREE.Mesh;
+    expect(clickedFromAbove(system, world, 11.08, 2.4)).toBe(site.id);
+
+    session.frames.push(frame(3, ghostrunner, [], [{
+      type: "building-died",
+      tick: 2,
+      id: site.id,
+      attackerId: ghostrunner.id,
+    }]));
+    system.update(0);
+    expect(clickedFromAbove(system, world, 11.08, 2.4)).toBeUndefined();
+
+    system.update(0.4);
+    // The stump stands as it was cut, without the collapse a finished building gets, and fades.
+    expect(world.getObjectByName("site model")).toBe(root);
+    expect(root.getObjectByName("Building visual")?.scale.y).toBe(1);
+    expect(model.material).not.toBe(finished);
+    expect((model.material as THREE.Material).opacity).toBeCloseTo(0.5);
+
+    system.update(0.5);
+    expect(world.getObjectByName("site model")).toBeUndefined();
+    expect(finishedDisposed).toBe(true);
   });
 
   test("keeps placement active until a queued build is authoritatively accepted", () => {

@@ -104,3 +104,19 @@ test("visible building wins over a nearer unit click helper and overlays", () =>
   unit.visible = false;
   expect(pickSurface(hits())).toBeUndefined();
 });
+
+test("an object that answers clicks for geometry drawn elsewhere is picked like a visible surface", () => {
+  const site = new THREE.Group();
+  site.userData.buildingId = "site";
+  // A scaffold is drawn by one mesh shared by every site; each site only answers its own rays.
+  const scaffold = new THREE.Object3D();
+  scaffold.userData.pickSurface = true;
+  scaffold.raycast = (raycaster, hits) => {
+    hits.push({ distance: 3, point: raycaster.ray.at(3, new THREE.Vector3()), object: scaffold });
+  };
+  site.add(scaffold);
+  const ray = new THREE.Raycaster(new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -1));
+  expect(selectableEntityId(pickSurface(ray.intersectObjects([site], true))?.object)).toBe("site");
+  site.visible = false;
+  expect(pickSurface(ray.intersectObjects([site], true))).toBeUndefined();
+});
