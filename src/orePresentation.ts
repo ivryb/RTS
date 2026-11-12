@@ -18,6 +18,8 @@ const WORKFACE_MAX_STEP = 0.4;
  * drone would trace again on each bob.
  */
 const WORKFACE_REUSE_DISTANCE = 0.2;
+/** The face reaches no further from the drone than this past the closest rock, which keeps the beam short. */
+const WORKFACE_DEPTH = 0.9;
 /** The face starts this far above the ground, clear of the sand the rock stands in. */
 const WORKFACE_GROUND_CLEARANCE = 0.12;
 /**
@@ -93,6 +95,7 @@ export class OrePresentation {
   private readonly deposits = new Map<string, OreDeposit>();
   // Scratch for tracing workfaces, reused from one trace to the next.
   private readonly candidate = new Workface();
+  private readonly hits = new Float32Array(WORKFACE_SAMPLES);
   private readonly slice = new THREE.Plane();
   private readonly localSlice = new THREE.Plane();
   private readonly sliceNormal = new THREE.Vector3();
@@ -253,12 +256,11 @@ export class OrePresentation {
     highest = Math.min(highest, WORKFACE_HIGHEST_PITCH);
     lowest = Math.max(lowest, Math.min(WORKFACE_LOWEST_PITCH, highest - WORKFACE_LEAST_PITCH_RANGE));
     highest -= (highest - lowest) * WORKFACE_CREST_INSET;
-    let bestStart = 0;
-    let bestLength = 0;
-    let runStart = 0;
-    let runLength = 0;
-    let previous = 0;
-    for (let sample = 0; sample < WORKFACE_SAMPLES && lowest <= highest; sample += 1) {
+    const hits = this.hits;
+    let closest = far;
+    for (let sample = 0; sample < WORKFACE_SAMPLES; sample += 1) {
+      hits[sample] = far;
+      if (lowest > highest) continue;
       const pitch = lowest + (highest - lowest) * (sample + 0.5) / WORKFACE_SAMPLES;
       const directionX = 1 / Math.hypot(1, pitch);
       const directionY = pitch * directionX;
@@ -279,25 +281,28 @@ export class OrePresentation {
       const y = origin.y + directionY * nearest;
       const z = origin.z + forwardZ * directionX * nearest;
       // Deposits stand on uneven ground: on the uphill side the rock's foot is under the sand.
-      if (nearest >= far || y < sampleHeight(this.map, x, z) + WORKFACE_GROUND_CLEARANCE) {
-        runLength = 0;
-        continue;
-      }
-      if (!runLength || Math.abs(nearest - previous) > WORKFACE_MAX_STEP) {
-        runStart = sample;
-        runLength = 0;
-      }
-      runLength += 1;
-      previous = nearest;
-      if (runLength > bestLength) {
-        bestStart = runStart;
-        bestLength = runLength;
-      }
+      if (nearest >= far || y < sampleHeight(this.map, x, z) + WORKFACE_GROUND_CLEARANCE) continue;
+      hits[sample] = nearest;
+      closest = Math.min(closest, nearest);
       face.points[sample * 3] = x;
       face.points[sample * 3 + 1] = y;
       face.points[sample * 3 + 2] = z;
     }
-    // The longest unbroken run of hits is the face; shorter runs are other rocks seen past it.
+    // The face is the longest unbroken run of hits on the rock nearest the drone. Rock much
+    // further off than the closest hit is another boulder seen past it, and a beam reaching
+    // over there grows long.
+    let bestStart = 0;
+    let bestLength = 0;
+    let runLength = 0;
+    for (let sample = 0; sample < WORKFACE_SAMPLES; sample += 1) {
+      const near = hits[sample]! <= closest + WORKFACE_DEPTH && closest < far;
+      const joined = near && runLength > 0 && Math.abs(hits[sample]! - hits[sample - 1]!) <= WORKFACE_MAX_STEP;
+      runLength = near ? (joined ? runLength + 1 : 1) : 0;
+      if (runLength > bestLength) {
+        bestStart = sample - runLength + 1;
+        bestLength = runLength;
+      }
+    }
     face.points.copyWithin(0, bestStart * 3, (bestStart + bestLength) * 3);
     face.count = bestLength;
     return bestLength ? face.points[bestLength * 3 - 2]! - face.points[1]! : -1;
