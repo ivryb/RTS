@@ -242,6 +242,7 @@ if (verifyEnabled) {
         behind: point.z > 1,
       };
     },
+    minimap: (x: number, z: number) => tacticalMap.clientPoint(x, z),
   };
 }
 

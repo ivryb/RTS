@@ -72,6 +72,9 @@ broke the first time — use them instead of raw Playwright calls:
   move/attack order, left = place building / cancel). `y` is height above
   terrain; the default projects onto terrain elevation, not y=0.
 - `screenPoint(page, x, z, y?)` — raw projection for custom gestures.
+- `minimapPoint(page, x, z)` — page pixels of a world point on `#minimap`,
+  from the minimap's own mapping and the map's real size. Click it with
+  `page.mouse`; never recompute the mapping from `mapSizeForPlayerCount`.
 
 HUD interaction uses plain `page.click` with the stable handles from
 `index.html`: buttons `[data-action="move|stop|attack|attack-ground|build"]`,
