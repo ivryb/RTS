@@ -67,7 +67,9 @@ export function createWeatheredHighlands(seed: number) {
       const p={x:r.x+Math.cos(a)*(r.radius+34),z:r.z+Math.sin(a)*(r.radius+34)};
       if(Math.abs(p.x)>94||Math.abs(p.z)>94)continue;
       const d=distance(p.x,p.z);
-      if(d>clearance){clearance=d;best=p;}
+      // Directions bounded only by this clearing tie at exactly 34 m, and the last bits of Math.cos
+      // differ between CPUs, so the first of near-equal directions wins on every machine.
+      if(d>clearance+1e-6){clearance=d;best=p;}
     }
     if(best && clearance>10)ascents.push({a:r,b:best,width:5,height:plateau});
   }
