@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Decks } from "./construction/deck";
 import { Glow, GlowEffects } from "./construction/glowEffects";
 import { measureOutline, type Outline } from "./construction/outline";
-import { createReveal } from "./construction/reveal";
+import { createReveal, type Reveal } from "./construction/reveal";
 import { loadScaffoldKit, MOST_BREAKS, Scaffolding, type Cage, type ScaffoldKitLoader } from "./construction/scaffold";
 import { BUILDING_DEFINITIONS } from "./sim/construction";
 import type { BuildingKind } from "./sim/units";
@@ -110,6 +110,8 @@ export class ConstructionSites {
   readonly effects: GlowEffects;
   private readonly decks: Decks;
   private readonly hulls = new Map<BuildingKind, { outline: Outline; table: number }>();
+  /** Cut materials kept from startup, so the shader programs they compiled stay in the renderer. */
+  private readonly preparedReveals: Reveal[] = [];
   private scaffolding?: Scaffolding;
   private loading?: Promise<void>;
   private disposed = false;
@@ -122,13 +124,12 @@ export class ConstructionSites {
 
   /** Loads the scaffold kit once. A site created before it arrives gets its scaffold then. */
   load() {
-    this.loading ??= this.loadKit().then(
-      (kit) => {
+    this.loading ??= this.loadKit()
+      .then((kit) => {
         if (!this.disposed) this.scaffolding = Scaffolding.create(this.parent, kit);
-      },
+      })
       // A site still shows its building rising without the kit, so play goes on.
-      (error: unknown) => console.error("Scaffold kit failed to load", error),
-    );
+      .catch((error: unknown) => console.error("Scaffold kit failed to load", error));
     return this.loading;
   }
 
@@ -138,6 +139,10 @@ export class ConstructionSites {
    * `visualRoot` holds its model. A model with no meshes has no hull.
    */
   measure(kind: BuildingKind, root: THREE.Object3D, visualRoot: THREE.Object3D) {
+    this.hull(kind, root, visualRoot);
+  }
+
+  private hull(kind: BuildingKind, root: THREE.Object3D, visualRoot: THREE.Object3D) {
     const known = this.hulls.get(kind);
     if (known) return known;
     root.updateWorldMatrix(true, true);
@@ -152,8 +157,18 @@ export class ConstructionSites {
    * `root` is placed on the terrain and turned only about its vertical axis. A model with no
    * meshes has nothing to build, so it gets no site.
    */
-  createSite(kind: BuildingKind, root: THREE.Object3D, visualRoot: THREE.Object3D): ConstructionSite | undefined {
-    const hull = this.measure(kind, root, visualRoot);
+  createSite(kind: BuildingKind, root: THREE.Object3D, visualRoot: THREE.Object3D) {
+    return this.stand(kind, root, visualRoot, (reveal) => reveal.dispose());
+  }
+
+  /** `releaseReveal` decides what becomes of the site's cut materials when the site is disposed. */
+  private stand(
+    kind: BuildingKind,
+    root: THREE.Object3D,
+    visualRoot: THREE.Object3D,
+    releaseReveal: (reveal: Reveal) => void,
+  ): ConstructionSite | undefined {
+    const hull = this.hull(kind, root, visualRoot);
     if (!hull) return;
     const { outline, table } = hull;
     root.updateWorldMatrix(true, true);
@@ -165,11 +180,11 @@ export class ConstructionSites {
     let cage: Cage | undefined;
     let disposed = false;
     // The scaffold stops at the main roofline; a dish or a mast stands proud of it.
-    const stand = () => {
+    const scaffold = () => {
       if (!disposed) cage = this.scaffolding?.createCage(root, corners, height * outline.roofline);
     };
-    if (this.scaffolding) stand();
-    else void this.load().then(stand);
+    if (this.scaffolding) scaffold();
+    else void this.load().then(scaffold);
 
     const perimeter = corners.reduce((total, corner, index) => total + corner.distanceTo(corners[(index + 1) % corners.length]!), 0);
     const center = corners.reduce((sum, corner) => sum.add(corner), new THREE.Vector3()).divideScalar(corners.length);
@@ -277,7 +292,7 @@ export class ConstructionSites {
       },
       dispose() {
         disposed = true;
-        reveal.dispose();
+        releaseReveal(reveal);
         deck.hide();
         cage?.dispose();
         glows.dispose();
@@ -289,7 +304,8 @@ export class ConstructionSites {
    * Stands two throwaway sites of `kind` far below the terrain, one being welded and one
    * fading after its destruction, so that a render compiles every shader a site ever needs
    * before the first one is placed. `model` is a loaded building's visual root. Call `flush`,
-   * render, then call the returned function.
+   * render, then call the returned function. The sites' cut materials are kept until `dispose`:
+   * the renderer drops a shader program as soon as the last material using it is disposed.
    */
   prepareRendering(kind: BuildingKind, model: THREE.Object3D) {
     const states: SiteState[] = [
@@ -305,7 +321,10 @@ export class ConstructionSites {
       });
       root.add(visual);
       this.parent.add(root);
-      const site = this.createSite(kind, root, visual);
+      const site = this.stand(kind, root, visual, (reveal) => {
+        reveal.finish();
+        this.preparedReveals.push(reveal);
+      });
       site?.update(state, 0);
       if (state.lifecycle === "destroyed") site?.fadeStump(0.5);
       return { root, site };
@@ -328,6 +347,7 @@ export class ConstructionSites {
 
   dispose() {
     this.disposed = true;
+    for (const reveal of this.preparedReveals) reveal.dispose();
     this.effects.dispose();
     this.decks.dispose();
     this.scaffolding?.dispose();

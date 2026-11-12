@@ -145,6 +145,8 @@ const build = async (page: Page, kind: Kind) => {
       await shoot(page, site, `${kind}-working-default`, frames, frameSize(kind, "default"));
     }
   }
+  // Every shader a site needs was compiled at startup, so no frame of the build stops for one.
+  expect(await page.evaluate(() => window.__dune77!.programs())).toBe(compiled);
   const away = await screenPoint(page, site.x + 9, site.z + 9);
   await page.mouse.click(away.x, away.y, { button: "right" });
   await waitForSnapshot(page, (snap) => snap.units.find((unit) => unit.id === SCOUT)!.order !== "build");
@@ -169,7 +171,6 @@ const build = async (page: Page, kind: Kind) => {
   const final = (await siteState(page, site.id)).site!;
   expect(final.lifecycle).toBe("active");
   expect(final.health).toBe(final.maxHealth);
-  // Every shader a site needs was compiled at startup, so no frame of the build stopped for one.
   expect(await page.evaluate(() => window.__dune77!.programs())).toBe(compiled);
 };
 
