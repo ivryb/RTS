@@ -33,6 +33,7 @@ const stills: Record<string, number> = {
   "completion-turret": 3240,
   destroyed: 3240,
   "destroyed-turret": 3240,
+  "destroyed-unbuilt": 3240,
   damage: 3240,
   "damage-turret": 3240,
   "first-layer": 3240,

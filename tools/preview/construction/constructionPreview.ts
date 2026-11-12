@@ -108,6 +108,15 @@ const destroyedPanels: Panel[] = [
   ...[0.1, 0.2, 0.3, 0.6].map((seconds) => ({ label: `Destroyed at 40% · +${seconds} s`, state: destroyed(seconds) })),
 ];
 
+/** A site destroyed before anything was built: only the scaffold is there to drop. */
+const unbuiltPanels: Panel[] = [
+  { label: "Just placed · 0%", state: constructing(0, false) },
+  ...[0.1, 0.2, 0.3, 0.6].map((seconds) => ({
+    label: `Destroyed at 0% · +${seconds} s`,
+    state: { ...destroyed(seconds), progress: 0 },
+  })),
+];
+
 const damagePanels: Panel[] = [1, 0.75, 0.5, 0.25, 0.05].map((health) => ({
   label: `Paused · 40% · ${percent(health)} health`,
   state: constructing(0.4, false, health),
@@ -340,6 +349,7 @@ const stripShots: Record<string, { panels: Panel[]; focus: Focus; viewHeight: nu
   "completion-turret": { panels: completionPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   destroyed: { panels: destroyedPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "destroyed-turret": { panels: destroyedPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  "destroyed-unbuilt": { panels: unbuiltPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   damage: { panels: damagePanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "damage-turret": { panels: damagePanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   "first-layer": { panels: firstLayerPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
