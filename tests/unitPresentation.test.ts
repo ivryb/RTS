@@ -742,21 +742,14 @@ describe("unit presentation timing", () => {
     expect(root?.rotation.y).toBe(building.rotation);
     expect(system.attackables).toContain(root!);
     const selectionRing = root!.getObjectByName("Selection ring") as THREE.Mesh;
-    const selectionHitbox = root!.children.find((child) => child instanceof THREE.Mesh
-      && child.material instanceof THREE.MeshBasicMaterial
-      && child.material.visible === false) as THREE.Mesh;
     const healthFill = root!.getObjectByName("Health bar fill") as THREE.Sprite;
     const model = root!.getObjectByName("Building model mesh") as THREE.Mesh;
     let selectionGeometryDisposed = false;
-    let hitboxGeometryDisposed = false;
     let healthMaterialDisposed = false;
     let modelGeometryDisposed = false;
     let modelMaterialDisposed = false;
     selectionRing.geometry.addEventListener("dispose", () => {
       selectionGeometryDisposed = true;
-    });
-    selectionHitbox.geometry.addEventListener("dispose", () => {
-      hitboxGeometryDisposed = true;
     });
     healthFill.material.addEventListener("dispose", () => {
       healthMaterialDisposed = true;
@@ -779,7 +772,6 @@ describe("unit presentation timing", () => {
     expect(world.getObjectByName("turret model")).toBe(root);
     expect(system.attackables).not.toContain(root!);
     expect(selectionGeometryDisposed).toBe(true);
-    expect(hitboxGeometryDisposed).toBe(true);
     expect(healthMaterialDisposed).toBe(true);
     expect(modelGeometryDisposed).toBe(false);
     expect(modelMaterialDisposed).toBe(false);

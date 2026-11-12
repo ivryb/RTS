@@ -222,7 +222,6 @@ interface BuildingPresentation {
   root: THREE.Group;
   visualRoot: THREE.Group;
   selectionRing: THREE.Mesh;
-  selectionHitbox: THREE.Mesh;
   healthBar: HealthBarPresentation;
   rangeIndicator?: THREE.Group;
   muzzle?: THREE.Object3D;
@@ -393,11 +392,12 @@ const disposeEntityOverlays = ({
   selectionHitbox,
   healthBar,
   rangeIndicator,
-}: Pick<BuildingPresentation, "selectionRing" | "selectionHitbox" | "healthBar" | "rangeIndicator">) => {
+}: Pick<BuildingPresentation, "selectionRing" | "healthBar" | "rangeIndicator">
+  & { selectionHitbox?: THREE.Mesh }) => {
   selectionRing.geometry.dispose();
   (selectionRing.material as THREE.Material).dispose();
-  selectionHitbox.geometry.dispose();
-  (selectionHitbox.material as THREE.Material).dispose();
+  selectionHitbox?.geometry.dispose();
+  (selectionHitbox?.material as THREE.Material | undefined)?.dispose();
   for (const child of healthBar.root.children) {
     if (child instanceof THREE.Sprite) child.material.dispose();
   }
@@ -1157,17 +1157,14 @@ export class UnitSystem {
     for (const child of [...root.children]) visualRoot.add(child);
     root.add(visualRoot);
     const color = building.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
+    // Buildings are picked by their visible model, with no invisible click helper: a helper
+    // as wide as the footprint and as tall as the model covered units standing behind it.
     const selectionRadius = (building.attackRadius ?? building.radius) / POSITION_SCALE;
     const selectionRing = createSelectionRing({
       radius: selectionRadius,
       offset: { x: 0, z: 0 },
     }, color);
     const healthBar = createHealthBar(height + 0.65, Math.max(1.8, selectionRadius * 1.25));
-    const selectionHitbox = createSelectionHitbox({
-      radius: selectionRadius,
-      height,
-      offset: { x: 0, y: height / 2, z: 0 },
-    });
     const weaponDefinition = BUILDING_DEFINITIONS[building.kind].weapon;
     const weaponRange = building.weapon?.range
       ?? (weaponDefinition ? weaponDefinition.range * POSITION_SCALE : undefined);
@@ -1199,7 +1196,6 @@ export class UnitSystem {
     root.add(
       selectionRing,
       healthBar.root,
-      selectionHitbox,
       ...(rangeIndicator ? [rangeIndicator] : []),
     );
     root.userData.selectionCenterY = height / 2;
@@ -1207,7 +1203,6 @@ export class UnitSystem {
       root,
       visualRoot,
       selectionRing,
-      selectionHitbox,
       healthBar,
       rangeIndicator,
       muzzle,
