@@ -56,8 +56,12 @@ const shoot = async (page: Page, site: BuildingSnapshot, name: string, frames: F
 const look = (page: Page, x: number, z: number, zoom = 1) =>
   page.evaluate(([viewX, viewZ, viewZoom]) => window.__dune77!.view(viewX, viewZ, viewZoom), [x, z, zoom] as const);
 
-/** Places a site through the HUD and the canvas, at the first spot around the drone the game accepts. */
-const placeSite = async (page: Page, kind: Kind, distance: number) => {
+/**
+ * Places a site through the HUD and the canvas, at the first spot around the drone the game
+ * accepts. With `stopDrone`, the stop order follows the build order at once, so the drone
+ * never reaches the site however slowly the machine draws.
+ */
+const placeSite = async (page: Page, kind: Kind, distance: number, stopDrone = false) => {
   const drone = (await snapshot(page)).units.find((unit) => unit.id === SCOUT)!;
   for (let turn = 0; turn < 12; turn += 1) {
     const x = drone.x + Math.cos(turn * Math.PI / 6) * distance;
@@ -71,6 +75,7 @@ const placeSite = async (page: Page, kind: Kind, distance: number) => {
     const point = await screenPoint(page, x, z);
     await page.mouse.move(point.x, point.y);
     await page.mouse.click(point.x, point.y);
+    if (stopDrone) await page.keyboard.press("s");
     try {
       const placed = await waitForSnapshot(page, (snap) =>
         snap.buildings.some((building) => !known.has(building.id)), 4_000);
@@ -131,8 +136,7 @@ const build = async (page: Page, kind: Kind) => {
     .map((program) => program.slice(0, 300));
 
   // Just placed: the drone is stopped on its way, so the site waits with nothing built.
-  const site = await placeSite(page, kind, 30);
-  await page.keyboard.press("s");
+  const site = await placeSite(page, kind, 30, true);
   await waitForSnapshot(page, (snap) => snap.units.find((unit) => unit.id === SCOUT)!.order === "idle");
   expect(await progressOf(page, site.id)).toBe(0);
   await look(page, site.x, site.z);
