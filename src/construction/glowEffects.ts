@@ -2,6 +2,8 @@ import * as THREE from "three";
 
 /** Floats per glow: position and size, velocity and seed, then kind, strength and age. */
 const STRIDE = 12;
+/** A lamp's glow never draws smaller than this many pixels across, so it reads at any zoom. */
+const LAMP_PIXELS = 15;
 
 export const Glow = {
   /** A welding arc: a flickering hot point. */
@@ -9,12 +11,14 @@ export const Glow = {
   /** A falling spark thrown from an arc; it loops on its own from the clock. */
   Spark: 1,
   /** A slow cyan blink on a scaffold lamp: the site is waiting for a drone. */
-  Beacon: 2,
-  /** A puff of sand kicked up as the scaffold drops; `age` runs it from 0 to 1. */
+  Lamp: 2,
+  /** A puff of sand kicked up as something drops; `age` runs it from 0 to 1. */
   Dust: 3,
+  /** Dark smoke rising from a broken part; it loops on its own from the clock. */
+  Smoke: 4,
 } as const;
 
-/** One site's glows for the current frame. Refill it from scratch on every update. */
+/** One owner's glows for the current frame. Refill it from scratch on every update. */
 export interface GlowList {
   clear(): void;
   add(
@@ -34,6 +38,7 @@ attribute vec4 aPlace;
 attribute vec4 aMotion;
 attribute vec4 aState;
 uniform float uTime;
+uniform float uViewportHeight;
 varying vec2 vCorner;
 varying float vKind;
 varying float vStrength;
@@ -62,7 +67,9 @@ void main() {
   } else if (vKind < 2.5) {
     // A lamp never goes fully dark, so a waiting site reads as waiting in any single frame.
     vStrength *= 0.3 + 0.7 * pow(0.5 + 0.5 * sin(uTime * 4.2 + seed), 5.0);
-  } else {
+    // The game's camera is orthographic, so one pixel is the same size everywhere on screen.
+    extent = max(extent, vec2(${(LAMP_PIXELS / 2).toFixed(1)} * 2.0 / (projectionMatrix[1][1] * uViewportHeight)));
+  } else if (vKind < 3.5) {
     float age = aState.z;
     center += aMotion.xyz * (1.0 - (1.0 - age) * (1.0 - age));
     extent *= 0.55 + 1.1 * age;
@@ -70,6 +77,12 @@ void main() {
     // A puff is a camera-facing disc resting on the ground; far enough forward, the terrain
     // no longer slices its lower half off in a straight line.
     lift = extent.y * 1.1;
+  } else {
+    float life = 1.5 + 0.9 * fract(seed * 5.31);
+    float age = fract(uTime / life + seed * 3.7);
+    center += aMotion.xyz * age * life + vec3(sin(age * 5.0 + seed * 9.0), 0.0, cos(age * 4.0 + seed * 7.0)) * 0.12 * age;
+    extent *= 0.45 + 1.25 * age;
+    vStrength *= (1.0 - age) * smoothstep(0.0, 0.18, age);
   }
   vec4 view = viewMatrix * vec4(center, 1.0);
   view.xy += vec2(axis.y, -axis.x) * position.x * extent.x + axis * position.y * extent.y;
@@ -79,8 +92,8 @@ void main() {
 }
 `;
 
-// Premultiplied output: light adds (alpha 0) and dust covers (alpha above 0) in one material.
-// Dust is tone mapped as a plain colour and only then weighted by its cover, or its thin
+// Premultiplied output: light adds (alpha 0) and dust or smoke covers (alpha above 0) in one
+// material. A cover is tone mapped as a plain colour and only then weighted, or its thin
 // edges would come out of the display curve brighter than its core and glow.
 const fragmentShader = /* glsl */ `
 varying vec2 vCorner;
@@ -101,9 +114,12 @@ void main() {
   } else if (vKind < 2.5) {
     light = vec3(0.55, 2.3, 2.5) * exp(-reach * reach * 22.0)
       + vec3(0.12, 0.6, 0.68) * exp(-reach * reach * 4.0) * 0.55;
-  } else {
+  } else if (vKind < 3.5) {
     cover = exp(-reach * reach * 3.0) * edge * 0.68 * vStrength;
     light = vec3(0.6, 0.41, 0.26);
+  } else {
+    cover = exp(-reach * reach * 2.2) * edge * 0.78 * vStrength;
+    light = vec3(0.05, 0.043, 0.038);
   }
   gl_FragColor = vec4(vKind < 2.5 ? light * edge * vStrength : light, 1.0);
   #include <tonemapping_fragment>
@@ -112,18 +128,24 @@ void main() {
 }
 `;
 
-/** Every site's sparks, arcs, lamp blinks and dust, drawn as one instanced set of quads. */
-export class WorkEffects {
+const viewport = new THREE.Vector4();
+
+/**
+ * Sparks, arcs, lamp blinks, dust and smoke for the whole world, drawn as one instanced set of
+ * quads in one draw call. Each owner fills its own `GlowList` every frame; `flush` gathers
+ * them once all owners have updated.
+ */
+export class GlowEffects {
   private readonly lists = new Set<{ data: Float32Array; count: number }>();
   private readonly mesh: THREE.Mesh<THREE.InstancedBufferGeometry, THREE.ShaderMaterial>;
   private buffer = new THREE.InstancedInterleavedBuffer(new Float32Array(1024 * STRIDE), STRIDE);
 
-  constructor(scene: THREE.Scene) {
+  constructor(parent: THREE.Object3D) {
     const geometry = new THREE.InstancedBufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
     geometry.setIndex([0, 1, 2, 0, 2, 3]);
     this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 } },
+      uniforms: { uTime: { value: 0 }, uViewportHeight: { value: 900 } },
       vertexShader,
       fragmentShader,
       transparent: true,
@@ -132,11 +154,15 @@ export class WorkEffects {
       blendSrc: THREE.OneFactor,
       blendDst: THREE.OneMinusSrcAlphaFactor,
     }));
-    this.mesh.name = "Construction work effects";
+    this.mesh.name = "Glow effects";
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
+    this.mesh.visible = false;
+    this.mesh.onBeforeRender = (renderer) => {
+      this.mesh.material.uniforms.uViewportHeight!.value = renderer.getCurrentViewport(viewport).w;
+    };
     this.bind();
-    scene.add(this.mesh);
+    parent.add(this.mesh);
   }
 
   private bind() {
@@ -147,7 +173,7 @@ export class WorkEffects {
     geometry.setAttribute("aState", new THREE.InterleavedBufferAttribute(this.buffer, 4, 8));
   }
 
-  /** Reserves room for up to `capacity` glows belonging to one site. */
+  /** Reserves room for up to `capacity` glows belonging to one owner. */
   createList(capacity: number): GlowList {
     const list = { data: new Float32Array(capacity * STRIDE), count: 0 };
     this.lists.add(list);
@@ -175,7 +201,7 @@ export class WorkEffects {
     };
   }
 
-  /** Gathers every site's glows into the shared buffer; call once per rendered frame. */
+  /** Gathers every owner's glows into the shared buffer; call once per rendered frame. */
   flush(time: number) {
     let total = 0;
     for (const list of this.lists) total += list.count;
@@ -189,13 +215,19 @@ export class WorkEffects {
     const { array } = this.buffer;
     let at = 0;
     for (const { data, count } of this.lists) {
-      for (let index = 0; index < count * STRIDE; index += 1) array[at + index] = data[index];
+      array.set(count * STRIDE === data.length ? data : data.subarray(0, count * STRIDE), at);
       at += count * STRIDE;
     }
     this.buffer.clearUpdateRanges();
     this.buffer.addUpdateRange(0, at);
     this.buffer.needsUpdate = true;
     this.mesh.geometry.instanceCount = total;
-    this.mesh.material.uniforms.uTime.value = time;
+    this.mesh.material.uniforms.uTime!.value = time;
+  }
+
+  dispose() {
+    this.mesh.removeFromParent();
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
   }
 }

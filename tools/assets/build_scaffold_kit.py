@@ -59,10 +59,32 @@ ochre = painted(materials.structure, 'Scaffold ochre paint', (1.75, 1.7, 1.55))
 # keeps a third of the graphite tile, enough for seams without bright worn edges.
 plate = painted(materials.machinery, 'Dusty road plate', (.15, .108, .072), 'MIX', .68)
 
+
+def plain(source, name, color, roughness):
+    """One flat tone with no tile, so pieces laid edge to edge show no line between them."""
+    mat = source.copy()
+    mat.name = name
+    shader = mat.node_tree.nodes.get('Principled BSDF')
+    for socket in ('Base Color', 'Roughness', 'Normal'):
+        for link in list(shader.inputs[socket].links):
+            mat.node_tree.links.remove(link)
+    shader.inputs['Base Color'].default_value = (*color, 1)
+    shader.inputs['Roughness'].default_value = roughness
+    shader.inputs['Metallic'].default_value = 0
+    return mat
+
+
+# The game builds a plate cut by a slanted side of the pad from several sheared triangles.
+# With the tile on them, every triangle drew its own seam across the plate.
+cut_plate = plain(materials.machinery, 'Dusty cut road plate', (.118, .088, .064), .82)
+
 # A bay is the nominal spacing between posts, a lift the nominal spacing between rail levels.
 BAY, LIFT = 1.6, 1.8
 POST_RADIUS, RAIL_RADIUS, BRACE_RADIUS = .075, .055, .042
 PAD_TOP = .06
+# Placement allows .75 m of height difference under a building. The pad and its kerbs reach
+# this far below the pivot, so the downhill edge of a site on a slope never hangs in the air.
+SKIRT = .5
 # Half the height of the node collar on a post top, and the top of a foot's screw jack: a
 # lamp stands on either.
 COLLAR, JACK_TOP = .085, PAD_TOP+.19
@@ -144,18 +166,18 @@ tube('Foot / screw jack', (0, 0, PAD_TOP+.03), (0, 0, JACK_TOP), POST_RADIUS+.03
 piece('ScaffoldPad')
 # One steel road plate per square of the pad's grid, from the pivot along +X and inward. The
 # game leaves the joint between plates when it lays them.
-block('Pad / steel road plate', (BAY/2, -BAY/2, PAD_TOP/2), (BAY, BAY, PAD_TOP), plate)
+block('Pad / steel road plate', (BAY/2, -BAY/2, (PAD_TOP-SKIRT)/2), (BAY, BAY, PAD_TOP+SKIRT), plate)
 
 piece('ScaffoldPadCut')
 # The same plate cut on the diagonal, with its right angle at the pivot. Any triangle is a
 # sheared copy of it, so a few of them make up a plate trimmed to a slanted side of a pad.
 corners = [(0, 0), (0, -BAY), (BAY, 0)]
-kit.solid('Pad / cut road plate', [at((x, y, 0)) for x, y in corners],
-          [at((x, y, PAD_TOP)) for x, y in corners], plate, 0)
+kit.solid('Pad / cut road plate', [at((x, y, -SKIRT)) for x, y in corners],
+          [at((x, y, PAD_TOP)) for x, y in corners], cut_plate, 0)
 
 piece('ScaffoldCurb')
 curb = [(-.11, PAD_TOP), (-.11, PAD_TOP+.20), (.11, PAD_TOP+.20), (.11, PAD_TOP)]
-block('Curb / ochre kerb beam', (BAY/2, 0, PAD_TOP+.10), (BAY-.44, .22, .20), ochre)
+block('Curb / ochre kerb beam', (BAY/2, 0, (PAD_TOP+.20-SKIRT)/2), (BAY-.44, .22, PAD_TOP+.20+SKIRT), ochre)
 stripes('Curb / warning stripes', .26, BAY-.26, 4,
         [(y*1.03, PAD_TOP+(z-PAD_TOP)*1.03+.001) for y, z in curb], rubber)
 

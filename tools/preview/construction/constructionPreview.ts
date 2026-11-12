@@ -1,13 +1,13 @@
 import * as THREE from "three";
-import { createEnvironmentProps } from "../../src/environmentProps";
-import { generateMap, sampleHeight } from "../../src/map";
-import { demoAssets, loadBuildingModel, loadDemoAsset } from "../../src/modelAssets";
-import { BUILDING_DEFINITIONS } from "../../src/sim/construction";
-import type { BuildingKind } from "../../src/sim/units";
-import { createTerrain } from "../../src/terrain";
-import { UI_SELECTION_COLOR } from "../../src/uiColors";
-import { findSceneCenter } from "../../tools/preview/demoModels";
-import type { ConstructionSite, ConstructionSketch, SiteModel, SiteState } from "./sketch";
+import { ConstructionSites, type ConstructionSite, type SiteState } from "../../../src/constructionSites";
+import { createEnvironmentProps } from "../../../src/environmentProps";
+import { generateMap, sampleHeight } from "../../../src/map";
+import { demoAssets, loadBuildingModel, loadDemoAsset } from "../../../src/modelAssets";
+import { BUILDING_DEFINITIONS } from "../../../src/sim/construction";
+import type { BuildingKind } from "../../../src/sim/units";
+import { createTerrain } from "../../../src/terrain";
+import { UI_SELECTION_COLOR } from "../../../src/uiColors";
+import { findSceneCenter } from "../demoModels";
 
 /** The game's default framing: `VIEW_HEIGHT / DEFAULT_ZOOM` in `src/camera.ts`. */
 const GAMEPLAY_VIEW_HEIGHT = 56 / 1.3;
@@ -16,6 +16,8 @@ const CLOSE_VIEW_HEIGHT = 56 / 3.9;
 /** Pixels per metre of the game at default zoom in a 900 px tall window; film shots keep it. */
 const GAMEPLAY_PIXELS_PER_METRE = 900 / GAMEPLAY_VIEW_HEIGHT;
 const FILM_FPS = 30;
+/** `BUILDING_DESTRUCTION_SECONDS` in `src/unitSystem.ts`: how long a destroyed site's stump fades. */
+const STUMP_FADE_SECONDS = 0.8;
 
 interface Panel {
   label: string;
@@ -23,7 +25,9 @@ interface Panel {
 }
 
 interface Site {
-  model: SiteModel;
+  kind: BuildingKind;
+  root: THREE.Group;
+  visualRoot: THREE.Group;
   handle: ConstructionSite;
   ground: number;
   drone: THREE.Group;
@@ -31,12 +35,15 @@ interface Site {
 }
 
 export interface PerfReport {
-  option: string;
   sites: string;
   /** Draw calls and triangles of one frame, shadow pass included. */
   emptyScene: { calls: number; triangles: number };
   atRest: { calls: number; triangles: number };
   underConstruction: { calls: number; triangles: number };
+  /** The same ten sites where the browser lacks `WEBGL_multi_draw`, as Firefox does. */
+  underConstructionWithoutMultiDraw: { calls: number; triangles: number };
+  /** Milliseconds to measure each building kind's hull, once per kind. */
+  measureMs: Record<string, number>;
   /** Milliseconds of `createSite` per building, in creation order. */
   createSiteMs: number[];
   /** Mean milliseconds per frame spent in every site's `update` plus `flush`, over 600 frames. */
@@ -50,10 +57,10 @@ export interface PerfReport {
 
 declare global {
   interface Window {
-    __sketchReady?: boolean;
-    __sketchFrameCount?: number;
-    __sketchFrame?: (index: number) => void;
-    __sketchPerf?: () => PerfReport;
+    __constructionReady?: boolean;
+    __constructionFrameCount?: number;
+    __constructionFrame?: (index: number) => void;
+    __constructionPerf?: () => PerfReport;
   }
 }
 
@@ -71,9 +78,15 @@ const completed = (seconds: number): SiteState => ({
   lifecycle: "active",
   sinceLifecycleChange: seconds,
 });
+const destroyed = (seconds: number): SiteState => ({
+  ...constructing(0.4, false, 0),
+  lifecycle: "destroyed",
+  sinceLifecycleChange: seconds,
+});
+const percent = (value: number) => `${Number((value * 100).toFixed(1))}%`;
 
 const progressPanels: Panel[] = [0, 0.15, 0.5, 0.85].map((progress) => ({
-  label: `${Math.round(progress * 100)}%`,
+  label: percent(progress),
   state: constructing(progress),
 })).concat({ label: "100% · complete", state: completed(10) });
 
@@ -82,27 +95,35 @@ const statePanels: Panel[] = [
   { label: "Drone working · 40%", state: constructing(0.4) },
   { label: "Paused · 40% · no drone", state: constructing(0.4, false) },
   { label: "Damaged · 40% · half health", state: constructing(0.4, true, 0.5) },
-  {
-    label: "Destroyed at 40% · 0.3 s later",
-    state: { ...constructing(0.4, false, 0), lifecycle: "destroyed", sinceLifecycleChange: 0.3 },
-  },
+  { label: "Destroyed at 40% · 0.3 s later", state: destroyed(0.3) },
 ];
 
 const completionPanels: Panel[] = [
   { label: "99%", state: constructing(0.99) },
-  ...[0, 0.15, 0.4, 1].map((seconds) => ({
-    label: `Complete · +${seconds} s`,
-    state: completed(seconds),
-  })),
+  ...[0, 0.15, 0.4, 1].map((seconds) => ({ label: `Complete · +${seconds} s`, state: completed(seconds) })),
 ];
 
 const destroyedPanels: Panel[] = [
   { label: "Drone working · 40%", state: constructing(0.4) },
-  ...[0.1, 0.2, 0.3, 0.6].map((seconds) => ({
-    label: `Destroyed at 40% · +${seconds} s`,
-    state: { ...constructing(0.4, false, 0), lifecycle: "destroyed" as const, sinceLifecycleChange: seconds },
-  })),
+  ...[0.1, 0.2, 0.3, 0.6].map((seconds) => ({ label: `Destroyed at 40% · +${seconds} s`, state: destroyed(seconds) })),
 ];
+
+const damagePanels: Panel[] = [1, 0.75, 0.5, 0.25, 0.05].map((health) => ({
+  label: `Paused · 40% · ${percent(health)} health`,
+  state: constructing(0.4, false, health),
+}));
+
+/** The first moments of work, as a share of the Turret's 10 s build. */
+const firstLayerPanels: Panel[] = [0.005, 0.02, 0.045, 0.09, 0.14].map((progress) => ({
+  label: `${percent(progress)} · first layer`,
+  state: constructing(progress),
+}));
+
+/** Heights at which the cut crosses the Command Center's shoulders and the Turret's barrels. */
+const cutPanels: Panel[] = [0.3, 0.4, 0.62, 0.74, 0.92].map((progress) => ({
+  label: percent(progress),
+  state: constructing(progress),
+}));
 
 /** One build from placement to completion, with the drone leaving for 1.5 s on the way. */
 const filmState = (seconds: number): SiteState => {
@@ -118,15 +139,16 @@ const FILM_SECONDS = 14.5;
 const excerptState = (seconds: number): SiteState => constructing(0.3 + seconds / 60);
 const EXCERPT_SECONDS = 12;
 
+/** A site shot at while it is built, then destroyed at 40%. */
+const lossState = (seconds: number): SiteState => {
+  if (seconds < 3) return constructing(0.25 + seconds * 0.05, true, 1 - seconds * 0.3);
+  return destroyed(seconds - 3);
+};
+const LOSS_SECONDS = 4.5;
+
 const params = new URLSearchParams(location.search);
-const optionName = params.get("option") ?? "current";
 const shot = params.get("shot") ?? "gameplay";
 const time = Number(params.get("time")) || 2.4;
-
-const options = import.meta.glob<{ sketch: ConstructionSketch }>("./options/*.ts");
-const loadOption = options[`./options/${optionName}.ts`];
-if (!loadOption) throw new Error(`Unknown option "${optionName}"`);
-const { sketch } = await loadOption();
 
 const map = generateMap(77);
 const canvas = document.querySelector<HTMLCanvasElement>("#preview")!;
@@ -155,8 +177,8 @@ sun.shadow.normalBias = 0.035;
 sun.shadow.intensity = 0.72;
 scene.add(sun, sun.target);
 
-const context = { scene, map, renderer };
-await sketch.prepare?.(context);
+const construction = new ConstructionSites(scene);
+await construction.load();
 
 const scoutDrone = demoAssets.find((asset) => asset.unitKind === "scout-drone")!;
 const groundAt = (x: number, z: number) => sampleHeight(map, x, z);
@@ -199,21 +221,22 @@ const createSite = async (kind: BuildingKind, x: number, z: number, rotation: nu
   beam.renderOrder = 4;
   scene.add(beam);
 
-  const model = { kind, root, visualRoot };
-  return { model, handle: sketch.createSite(model, context), ground, drone, beam };
+  return { kind, root, visualRoot, handle: construction.createSite(kind, root, visualRoot)!, ground, drone, beam };
 };
 
 const applyState = (site: Site, state: SiteState, seconds: number) => {
   site.handle.update(state, seconds);
+  // The game fades what a destroyed site leaves standing, as `updateBuildingDestruction` does.
+  site.handle.fadeStump(state.lifecycle === "destroyed"
+    ? Math.max(0, 1 - state.sinceLifecycleChange / STUMP_FADE_SECONDS)
+    : 1);
   site.beam.visible = state.working && state.lifecycle === "constructing";
   site.drone.visible = site.beam.visible;
   if (!site.beam.visible) return;
   const positions = site.beam.geometry.getAttribute("position");
-  const { x, z } = site.model.root.position;
+  const { x, z } = site.root.position;
   positions.setXYZ(0, site.drone.position.x, site.drone.position.y + 1.05, site.drone.position.z);
-  const target = site.handle.beamTarget;
-  if (target) positions.setXYZ(1, target.x, target.y, target.z);
-  else positions.setXYZ(1, x, site.handle.beamTargetY ?? site.ground + 0.8, z);
+  positions.setXYZ(1, x, site.handle.beamTargetY, z);
   positions.needsUpdate = true;
 };
 
@@ -240,18 +263,18 @@ const aimSun = (target: { x: number; z: number }) => {
 };
 
 const labels = document.querySelector("#labels")!;
-const showLabels = (panels: readonly Panel[]) => {
+const showLabels = (texts: readonly string[]) => {
   labels.replaceChildren();
-  panels.forEach((panel, index) => {
+  texts.forEach((text, index) => {
     const label = document.createElement("div");
     label.className = "preview-label";
-    label.style.left = `${(index + 0.5) / panels.length * 100}%`;
-    label.textContent = panel.label;
+    label.style.left = `${(index + 0.5) / texts.length * 100}%`;
+    label.textContent = text;
     labels.append(label);
     if (!index) return;
     const divider = document.createElement("div");
     divider.className = "preview-divider";
-    divider.style.left = `${index / panels.length * 100}%`;
+    divider.style.left = `${index / texts.length * 100}%`;
     labels.append(divider);
   });
 };
@@ -274,29 +297,37 @@ const renderStrip = (
   renderer.setScissorTest(true);
   panels.forEach((panel, index) => {
     for (const site of sites) applyState(site, panel.state, time);
-    sketch.flush?.(time);
+    construction.flush(time);
     const x = Math.round(index * panelWidth);
     const width = Math.round((index + 1) * panelWidth) - x;
     renderer.setViewport(x, 0, width, innerHeight);
     renderer.setScissor(x, 0, width, innerHeight);
     renderer.render(scene, camera);
   });
-  showLabels(panels);
+  showLabels(panels.map((panel) => panel.label));
 };
 
-const stripShots: Record<string, { panels: Panel[]; focus: "both" | "turret" | "command-center"; viewHeight: number }> = {
+type Focus = "both" | "turret" | "command-center";
+const stripShots: Record<string, { panels: Panel[]; focus: Focus; viewHeight: number }> = {
   gameplay: { panels: progressPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "turret-close": { panels: progressPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   "command-center-close": { panels: progressPanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
   states: { panels: statePanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "states-turret": { panels: statePanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  "states-command-center": { panels: statePanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
   completion: { panels: completionPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "completion-turret": { panels: completionPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   destroyed: { panels: destroyedPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "destroyed-turret": { panels: destroyedPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  damage: { panels: damagePanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
+  "damage-turret": { panels: damagePanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  "first-layer": { panels: firstLayerPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
+  "first-layer-turret": { panels: firstLayerPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  "cuts-turret": { panels: cutPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  "cuts-command-center": { panels: cutPanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
 };
 
-const focusPoint = (which: "both" | "turret" | "command-center") => which === "turret"
+const focusPoint = (which: Focus) => which === "turret"
   ? { x: turretAt.x + 0.5, z: turretAt.z + 0.9 }
   : which === "command-center"
     ? { x: commandCenterAt.x + 0.3, z: commandCenterAt.z + 1.1 }
@@ -310,60 +341,98 @@ const measureFrame = (camera: THREE.Camera) => {
 
 /** Counts screen pixels, on a 6 px grid at gameplay zoom, where a click ray hits the site. */
 const pickablePixels = (site: Site) => {
-  const camera = cameraFor(site.model.root.position, GAMEPLAY_VIEW_HEIGHT, 1);
+  const camera = cameraFor(site.root.position, GAMEPLAY_VIEW_HEIGHT, 1);
   const raycaster = new THREE.Raycaster();
-  const reach = BUILDING_DEFINITIONS[site.model.kind].radius * 2.2 * GAMEPLAY_PIXELS_PER_METRE;
+  const reach = BUILDING_DEFINITIONS[site.kind].radius * 2.2 * GAMEPLAY_PIXELS_PER_METRE;
   const step = 6;
   let hits = 0;
   for (let x = -reach; x <= reach; x += step) {
     for (let y = -reach; y <= reach; y += step) {
       raycaster.setFromCamera(new THREE.Vector2(x / 450, y / 450), camera);
-      if (raycaster.intersectObject(site.model.root, true).length) hits += 1;
+      if (raycaster.intersectObject(site.root, true).length) hits += 1;
     }
   }
   return hits * step * step;
 };
 
+const standardSites = async () => [
+  await createSite("command-center", commandCenterAt.x, commandCenterAt.z, Math.PI / 4),
+  await createSite("turret", turretAt.x, turretAt.z, 0),
+];
+
 if (shot in stripShots) {
   const { panels, focus: which, viewHeight } = stripShots[shot]!;
-  const sites = [
-    await createSite("command-center", commandCenterAt.x, commandCenterAt.z, Math.PI / 4),
-    await createSite("turret", turretAt.x, turretAt.z, 0),
-  ];
-  sceneName.textContent = `${sketch.title} · ${shot} · ${viewHeight.toFixed(1)} m view`;
-  renderStrip(sites, panels, focusPoint(which), viewHeight);
+  sceneName.textContent = `Construction · ${shot} · ${viewHeight.toFixed(1)} m view`;
+  renderStrip(await standardSites(), panels, focusPoint(which), viewHeight);
+} else if (shot === "fit") {
+  // What nobody authors per building: other turns of the building, a slope, a neighbour.
+  const turns = [0, 30, 45, 77, 180];
+  const spacing = 19;
+  const row = (index: number) => ({ x: focus.x - 30 + index * spacing * 0.7, z: focus.z + 22 - index * spacing * 0.7 });
+  const sites: Site[] = [];
+  for (const [index, turn] of turns.entries()) {
+    const at = row(index);
+    sites.push(await createSite("command-center", at.x, at.z, THREE.MathUtils.degToRad(turn)));
+    sites.push(await createSite("turret", at.x + 7.2, at.z + 7.2, THREE.MathUtils.degToRad(turn)));
+  }
+  const target = row(2);
+  const camera = cameraFor({ x: target.x + 3, z: target.z + 3 }, 46, innerWidth / innerHeight);
+  aimSun(target);
+  sites.forEach((site, index) => applyState(site, constructing(0.45, index % 4 < 2), time));
+  construction.flush(time);
+  renderer.render(scene, camera);
+  sceneName.textContent = `Construction · buildings turned ${turns.join(", ")} degrees, standing side by side`;
+} else if (shot === "slope") {
+  // Placement allows 0.75 m of height difference across a footprint; find the steepest such spot.
+  const radius = BUILDING_DEFINITIONS["command-center"].radius;
+  let steepest = { x: focus.x, z: focus.z, variation: 0 };
+  for (let x = -map.size / 2 + 20; x < map.size / 2 - 20; x += 3) {
+    for (let z = -map.size / 2 + 20; z < map.size / 2 - 20; z += 3) {
+      const heights = [0, 1, 2, 3, 4, 5, 6, 7].map((index) => groundAt(
+        x + Math.cos(index * Math.PI / 4) * radius,
+        z + Math.sin(index * Math.PI / 4) * radius,
+      ));
+      const variation = Math.max(...heights) - Math.min(...heights);
+      if (variation <= 0.75 && variation > steepest.variation) steepest = { x, z, variation };
+    }
+  }
+  const site = await createSite("command-center", steepest.x, steepest.z, Math.PI / 4);
+  const panels = [constructing(0, false), constructing(0.3), completed(0.3)];
+  sceneName.textContent = `Construction · Command Center on a ${steepest.variation.toFixed(2)} m slope`;
+  renderStrip(
+    [site],
+    panels.map((state, index) => ({ label: ["Just placed", "30%", "Complete · +0.3 s"][index]!, state })),
+    steepest,
+    CLOSE_VIEW_HEIGHT * 1.5,
+  );
 } else if (shot.startsWith("film")) {
-  const which = shot === "film-turret" ? "turret" : shot === "film-command-center" ? "command-center" : "both";
+  const which: Focus = shot.endsWith("turret") ? "turret" : shot.endsWith("command-center") ? "command-center" : "both";
   // The Command Center does not fit a 720 px frame at the closest zoom, so its film stands back a little.
   const viewHeight = which === "both"
     ? innerHeight / GAMEPLAY_PIXELS_PER_METRE
     : which === "command-center" ? 16 : CLOSE_VIEW_HEIGHT * innerHeight / 900;
-  const sites = [
-    await createSite("command-center", commandCenterAt.x, commandCenterAt.z, Math.PI / 4),
-    await createSite("turret", turretAt.x, turretAt.z, 0),
-  ];
+  const sites = await standardSites();
   const target = focusPoint(which);
   const camera = cameraFor(target, viewHeight, innerWidth / innerHeight);
   aimSun(target);
-  sceneName.textContent = sketch.title;
-  const excerpt = which === "command-center";
-  window.__sketchFrameCount = Math.round((excerpt ? EXCERPT_SECONDS : FILM_SECONDS) * FILM_FPS);
-  window.__sketchFrame = (index) => {
+  sceneName.textContent = "Construction";
+  const [stateAt, length] = shot.startsWith("film-loss")
+    ? [lossState, LOSS_SECONDS]
+    : shot === "film-command-center" ? [excerptState, EXCERPT_SECONDS] : [filmState, FILM_SECONDS];
+  window.__constructionFrameCount = Math.round(length * FILM_FPS);
+  window.__constructionFrame = (index) => {
     const seconds = index / FILM_FPS;
-    const state = excerpt ? excerptState(seconds) : filmState(seconds);
+    const state = stateAt(seconds);
     for (const site of sites) applyState(site, state, seconds);
-    sketch.flush?.(seconds);
+    construction.flush(seconds);
     renderer.render(scene, camera);
-    labels.replaceChildren();
-    const label = document.createElement("div");
-    label.className = "preview-label";
-    label.style.left = "50%";
-    label.textContent = state.lifecycle === "active"
+    showLabels([state.lifecycle === "active"
       ? "Complete"
-      : `${Math.round(state.progress * 100)}% · ${state.working ? "drone working" : state.progress ? "paused, no drone" : "just placed"}`;
-    labels.append(label);
+      : state.lifecycle === "destroyed"
+        ? "Destroyed"
+        : `${Math.round(state.progress * 100)}% · ${state.working ? "drone working" : state.progress ? "paused, no drone" : "just placed"}${state.health < 1 ? ` · ${percent(state.health)} health` : ""}`]);
   };
-  window.__sketchFrame(0);
+  window.__constructionFrame(0);
 } else if (shot === "perf") {
   const target = { x: focus.x - 4, z: focus.z + 4 };
   const camera = cameraFor(target, 110, innerWidth / innerHeight);
@@ -372,22 +441,30 @@ if (shot in stripShots) {
   const emptyScene = measureFrame(camera);
   const sites: Site[] = [];
   const createSiteMs: number[] = [];
+  const measureMs: Record<string, number> = {};
   // Five Command Centers and five Turrets: ten sites under construction at once.
   for (let index = 0; index < 10; index += 1) {
     const kind: BuildingKind = index < 5 ? "command-center" : "turret";
     const column = index % 5;
     const x = target.x - 32 + column * 16;
     const z = target.z + (index < 5 ? -9 : 9);
+    if (!(kind in measureMs)) {
+      const model = await loadBuildingModel(kind);
+      model.updateWorldMatrix(true, true);
+      const started = performance.now();
+      new ConstructionSites(new THREE.Group()).measure(kind, model, model);
+      measureMs[kind] = Number((performance.now() - started).toFixed(1));
+    }
     const site = await createSite(kind, x, z, index < 5 ? Math.PI / 4 : 0);
     const started = performance.now();
     site.handle.dispose();
-    site.handle = sketch.createSite(site.model, context);
+    site.handle = construction.createSite(kind, site.root, site.visualRoot)!;
     createSiteMs.push(Number((performance.now() - started).toFixed(2)));
     sites.push(site);
   }
   const frame = (state: (index: number) => SiteState, seconds: number) => {
     sites.forEach((site, index) => applyState(site, state(index), seconds));
-    sketch.flush?.(seconds);
+    construction.flush(seconds);
   };
   frame(() => completed(30), 0);
   renderer.render(scene, camera);
@@ -398,9 +475,14 @@ if (shot in stripShots) {
   renderer.render(scene, camera);
   const underConstruction = measureFrame(camera);
   const programsAddedByConstruction = (renderer.info.programs?.length ?? 0) - programsAtRest;
-  sceneName.textContent = `${sketch.title} · 10 sites under construction`;
+  // three.js asks for the extension on every batch draw, so hiding it shows the fallback's cost.
+  const { get } = renderer.extensions;
+  renderer.extensions.get = (name: string) => name === "WEBGL_multi_draw" ? null : get(name);
+  const underConstructionWithoutMultiDraw = measureFrame(camera);
+  renderer.extensions.get = get;
+  sceneName.textContent = "Construction · 10 sites under construction";
 
-  window.__sketchPerf = () => {
+  window.__constructionPerf = () => {
     const frames = 600;
     for (let index = 0; index < 60; index += 1) frame(building, index / 60);
     const started = performance.now();
@@ -413,19 +495,20 @@ if (shot in stripShots) {
     for (const site of [sites[0]!, sites[5]!]) {
       for (const progress of [0, 0.15, 0.5, 1]) {
         applyState(site, progress === 1 ? completed(30) : constructing(progress), 1);
-        sketch.flush?.(1);
-        site.model.root.updateWorldMatrix(true, true);
-        picks[`${site.model.kind} ${Math.round(progress * 100)}%`] = pickablePixels(site);
+        construction.flush(1);
+        site.root.updateWorldMatrix(true, true);
+        picks[`${site.kind} ${Math.round(progress * 100)}%`] = pickablePixels(site);
       }
     }
     frame(building, 1);
     renderer.render(scene, camera);
     return {
-      option: optionName,
       sites: "5 Command Centers + 5 Turrets",
       emptyScene,
       atRest,
       underConstruction,
+      underConstructionWithoutMultiDraw,
+      measureMs,
       createSiteMs,
       updateMsPerFrame,
       programsAtRest,
@@ -438,5 +521,5 @@ if (shot in stripShots) {
 }
 
 requestAnimationFrame(() => {
-  window.__sketchReady = true;
+  window.__constructionReady = true;
 });
