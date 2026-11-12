@@ -2449,7 +2449,9 @@ export class UnitSystem {
     if (lifecycle !== "constructing") construction.ended += deltaSeconds;
     const builder = building?.builderId ? this.current.get(building.builderId) : undefined;
     // A site's health grows as it is built, so damage is what the part built so far is missing.
-    const builtHealth = 1 + construction.progress * ((building?.maxHealth ?? 1) - 1);
+    // This is the health `stepConstruction` in the simulation has granted by this progress,
+    // floor included: without it every undamaged site looked damaged for its first ticks.
+    const builtHealth = 1 + Math.floor(construction.progress * ((building?.maxHealth ?? 1) - 1));
     const showing = construction.site.update({
       // Progress arrives ten times a second; blending it keeps the cut rising smoothly.
       progress: THREE.MathUtils.lerp(construction.previousProgress, construction.progress, alpha),

@@ -96,18 +96,22 @@ const scaffoldKit = async () => {
 /** Resolves once a site placed in this turn has been given its scaffold. */
 const kitLoaded = () => new Promise((resolve) => setTimeout(resolve));
 
-/** What a click straight down onto the world point (x, z) selects. */
-const clickedFromAbove = (system: UnitSystem, world: THREE.Group, x: number, z: number) => {
+/** What a click selects when its ray runs from `from` towards `towards`. */
+const clicked = (system: UnitSystem, world: THREE.Group, from: THREE.Vector3, towards: THREE.Vector3) => {
   world.updateMatrixWorld(true);
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-  camera.up.set(0, 0, -1);
-  camera.position.set(x, 50, z);
-  camera.lookAt(x, 0, z);
+  if (from.x === towards.x && from.z === towards.z) camera.up.set(0, 0, -1);
+  camera.position.copy(from);
+  camera.lookAt(towards);
   camera.updateMatrixWorld();
   const ray = new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2(), camera);
   return selectableEntityId(pickSurface(ray.intersectObjects(system.selectables, true))?.object);
 };
+
+/** What a click straight down onto the world point (x, z) selects. */
+const clickedFromAbove = (system: UnitSystem, world: THREE.Group, x: number, z: number) =>
+  clicked(system, world, new THREE.Vector3(x, 50, z), new THREE.Vector3(x, 0, z));
 
 const createTurretHead = () => {
   const head = new THREE.Group();
@@ -569,6 +573,11 @@ describe("unit presentation timing", () => {
     system.update(0.05);
     expect(beam.geometry.getAttribute("position").getY(1)).toBeCloseTo(0.9);
     expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);
+    // The model is clicked only where it is built: below the cut at 0.9 m, not above it.
+    const levelWith = (height: number) =>
+      clicked(system, world, new THREE.Vector3(3.5, height, 30), new THREE.Vector3(3.5, height, 0));
+    expect(levelWith(0.6)).toBe(site.id);
+    expect(levelWith(2.4)).toBeUndefined();
     system.select([site.id]);
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(false);
     expect(system.selectedBuildings()[0]).toMatchObject({
