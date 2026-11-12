@@ -484,6 +484,7 @@ describe("unit presentation timing", () => {
         damage: 25,
         intervalTicks: 6,
         cooldownTicks: 0,
+        facing: 0,
       },
     });
     const workingScout = structuredClone(scout);

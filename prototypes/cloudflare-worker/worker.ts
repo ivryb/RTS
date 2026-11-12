@@ -42,8 +42,12 @@ const unitAt = (index: number): UnitState => {
 const units = Array.from({ length: 400 }, (_, index) => unitAt(index));
 const buildings: BuildingState[] = Array.from({ length: 40 }, (_, index) => ({
   id: `building-${index}`,
+  kind: "command-center",
+  lifecycle: "active",
+  constructionProgress: 1,
   ownerId: players[index % players.length]!,
   position: toSimPoint(-27 + index % 10 * 6, -9 + Math.floor(index / 10) * 6),
+  rotation: 0,
   radius: 1_500,
   health: 2_500,
   maxHealth: 2_500,

@@ -36,7 +36,7 @@ export function createBiomeTerrain(source:MapLayout){
   const {cells,size}=source,row=cells+1,step=size/cells;
   const heights=source.heights.slice(),blocked=source.blocked.slice(),rockEdges=source.rockEdges.slice();
   const talus=new Float32Array(heights.length);
-  const layout={...source,heights,blocked,rockEdges};
+  const layout: MapLayout={...source,heights,blocked,rockEdges};
   const mountains=new Set(source.regions.filter(region=>region.mountain).map(region=>region.id));
   if(!mountains.size)return {layout,talus};
   const index=(x:number,z:number)=>Math.round((z+size/2)/step)*row+Math.round((x+size/2)/step);
