@@ -2,14 +2,15 @@ import * as THREE from "three";
 import { BUILDING_DEFINITIONS } from "../../../src/sim/construction";
 import type { ConstructionSketch, SiteModel, SiteState, SketchContext } from "../sketch";
 import { deriveParts, type BuildingParts } from "./assembly/parts";
-import { createUniforms, patchMaterial } from "./assembly/shader";
+import { createUniforms, IMPACT, partPath, patchMaterial } from "./assembly/shader";
 
 /** Real seconds a part takes to set off and settle, plus this many per metre of its path. */
 const PART_SECONDS = 0.6;
 const PART_SECONDS_PER_METRE = 0.35;
-/** Seconds between the last part locking and completion, so the finish never cuts it short. */
-const FINAL_HOLD_SECONDS = 0.35;
-/** How long the completed building keeps its construction material for the closing settle. */
+/**
+ * How long the completed building keeps its construction material: the last part locks at the
+ * moment of completion and settles during this time.
+ */
 const SETTLE_SECONDS = 0.9;
 /** The plan of the unbuilt parts is gone this long after the site is destroyed. */
 const PLAN_VANISH_SECONDS = 0.25;
@@ -38,16 +39,26 @@ const readSource = (mesh: SiteMesh["mesh"], toBuilding: THREE.Matrix4) => {
   return { positions, index };
 };
 
-/** When each part sets off, as construction progress: larger parts get a longer turn. */
+/**
+ * When each part sets off, as construction progress: larger parts get a longer turn. The last
+ * part meets its seat exactly at 100%, so the site never looks finished before it is, and no
+ * part sets off before the one ahead of it is seated, so the drone carries one at a time.
+ */
 const scheduleParts = ({ parts }: BuildingParts, constructionSeconds: number, pathLength: number) => {
-  const span = Math.min((PART_SECONDS + PART_SECONDS_PER_METRE * pathLength) / constructionSeconds, 0.3);
-  const lastStart = 1 - FINAL_HOLD_SECONDS / constructionSeconds - span;
   const largest = Math.max(...parts.map((part) => part.area));
-  const turns = parts.map((part) => 0.5 + 0.5 * Math.sqrt(part.area / largest));
-  const total = turns.slice(0, -1).reduce((sum, turn) => sum + turn, 0) || 1;
+  const turns = parts.map((part) => 0.7 + 0.3 * Math.sqrt(part.area / largest));
+  // The last part's own turn is the closing settle, so only the turns before it share the build.
+  const earlier = turns.slice(0, -1);
+  const total = earlier.reduce((sum, turn) => sum + turn, 0) || 1;
+  const shortestTurn = Math.min(...earlier, total) / total;
+  const span = Math.min(
+    (PART_SECONDS + PART_SECONDS_PER_METRE * pathLength) / constructionSeconds,
+    shortestTurn / (IMPACT * (1 + shortestTurn)),
+  );
+  const lastStart = 1 - IMPACT * span;
   let elapsed = 0;
-  const starts = turns.map((turn) => {
-    const start = elapsed / total * lastStart;
+  const starts = turns.map((turn, order) => {
+    const start = order === turns.length - 1 ? lastStart : elapsed / total * lastStart;
     elapsed += turn;
     return start;
   });
@@ -75,6 +86,9 @@ const partTravel = ({ parts, min, max }: BuildingParts, distance: number) => {
     return new THREE.Vector3(x * sideways, distance * (1 - 0.35 * outward), z * sideways);
   });
 };
+
+const partCentre = ({ min, max }: BuildingParts["parts"][number]) =>
+  new THREE.Vector3((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
 
 /**
  * A copy of the mesh's geometry that also tells every vertex which part it belongs to. It
@@ -137,13 +151,11 @@ const buildConstructionGeometry = (
 
   const toLocal = toBuilding.clone().invert();
   const localTurn = new THREE.Matrix3().setFromMatrix4(toLocal);
-  const pivots = building.parts.map((part) => new THREE.Vector3(
-    (part.min[0] + part.max[0]) / 2,
-    part.min[1],
-    (part.min[2] + part.max[2]) / 2,
-  ).applyMatrix4(toLocal));
+  const pivots = building.parts.map((part) => partCentre(part).applyMatrix4(toLocal));
   const localTravels = travels.map((travel) => travel.clone().applyMatrix3(localTurn));
-  const seeds = building.parts.map((_, order) => (order * 0.6180339887) % 1);
+  // A flat plate would flash all over as it locks, so its seam flash is held back.
+  const seams = building.parts.map((part) =>
+    0.25 + 0.75 * THREE.MathUtils.smoothstep(part.max[1] - part.min[1], 0.08, 0.5));
   const buildingBase = building.min[1];
   const buildingHeight = building.max[1] - building.min[1] || 1;
 
@@ -161,7 +173,7 @@ const buildConstructionGeometry = (
     timing[vertex * 4] = starts[order]!;
     timing[vertex * 4 + 1] = (y - part.min[1]) / (part.max[1] - part.min[1] || 1);
     timing[vertex * 4 + 2] = (y - buildingBase) / buildingHeight;
-    timing[vertex * 4 + 3] = seeds[order]!;
+    timing[vertex * 4 + 3] = seams[order]!;
   }
   geometry.setAttribute("aPartPivot", new THREE.BufferAttribute(pivot, 3));
   geometry.setAttribute("aPartTravel", new THREE.BufferAttribute(travel, 3));
@@ -226,10 +238,10 @@ const createSite = ({ kind, root, visualRoot }: SiteModel, { renderer }: SketchC
     };
   });
 
-  const ground = root.position.y;
-  // The beam ends on the part being set: the top of the last part that has set off.
-  const beamHeights = building.parts.map((part) => ground + part.max[1]);
-  const beamHeightAt = (progress: number) => {
+  // The beam ends on the part being set: the last one that has set off, wherever it is on its path.
+  const centres = building.parts.map(partCentre);
+  const beamTarget = new THREE.Vector3();
+  const aimBeam = (progress: number) => {
     let low = 0;
     let high = starts.length - 1;
     while (low < high) {
@@ -237,8 +249,11 @@ const createSite = ({ kind, root, visualRoot }: SiteModel, { renderer }: SketchC
       if (starts[middle]! <= progress) low = middle;
       else high = middle - 1;
     }
-    return beamHeights[low]!;
+    beamTarget.copy(centres[low]!)
+      .addScaledVector(travels[low]!, partPath((progress - starts[low]!) / span))
+      .applyMatrix4(visualRoot.matrixWorld);
   };
+  aimBeam(0);
 
   let underConstruction = false;
   const show = (construction: boolean) => {
@@ -253,7 +268,7 @@ const createSite = ({ kind, root, visualRoot }: SiteModel, { renderer }: SketchC
   };
 
   return {
-    beamTargetY: beamHeights[0]!,
+    beamTarget,
     update(state: SiteState, time: number) {
       const settling = state.lifecycle === "active" && state.sinceLifecycleChange < SETTLE_SECONDS;
       // A finished building is the plain model again: its own geometry, material and shadow.
@@ -262,15 +277,21 @@ const createSite = ({ kind, root, visualRoot }: SiteModel, { renderer }: SketchC
       const settle = settling ? state.sinceLifecycleChange : 0;
       visualRoot.scale.setScalar(1 + 0.022 * Math.exp(-settle * 7) * Math.sin(settle * 21));
       if (!underConstruction) return;
-      uniforms.uProgress.value = state.lifecycle === "active" ? 1 : state.progress;
+      // The last part locks at 100%, so its settle plays on through the closing settle.
+      uniforms.uProgress.value = state.lifecycle === "active"
+        ? 1 + state.sinceLifecycleChange / constructionSeconds
+        : state.progress;
       uniforms.uTime.value = time;
-      uniforms.uWorking.value = state.working && state.lifecycle === "constructing" ? 1 : 0;
+      const working = state.working && state.lifecycle === "constructing";
+      // The settle counts as work, so the last part finishes its path and flashes as it locks.
+      uniforms.uWorking.value = working || settling ? 1 : 0;
+      uniforms.uStandby.value = state.lifecycle === "constructing" && !working && state.progress > 0 ? 1 : 0;
       uniforms.uHealth.value = state.lifecycle === "destroyed" ? 1 : state.health;
       uniforms.uSettle.value = settling ? state.sinceLifecycleChange : -1;
       uniforms.uPlan.value = state.lifecycle === "destroyed"
         ? Math.max(0, 1 - state.sinceLifecycleChange / PLAN_VANISH_SECONDS)
         : 1;
-      this.beamTargetY = beamHeightAt(state.progress);
+      aimBeam(state.progress);
     },
     dispose() {
       show(false);
