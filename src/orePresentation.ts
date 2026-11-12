@@ -35,6 +35,8 @@ const WORKFACE_TALL_ENOUGH = 0.5;
  */
 const WORKFACE_LOWEST_PITCH = -0.4;
 const WORKFACE_HIGHEST_PITCH = 1.2;
+/** A drone standing above a low rock may aim this far below the crest, however steep that is. */
+const WORKFACE_LEAST_PITCH_RANGE = 0.35;
 /** The sweep stops this fraction short of the rock's crest, so the glow stays on the face. */
 const WORKFACE_CREST_INSET = 0.06;
 
@@ -248,8 +250,8 @@ export class OrePresentation {
         highest = Math.max(highest, endY / endX);
       }
     }
-    lowest = Math.max(lowest, WORKFACE_LOWEST_PITCH);
     highest = Math.min(highest, WORKFACE_HIGHEST_PITCH);
+    lowest = Math.max(lowest, Math.min(WORKFACE_LOWEST_PITCH, highest - WORKFACE_LEAST_PITCH_RANGE));
     highest -= (highest - lowest) * WORKFACE_CREST_INSET;
     let bestStart = 0;
     let bestLength = 0;
