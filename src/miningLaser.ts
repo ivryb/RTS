@@ -7,6 +7,8 @@ const FLOATS_PER_LASER = 10;
 const INITIAL_CAPACITY = 32;
 /** The shader clock wraps here so its hashes keep their precision in long matches. */
 const SHADER_CLOCK_SECONDS = 512;
+// Half the width of the beam's ribbon, in metres. Only its middle is bright: the rest is halo.
+const beamHalfWidth = `const float BEAM_HALF_WIDTH = 0.13;`;
 
 // One laser is a handful of camera-facing quads. Each vertex carries its quad corner in x and y
 // (-1 to 1) and its part in z: 0 cut trail, 1 beam, 2 contact bloom, 3 contact glow, 4 emitter
@@ -24,6 +26,7 @@ const createQuads = () => {
 };
 
 const vertexShader = /* glsl */ `
+  ${beamHalfWidth}
   uniform float time;
   attribute vec3 beamStart;
   attribute vec3 beamEnd;
@@ -34,8 +37,11 @@ const vertexShader = /* glsl */ `
   varying float vSeed;
   varying float vLife;
   varying float vAlong;
+  varying float vReach;
 
-  const float BEAM_HALF_WIDTH = 0.065;
+  // The ribbon is never narrower than this share of the view's half height (about 2 pixels), or
+  // from far away the beam thins to a wire.
+  const float BEAM_LEAST_SCREEN = 0.005;
   const float TRAIL_HALF_WIDTH = 0.06;
   const float TRAIL_SECONDS = ${MINING_TRAIL_SECONDS.toFixed(3)};
   const float CONTACT_RADIUS = 0.24;
@@ -64,6 +70,7 @@ const vertexShader = /* glsl */ `
     vec3 point;
     vLife = 0.0;
     vAlong = 0.0;
+    vReach = 0.0;
     if (part < 1.5) {
       // Ribbons turned to the camera: the beam, and the cut still glowing behind the contact.
       bool trail = part < 0.5;
@@ -73,10 +80,11 @@ const vertexShader = /* glsl */ `
       vec3 side = cross(along, isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(-center));
       float sideLength = length(side);
       side = sideLength > 0.00001 ? side / sideLength : vec3(1.0, 0.0, 0.0);
-      float shimmer = 0.9 + 0.1 * sin(time * 61.0 + seed * 30.0) * sin(time * 43.0 + seed * 11.0);
-      point = center + side * corner.x * (trail ? TRAIL_HALF_WIDTH : BEAM_HALF_WIDTH * shimmer);
+      float leastWidth = (isOrthographic ? 1.0 : -center.z) / projectionMatrix[1][1] * BEAM_LEAST_SCREEN;
+      point = center + side * corner.x * (trail ? TRAIL_HALF_WIDTH : max(BEAM_HALF_WIDTH, leastWidth));
       if (trail) point = towardCamera(point, SURFACE_LIFT);
-      vAlong = (corner.y * 0.5 + 0.5) * length(along);
+      vReach = corner.y * 0.5 + 0.5;
+      vAlong = vReach * length(along);
     } else if (part < 4.5) {
       float flicker = 0.86 + 0.14 * sin(time * 47.0 + seed * 40.0) * sin(time * 31.0 + seed * 17.0);
       // A short beam gets a smaller glow, or a drone close to its rock wears the glow on its nose.
@@ -112,15 +120,17 @@ const vertexShader = /* glsl */ `
 `;
 
 // Output is premultiplied: rgb is light added to the scene, alpha is how much of the scene behind
-// is covered. Covering keeps the beam readable over bright sand, where light that is only added
+// is covered. Covering keeps the beam blue over bright sand, where light that is only added
 // washes out.
 const fragmentShader = /* glsl */ `
+  ${beamHalfWidth}
   uniform float time;
   varying vec2 vCorner;
   varying float vPart;
   varying float vSeed;
   varying float vLife;
   varying float vAlong;
+  varying float vReach;
 
   const vec3 BEAM = vec3(0.04, 0.55, 1.0);
   // Pale blue, not white: at the farthest zoom the core is all that is left of the beam, and white
@@ -138,15 +148,23 @@ const fragmentShader = /* glsl */ `
       float heat = vCorner.y * 0.5 + 0.5;
       light = mix(EMBER, MOLTEN, heat) * across * across * heat * heat * heat * 1.0;
     } else if (vPart < 1.5) {
-      float across = abs(vCorner.x);
-      float core = 1.0 - smoothstep(0.18, 0.4, across);
-      float sheath = 1.0 - smoothstep(0.3, 1.0, across);
-      sheath *= sheath;
-      float pulse = 0.72 + 0.28 * sin(vAlong * 7.0 - time * 30.0 + vSeed * 20.0);
-      light = BEAM * sheath * 0.9 * pulse + BEAM_CORE * core;
-      // The blue sheath half covers the sand: blue light merely added to orange sand turns grey,
-      // and a sheath that covers it fully reads as a solid rod.
-      cover = max(core * 0.9, sheath * 0.5);
+      // A beam that is even along its length and steady in time reads as a solid stick. This one
+      // is a thin core that shimmers off its axis, with bright packets running to the rock.
+      float ends = sin(vReach * 3.14159);
+      float sway = (sin(vAlong * 9.0 + time * 38.0 + vSeed * 31.0) * 0.6
+        + sin(vAlong * 21.0 - time * 59.0 + vSeed * 17.0) * 0.4) * 0.011 * ends;
+      float offAxis = vCorner.x * BEAM_HALF_WIDTH - sway;
+      float packet = 0.5 + 0.5 * sin(vAlong * 8.0 - time * 44.0 + vSeed * 20.0);
+      packet = packet * packet * packet;
+      float ripple = 0.5 + 0.5 * sin(vAlong * 19.0 - time * 77.0 + vSeed * 9.0);
+      float energy = 0.3 + 0.55 * packet + 0.15 * ripple;
+      float flicker = 0.82 + 0.18 * sin(time * 61.0 + vSeed * 30.0) * sin(time * 43.0 + vSeed * 11.0);
+      float coreWidth = 0.014 * (0.75 + 0.5 * packet);
+      float core = exp(-offAxis * offAxis / (coreWidth * coreWidth)) * energy;
+      float halo = exp(-offAxis * offAxis / (0.055 * 0.055)) * (0.22 + 0.38 * packet);
+      light = (BEAM_CORE * core * 1.15 + BEAM * halo) * flicker;
+      // The halo part covers the sand: blue light merely added to orange sand turns grey.
+      cover = max(core * 0.6, halo * 0.45);
     } else if (vPart < 2.5) {
       light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.22;
     } else if (vPart < 4.5) {
