@@ -96,7 +96,7 @@ const resume = async (page: Page, site: BuildingSnapshot) => {
 
 /** How many pixels of the page a capture covers, at default zoom and at the closest zoom. */
 const frameSize = (kind: Kind, zoom: "default" | "close"): [number, number] =>
-  zoom === "default" ? [460, 340] : kind === "turret" ? [520, 400] : [900, 600];
+  zoom === "default" ? (kind === "turret" ? [280, 210] : [460, 340]) : kind === "turret" ? [520, 400] : [900, 600];
 
 const progressOf = async (page: Page, id: string) => (await siteState(page, id)).site?.constructionProgress ?? 0;
 

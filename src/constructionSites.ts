@@ -199,6 +199,8 @@ export class ConstructionSites {
     const framePitch = clamp(height * 0.085, 0.22, 0.5);
     const firstLayer = FIRST_LAYER_SECONDS / BUILDING_DEFINITIONS[kind].constructionSeconds;
     const widest = outline.radius * 1.05;
+    // A plume sized for a Turret is lost against a Command Center.
+    const smokeScale = clamp(perimeter / 14, 1, 2);
 
     /** Welding arcs hop between points of the deck's rim, no farther out than `reach`. */
     const addArcs = (progress: number, reach: number, time: number) => {
@@ -241,8 +243,9 @@ export class ConstructionSites {
     const addSmoke = () => {
       cage?.breaks.forEach((spot, index) => {
         for (let wisp = 0; wisp < SMOKE_WISPS; wisp += 1) {
-          velocity.set(0.3 * (chance(index + wisp * 3.3) - 0.5), 1.2 + 0.3 * wisp, 0.3 * (chance(index * 2.1 + wisp) - 0.5));
-          glows.add(Glow.Smoke, spot, 0.75 + 0.25 * wisp, 1, seed * 4 + index * 1.7 + wisp * 0.53, velocity);
+          velocity.set(0.3 * (chance(index + wisp * 3.3) - 0.5), 1.2 + 0.3 * wisp, 0.3 * (chance(index * 2.1 + wisp) - 0.5))
+            .multiplyScalar(smokeScale);
+          glows.add(Glow.Smoke, spot, (0.75 + 0.25 * wisp) * smokeScale, 1, seed * 4 + index * 1.7 + wisp * 0.53, velocity);
         }
       });
     };
@@ -273,7 +276,9 @@ export class ConstructionSites {
         // Nothing is welded at 0%. The first layer then spreads out from under the beam.
         const spread = 1 - (1 - Math.min(1, progress / firstLayer)) ** 2;
         const reach = spread < 1 ? widest * spread : WHOLE_HULL;
-        reveal.set(cut, band, fullFraming * spread, framePitch, welding ? flicker : 0, reach);
+        // The frame goes up once the first layer lies out to the hull.
+        const framing = fullFraming * smoothstep(progress, firstLayer, firstLayer * 2);
+        reveal.set(cut, band, framing, framePitch, welding ? flicker : 0, reach);
         if (spread) deck.set(progress, Math.max(cut, ground + DECK_FLOOR), welding ? flicker : 0, reach);
         else deck.hide();
         cage?.set(constructing ? 0 : Math.min(1, since / COLLAPSE_SECONDS) ** 2, health);

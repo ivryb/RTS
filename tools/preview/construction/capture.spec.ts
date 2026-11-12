@@ -27,6 +27,9 @@ const stills: Record<string, number> = {
   "states-turret": 3240,
   "states-command-center": 5200,
   completion: 3240,
+  "completion-command-center": 5200,
+  "destroyed-command-center": 5200,
+  "damage-command-center": 5200,
   "completion-turret": 3240,
   destroyed: 3240,
   "destroyed-turret": 3240,
@@ -52,7 +55,8 @@ for (const [shot, width] of Object.entries(stills)) {
   });
 }
 
-for (const shot of ["film", "film-turret", "film-command-center", "film-loss", "film-loss-turret"]) {
+const films = ["film", "film-turret", "film-command-center", "film-opening-command-center", "film-loss", "film-loss-turret"];
+for (const shot of films) {
   if (only && !only.includes(shot)) continue;
   test(`construction ${shot}`, async ({ page }) => {
     await open(page, shot, 1280, 720);
