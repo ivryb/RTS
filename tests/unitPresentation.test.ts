@@ -12,7 +12,7 @@ import {
 } from "../src/sim/units";
 import { pickSurface, selectableEntityId } from "../src/unitInput";
 import { UnitSystem, createHealthBar, updateHealthBar, type UnitPresentationOptions, type UnitSpawn } from "../src/unitSystem";
-import { ScoutHarvestPresentation } from "../src/orePresentation";
+import type { OreModelLoader } from "../src/orePresentation";
 
 const map = {
   size: 100,
@@ -200,21 +200,120 @@ test("gather orders affect only owned selected Scouts and reject exhausted ore",
   system.dispose();
 });
 
-test("mechanical cutter reaches the mineral contact and retracts for hauling", () => {
-  const root = new THREE.Group();
+// A box of rock scaled to the deposit's 3 m footprint: flat faces 2.12 m from its centre, 1.65 m tall.
+const boxRock: OreModelLoader = async () => {
+  const model = new THREE.Group();
+  model.add(new THREE.Mesh(new THREE.BoxGeometry(10, 4, 10).translate(0, 2, 0), new THREE.MeshStandardMaterial()));
+  return [model];
+};
+const ROCK_FACE = 3 / Math.SQRT2;
+const ROCK_TOP = 4 * 3 / (5 * Math.SQRT2) - 0.05;
+
+/** Scouts extracting from one deposit, standing 4.5 m out along +x, -x, +z and -z in turn, already turned to face it. */
+const miningScene = async (scoutCount = 1) => {
+  const deposit = { id: "ore-1", position: toSimPoint(0, 0), radius: 3000, amount: 200, initialAmount: 200 };
+  const scouts = Array.from({ length: scoutCount }, (_, index) => {
+    const position = toSimPoint(Math.round(Math.cos(index * Math.PI / 2)) * 4.5, Math.round(Math.sin(index * Math.PI / 2)) * 4.5);
+    return {
+      ...unit("scout-drone"), id: `scout-drone-${index + 1}`, attacking: false, attackTargetId: undefined,
+      order: "gather" as const, position, target: position, cargoTitanium: 2,
+      harvest: { depositId: deposit.id, phase: "extracting" as const, workPosition: position },
+    } satisfies UnitState as UnitState;
+  });
+  const session = new TestSession({ ...frame(1, scouts, []), titaniumDeposits: [deposit] });
   const world = new THREE.Group();
-  const mining = new ScoutHarvestPresentation(root, world);
-  const contact = new THREE.Vector3(2.2, 0.8, 0);
-  mining.update(2, true, 0, 0, 0, contact, 0.1);
-  expect(mining.tool.visible).toBe(true);
-  expect(mining.cargo.visible).toBe(true);
-  expect(mining.tool.children.some(child => child.position.distanceTo(contact) < 0.001)).toBe(true);
-  mining.update(20, false, 0, 0, 0, undefined, 0.1);
-  expect(mining.tool.visible).toBe(false);
-  expect(mining.cargo.visible).toBe(true);
-  mining.update(0, false, 0, 0, 0, undefined, 0.1);
-  expect(mining.cargo.visible).toBe(false);
-  mining.dispose();
+  const system = new UnitSystem(
+    world, { ...map, titaniumDeposits: [deposit] } as GeneratedMap, [], [], session, undefined, undefined, boxRock,
+  );
+  for (const scout of scouts) system.attachScoutDrone(scout.id, new THREE.Group(), new THREE.Group(), options);
+  await new Promise(resolve => setTimeout(resolve));
+  system.update(0.1);
+  let version = 1;
+  return {
+    deposit, scouts, system, world,
+    laser: (id = "scout-drone-1") => system.inspect().units.find(candidate => candidate.id === id)?.miningLaser,
+    lasersDrawn: () => world.getObjectByName("Scout mining lasers")?.visible,
+    /** Delivers the scouts and deposit as they now stand, as the next simulation frame. */
+    advance: () => {
+      version += 1;
+      session.frames.push({ ...frame(version, scouts, []), titaniumDeposits: [deposit] });
+      system.update(0.1);
+    },
+  };
+};
+
+test("a Scout extracting Titanium fires a laser from its body onto the rock face", async () => {
+  const { system, world, laser, lasersDrawn } = await miningScene();
+  system.update(0.1);
+  const beam = laser();
+  expect(lasersDrawn()).toBe(true);
+  expect(beam).toBeDefined();
+  // It leaves the drone, which stands at x 4.5 and faces the rock, and ends on the face, not in or past it.
+  expect(beam!.from[0]).toBeGreaterThan(3.5);
+  expect(beam!.from[0]).toBeLessThan(4.5);
+  expect(beam!.to[0]).toBeCloseTo(ROCK_FACE, 4);
+  expect(beam!.to[2]).toBeCloseTo(0, 1);
+  expect(world.getObjectByName("Scout mineral cutter")).toBeUndefined();
+  system.dispose();
+});
+
+test("the laser's contact sweeps up and down the rock face and never leaves it", async () => {
+  const { system, laser } = await miningScene();
+  const heights: number[] = [];
+  for (let step = 0; step < 60; step += 1) {
+    system.update(0.05);
+    const beam = laser()!;
+    expect(beam.to[0]).toBeCloseTo(ROCK_FACE, 4);
+    heights.push(beam.to[1]);
+  }
+  expect(Math.min(...heights)).toBeGreaterThan(0.1);
+  expect(Math.min(...heights)).toBeLessThan(0.35);
+  expect(Math.max(...heights)).toBeGreaterThan(ROCK_TOP - 0.25);
+  expect(Math.max(...heights)).toBeLessThan(ROCK_TOP + 0.001);
+  const turns = heights.slice(2).filter((height, index) =>
+    Math.sign(height - heights[index + 1]!) !== Math.sign(heights[index + 1]! - heights[index]!));
+  expect(turns.length).toBeGreaterThanOrEqual(2);
+  system.dispose();
+});
+
+test("drones mining one deposit do not sweep in step", async () => {
+  const { system, laser } = await miningScene(2);
+  let widestGap = 0;
+  for (let step = 0; step < 40; step += 1) {
+    system.update(0.05);
+    widestGap = Math.max(widestGap, Math.abs(laser("scout-drone-1")!.to[1] - laser("scout-drone-2")!.to[1]));
+  }
+  expect(widestGap).toBeGreaterThan(0.4);
+  system.dispose();
+});
+
+describe("the mining laser stops when", () => {
+  const endings: Record<string, (scene: Awaited<ReturnType<typeof miningScene>>) => void> = {
+    "the cargo is full": ({ scouts, deposit }) => Object.assign(scouts[0]!, {
+      cargoTitanium: 20, moving: true,
+      harvest: { depositId: deposit.id, phase: "to-dropoff", dropoffId: "home", workPosition: toSimPoint(-8, 0) },
+    }),
+    "the Scout gets a new order": ({ scouts }) => Object.assign(scouts[0]!, {
+      order: "move", moving: true, harvest: undefined,
+    }),
+    "the Scout is destroyed": ({ scouts }) => Object.assign(scouts[0]!, { health: 0 }),
+    "the deposit runs out": ({ scouts, deposit }) => {
+      deposit.amount = 0;
+      Object.assign(scouts[0]!, { order: "idle", harvest: undefined });
+    },
+  };
+  for (const [ending, apply] of Object.entries(endings)) {
+    test(ending, async () => {
+      const scene = await miningScene();
+      scene.system.update(0.1);
+      expect(scene.laser()).toBeDefined();
+      apply(scene);
+      scene.advance();
+      expect(scene.laser()).toBeUndefined();
+      expect(scene.lasersDrawn()).toBe(false);
+      scene.system.dispose();
+    });
+  }
 });
 
 test("authoritative mining and hauling show different physical work states and delivered stock", () => {
@@ -241,7 +340,6 @@ test("authoritative mining and hauling show different physical work states and d
   scout.harvest = { depositId: deposit.id, phase: "to-dropoff", dropoffId: "home", workPosition: toSimPoint(-8, 0) };
   session.frames.push({ ...frame(2, scout, []), titaniumDeposits: [deposit] });
   system.update(0.1);
-  expect(world.getObjectByName("Scout mineral cutter")?.visible).toBe(false);
   expect(root.getObjectByName("Titanium cargo")?.visible).toBe(true);
   expect(system.selectedUnits()[0]?.harvest?.phase).toBe("to-dropoff");
   scout.cargoTitanium = 0;
