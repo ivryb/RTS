@@ -1,7 +1,7 @@
 const port = 8_799;
 const worker = Bun.spawn([
-  "pnpm",
-  "exec",
+  process.execPath,
+  "x",
   "wrangler",
   "dev",
   "--config",

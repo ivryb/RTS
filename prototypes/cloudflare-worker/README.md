@@ -5,8 +5,8 @@ This prototype checks whether the deterministic simulation, Recast WASM initiali
 It is not the multiplayer server. The planned production adapter will use PartyServer and keep Cloudflare-specific code outside `src/sim/`.
 
 ```sh
-pnpm benchmark:worker-stack
-pnpm probe:cloudflare
+bun run benchmark:worker-stack
+bun run probe:cloudflare
 ```
 
 The second command starts a local Wrangler process and may download or initialize Cloudflare development tooling.

@@ -9,7 +9,7 @@ const UNIT_KIND = {
   behemoth: 2,
   hornet: 3,
 } as const;
-const UNIT_ORDER = { idle: 0, move: 1, attack: 2, "attack-ground": 3, build: 4 } as const;
+const UNIT_ORDER = { idle: 0, move: 1, attack: 2, "attack-ground": 3, build: 4, gather: 5 } as const;
 const BUILDING_KIND = { "command-center": 0, turret: 1 } as const;
 const BUILDING_LIFECYCLE = { constructing: 0, active: 1 } as const;
 

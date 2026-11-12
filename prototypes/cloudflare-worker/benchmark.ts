@@ -36,7 +36,7 @@ const unitAt = (
       : kind === "behemoth" ? { radius: 1_524, speed: 5_000, health: 1_100 }
         : { radius: 1_309, speed: 8_500, health: 430 };
   const position = toSimPoint(x, z);
-  const result = {
+  return {
     id,
     kind,
     ownerId,
