@@ -7,10 +7,9 @@ live in [`../SKILL.md`](../SKILL.md).
 
 ## Baseline preconditions
 
-- A dev server is answering at `http://localhost:<port>` (reuse the user's on
-  5173, or start your own on 5175 per SKILL.md Launch).
-- `node tools/verify/doctor.mjs http://localhost:<port>` reports
-  `{"ok":true,"units":6,"buildings":4}` — the seed-77 combat-proof opening.
+- The launch command in SKILL.md started the dev server on Boat, and its doctor
+  reported `{"ok":true,"units":7,"buildings":4}` — the seed-77 combat-proof
+  opening.
 - Every recipe opens its own fresh page via `openGame(page, 77)`; matches do
   not share state between pages, but two specs against one server run
   sequentially (`workers: 1`).

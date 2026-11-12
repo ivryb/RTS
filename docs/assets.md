@@ -2,7 +2,7 @@
 
 ## Directory rules
 
-- `art/` contains the current 2D concepts used to guide image generation and 3D work.
+- `art/` contains the original 2D concepts of the existing units and buildings, kept as style references.
 - `art/workbench/` contains local WIP, old generations, third-party visual references, preview renders, and rejected assets. Git ignores the entire directory.
 - `assets/models/` contains runtime GLBs loaded by the game.
 - `assets/textures/` contains runtime terrain textures.
@@ -16,30 +16,25 @@ The original Meshy command center and turret are retained as explicit reference 
 
 ## Model workflow
 
-New buildings, props, and resources are generated procedurally. A Blender Python generator in `tools/assets/` builds named geometry and source materials, bakes one PBR atlas through [`building_bake.py`](../tools/assets/building_bake.py), and exports a runtime GLB with a ground pivot. Editable `.blend` files and renders stay in `art/workbench/`; the generator is the reproducible source.
+Every new unit, building, prop, and resource is a Blender Python generator in `tools/assets/`. It builds named geometry, source materials, and any rig or animation clips, bakes one PBR atlas through [`building_bake.py`](../tools/assets/building_bake.py), and exports a runtime GLB with a ground pivot. Editable `.blend` files and renders stay in `art/workbench/`; the generator is the reproducible source.
 
 1. Write or extend a generator, reusing the shared geometry parts and palette described below.
-2. Run Blender outside any sandbox. A `--draft` pass that skips baking is enough for shape review.
-3. Compare candidate GLBs in the real game before copying anything into `assets/`. For Titanium Deposits, `bun tools/verify/capture-ore.mjs --model <glb> --out <dir>` serves the candidate in place of every production ore model and captures gameplay and close views.
-4. Copy the accepted GLB to `assets/models/` and record its generator, size, hash, and triangle count in the matching manifest.
+2. Run it on Boat, where `scripts/box-setup.sh` installs the Mac's Blender with the Pillow and NumPy its texture step needs. `--draft` skips baking for a quick shape pass. Outputs land on the Boat machine, so pull the candidate back:
+   ```sh
+   box blender --background --python-exit-code 1 --python tools/assets/build_turret.py
+   box pull art/workbench/procedural-turret/
+   ```
+3. Load the candidate in the real game or a preview scene and compare it at gameplay and close range with the existing units, buildings, and terrain. For Titanium Deposits, `bun tools/verify/capture-ore.mjs --model <glb> --out <dir>` serves the candidate in place of every production ore model and captures gameplay and close views.
+4. Change the generator to fix what reads wrong, such as scale, silhouette, palette, or detail density, and repeat from step 2 until the model sits naturally beside them.
+5. Copy the accepted GLB to `assets/models/` and record its generator, size, hash, and triangle count in the matching manifest.
+
+Boat syncs only files git sees, so generators that read ignored inputs from `art/workbench/`, such as the Poly Haven scans behind the terrain and titanium preparation scripts, still run only where those folders exist.
 
 Terrain models and vegetation follow the same rule from a different start: CC0 Poly Haven scans reshaped by repeatable scripts, recorded in the [terrain manifest](../assets/models/terrain/manifest.json).
 
-### Meshy units
+### Existing units
 
-The current units come from Meshy. Use it for organic and humanoid models that need rigs, which the procedural generators do not cover.
-
-1. Start from an approved image in `art/`.
-2. Create the model manually in Meshy with Smart Topology.
-3. Retexture it from the approved image.
-4. Rig humanoids and add the animations the game needs. Extra near-term clips may stay in the runtime GLB when their size is negligible; record them in the manifest.
-5. Preserve the original export under `assets/source/meshy/`. If the runtime GLB is byte-identical, keep one copy under `assets/models/` and record that exception in the manifest.
-6. Make repairs in Blender without changing source geometry merely to reduce file size.
-7. Export the browser-ready GLB to `assets/models/`.
-8. Update `assets/models/meshy-manifest.json`.
-9. Run `bun run preview:capture:units` and inspect overview, gameplay, and close views.
-
-For ordinary units, start with 1024 px WebP textures at about 80 percent quality. Keep larger textures only when the focused preview shows a meaningful difference.
+The Scout Drone, Ghostrunner, Hornet, and Behemoth predate the generators: they were made in Meshy, and `assets/models/meshy-manifest.json` records their source exports under `assets/source/meshy/`. A replacement follows the model workflow above. HUD portraits are generated images; `assets/source/ui/portraits/generation.json` records each prompt and reference.
 
 ## Procedural building materials
 
@@ -67,7 +62,6 @@ The approved New terrain is used by both the main game and terrain hub. Its six 
 - Code and documentation use AGPL-3.0-or-later under the root [`LICENSE`](../LICENSE).
 - Project-created 2D concepts, UI images, textures, 3D models, and model source files use CC BY-SA 4.0 under [`ASSET-LICENSE`](../ASSET-LICENSE), to the extent that copyright applies.
 - Poly Haven source images and their derived runtime textures remain CC0.
-- The repository-local Meshy agent skills retain the license declared in each skill file.
 - The robot-dog rigging prototype names its separately licensed animation reference in its own README. The third-party model is not stored in this repository.
 
 Record the source and license before adding any third-party asset to the public tree.

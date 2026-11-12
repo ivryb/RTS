@@ -223,13 +223,13 @@ Before adoption, the prototype under `prototypes/cloudflare-worker/` must valida
 
 ## Art direction
 
-The game uses stylized low-detail 3D models with strong silhouettes and a fixed high-isometric camera. The accepted images under `art/` are references for concept and model generation, not runtime sprites.
+The game uses stylized low-detail 3D models with strong silhouettes and a fixed high-isometric camera. The accepted images under `art/` are style references, not runtime sprites.
 
 The current palette combines pale sand, warm bone or ivory armor, charcoal machinery and undersuits, muted rust, and restrained cyan lights. Unit design should read clearly at gameplay distance.
 
 The models do not have player-color materials yet. Ownership is shown through selection, range, command, and health UI. Model-level player-color accents remain an open art task.
 
-Meshy creates the initial models. Blender handles repairs, rigging, animation work, texture preparation, and export. See `docs/assets.md` for the active workflow and license boundaries.
+Blender Python generators build the models, rigs, and animations; each one is refined against the existing models and terrain in the running game until it fits. See `docs/assets.md` for the workflow and license boundaries.
 
 ## Open decisions
 

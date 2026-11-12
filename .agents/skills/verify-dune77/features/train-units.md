@@ -27,7 +27,7 @@ point). This is the game's economy loop.
 
 Preconditions:
 
-- Doctor reports `{"ok":true,"units":6,"buildings":4}` on seed 77.
+- Doctor reports `{"ok":true,"units":7,"buildings":4}` on seed 77.
 - `local-command-center` present in `inspect().buildings` with
   `lifecycle: "active"` and empty `productionQueue`.
 

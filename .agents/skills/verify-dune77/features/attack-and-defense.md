@@ -27,7 +27,7 @@ enemy Command Center.
 
 Preconditions:
 
-- Doctor reports `{"ok":true,"units":6,"buildings":4}` on seed 77.
+- Doctor reports `{"ok":true,"units":7,"buildings":4}` on seed 77.
 - Enemy entities: `enemy-command-center`, `enemy-turret-left/right`,
   `enemy-ghostrunner-1/2`, `enemy-hornet-1` (guards, `guardMode` set).
 - A friendly Ghostrunner selected via `clickEntity` / `dragSelectUnits`.

@@ -22,7 +22,7 @@ bun run dev
 
 Open the URL printed by Vite, normally `http://localhost:5173`.
 
-No environment variables are required to run the game. Meshy API tooling is optional and uses `MESHY_API_KEY`; keep it in an untracked `.env` file.
+No environment variables are required to run the game.
 
 ## Controls
 

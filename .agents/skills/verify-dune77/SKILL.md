@@ -1,13 +1,10 @@
 ---
 name: verify-dune77
 description: >
-  Drive the real Dune77 browser RTS end to end: launch the dev server, run the
-  doctor check, exercise user-facing features through the live game (canvas
-  input plus HUD), capture proof artifacts, and clean up. Use whenever a task
-  needs behavioral evidence from the running game — UI flows, combat, economy,
-  or match outcome — or when something "looks broken in the game" and needs a
-  scripted reproduction. For pure simulation rules use the headless bun tests;
-  for art/model visuals use the preview capture harness.
+  Drive the live Dune77 game on Boat with Playwright for behavioral evidence:
+  UI flows, combat, economy, match outcome, or a scripted repro of something
+  broken in the game. Simulation rules belong in bun tests, model visuals in the
+  preview captures.
 ---
 
 # Verifying Dune77
@@ -20,51 +17,38 @@ the live game.
 
 ## Launch
 
-1. Check whether a dev server is already running and **reuse it; never spawn a
-   second dev server alongside the user's**:
-   ```sh
-   curl -sf -o /dev/null http://localhost:5173 && echo RUNNING
-   ```
-2. If none is running (or you need isolation from the user's session), start one
-   on a dedicated verification port with strictPort so it cannot silently drift:
-   ```sh
-   (nohup bun run dev --port 5175 --strictPort < /dev/null > /tmp/dune77-verify-dev.log 2>&1 &)
-   ```
-3. Ready when the log shows `VITE ... ready` **and** the port answers:
-   ```sh
-   curl -sf -o /dev/null http://localhost:5175
-   ```
-4. Always use `http://localhost:<port>` — **never `127.0.0.1`**. Vite 8 binds
-   the IPv6 loopback only, and IPv4-only URLs time out with no error.
-5. No env vars, auth, or seed data are required. Match setup is deterministic
-   per seed via the URL: `/?seed=77`. Seed 77 is the reference seed used by the
-   unit tests and feature proofs.
+The game, its dev server, and the browser all run on Boat through `box`. A dev
+server lives only as long as its `box` command, so one command starts it, waits
+for it, and runs the doctor and the drive; evidence comes back with `box pull`:
+
+```sh
+box 'bun run dev >/tmp/vite.log 2>&1 &
+  until curl -sf -o /dev/null http://localhost:5173; do sleep 1; done
+  node tools/verify/doctor.mjs http://localhost:5173 &&
+  bunx playwright test --config tools/verify/playwright.config.ts --reporter=line --grep "<name>"'
+box pull art/workbench/verify/<feature>/
+```
+
+No env vars, auth, or seed data are required. Match setup is deterministic per
+seed via the URL: `/?seed=77`. Seed 77 is the reference seed used by the unit
+tests and feature proofs.
 
 ## Doctor
 
-Run before driving whenever anything looks off — it answers "is this instance
-worth driving?" without changing anything:
-
-```sh
-node tools/verify/doctor.mjs http://localhost:5175
-```
+The launch command runs it before driving — it answers "is this instance worth
+driving?" without changing anything.
 
 It loads `/?seed=77&verify=1` in headless Chromium, waits for the match to boot,
-and prints JSON: `{"ok":true,"seed":"Seed 77 · ...","units":6,"buildings":4,"tick":3}`.
+and prints JSON: `{"ok":true,"seed":"Seed 77 · ...","units":7,"buildings":4,"tick":3}`.
 Non-zero exit or `"ok":false` means: wrong server, stale build, or a runtime
-error on the page — fix that first. `units: 6, buildings: 4` is the expected
-opening of the combat-proof encounter (3 friendly Ghostrunners, 2 enemy
-Ghostrunners, 1 enemy Hornet; two Command Centers, two enemy Turrets).
+error on the page — fix that first. `units: 7, buildings: 4` is the expected
+opening of the combat-proof encounter (1 Scout Drone, 3 friendly Ghostrunners,
+2 enemy Ghostrunners, 1 enemy Hornet; two Command Centers, two enemy Turrets).
 
 ## Drive
 
 Harness: Playwright specs in `tools/verify/specs/` against the shared helpers in
-`tools/verify/helpers.ts`. Run:
-
-```sh
-VERIFY_BASE_URL=http://localhost:5175 bunx playwright test \
-  --config tools/verify/playwright.config.ts --reporter=line --grep "<name>"
-```
+`tools/verify/helpers.ts`, run by the launch command above.
 
 Write one-off feature drives as a new spec file there (they double as
 regression proofs and are cheap to keep). The helpers encode everything that
@@ -122,10 +106,8 @@ never delete it during teardown). Standards:
 
 ## Cleanup
 
-- Kill only the server process you started: `kill <PID>` (the PID from your own
-  launch, or `lsof -nP -iTCP:5175 -sTCP:LISTEN` restricted to the port you
-  chose). **Never `pkill node` / kill by process name** — that can kill the
-  user's own dev server and tooling. Confirm the port is free afterwards.
+- The dev server stops with its `box` command. Run `box stop` after a burst of
+  checks.
 - Delete `test-results/` if a failed run created it.
 - Keep `art/workbench/verify/` — evidence survives teardown. Keep spec files:
   they are regression proofs, not scratch.
@@ -137,16 +119,18 @@ never delete it during teardown). Standards:
   for rule changes; it drives `UnitSystem` directly without a browser.
 - **Terrain/building/unit visuals**: `bun run preview:capture` (or `:terrain`,
   `:buildings`, `:units`) renders production assets via
-  `tools/preview/` and writes to `art/workbench/renders/previews/`. Requires a
-  dev server on port 5173; the Playwright specs poll `window.__previewReady`.
+  `tools/preview/` and writes to `art/workbench/renders/previews/`. It needs a
+  dev server on port 5173 in the same `box` command; the Playwright specs poll
+  `window.__previewReady`.
 - **Determinism**: the map, encounter, and simulation are seed-deterministic.
   Use seed 77 to match unit-test expectations; use other seeds only when
   testing map variety itself.
 
 ## Gotchas
 
-- `127.0.0.1` URLs hang forever against vite 8 (IPv6-only binding). Use
-  `localhost`.
+- Boat has no GPU. The verify config renders through Mesa's llvmpipe at 2–3
+  frames per second and allows 5 minutes per spec. Give `page.screenshot` a
+  longer timeout than Playwright's 30 s default.
 - Clicking before models load selects nothing and reports no error — always go
   through `openGame` (waits `networkidle`).
 - A drag box in world coordinates selects nothing (screen axes are world

@@ -26,7 +26,7 @@ train) sits on top of a selection.
 
 Preconditions:
 
-- Doctor reports `{"ok":true,"units":6,"buildings":4}` on seed 77.
+- Doctor reports `{"ok":true,"units":7,"buildings":4}` on seed 77.
 - Friendly Ghostrunners `ghostrunner-1..3` idle near the player start.
 
 - **Click select.** `await clickEntity(page, "ghostrunner-1")` then wait for
