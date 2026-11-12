@@ -209,8 +209,11 @@ const boxRock: OreModelLoader = async () => {
 const ROCK_FACE = 3 / Math.SQRT2;
 const ROCK_TOP = 4 * 3 / (5 * Math.SQRT2) - 0.05;
 
-/** Scouts extracting from one deposit, standing 4.5 m out along +x, -x, +z and -z in turn, already turned to face it. */
-const miningScene = async (scoutCount = 1) => {
+/**
+ * Scouts extracting from one deposit, standing 4.5 m out along +x, -x, +z and -z in turn. They
+ * have turned to face it, unless `facing` is false.
+ */
+const miningScene = async (scoutCount = 1, facing = true) => {
   const deposit = { id: "ore-1", position: toSimPoint(0, 0), radius: 3000, amount: 200, initialAmount: 200 };
   const scouts = Array.from({ length: scoutCount }, (_, index) => {
     const position = toSimPoint(Math.round(Math.cos(index * Math.PI / 2)) * 4.5, Math.round(Math.sin(index * Math.PI / 2)) * 4.5);
@@ -227,7 +230,7 @@ const miningScene = async (scoutCount = 1) => {
   );
   for (const scout of scouts) system.attachScoutDrone(scout.id, new THREE.Group(), new THREE.Group(), options);
   await new Promise(resolve => setTimeout(resolve));
-  system.update(0.1);
+  if (facing) system.update(0.1);
   let version = 1;
   return {
     deposit, scouts, system, world,
@@ -254,6 +257,15 @@ test("a Scout extracting Titanium fires a laser from its body onto the rock face
   expect(beam!.to[0]).toBeCloseTo(ROCK_FACE, 4);
   expect(beam!.to[2]).toBeCloseTo(0, 1);
   expect(world.getObjectByName("Scout mineral cutter")).toBeUndefined();
+  system.dispose();
+});
+
+test("the laser waits until the Scout has turned to face the rock", async () => {
+  const { system, laser } = await miningScene(1, false);
+  system.update(0.005);
+  expect(laser()).toBeUndefined();
+  system.update(0.1);
+  expect(laser()).toBeDefined();
   system.dispose();
 });
 

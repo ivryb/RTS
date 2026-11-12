@@ -79,27 +79,30 @@ node tools/verify/profile-mining.mjs <label> [drones]
 
 The script loads the mining preview scene (`/tools/preview/?scene=mining`) twice, with the Scout
 Drones extracting and with the same drones idle, and reports the difference: what the mining effect
-adds in draw calls, triangles and script time per frame. Draw calls and triangles are exact and the
-same on any machine. The script time is JavaScript only, measured on the machine that runs it; it
-leaves out drawing, which Boat does in software and which says nothing about a real GPU. Reports go
-to `art/workbench/performance/mining-<label>.json`.
+adds in draw calls, triangles and `UnitSystem.update` time per frame. Draw calls and triangles are
+exact and the same on any machine. The update time is measured on the machine that runs the script
+and leaves out `renderer.render`, where the saving in draw calls lands: Boat draws in software, so
+its render time says nothing about a real GPU. Reports go to
+`art/workbench/performance/mining-<label>.json`.
 
 ### Findings (2026-11-12)
 
-20 drones mining one deposit, on Boat (AMD EPYC 4585PX, headless Chromium), two runs of each, every
-run the median of 7 passes of 20,000 frames:
+20 drones mining one deposit, on Boat (AMD EPYC 4585PX, headless Chromium), two runs of the cutter
+and three of the laser, every run the median of 7 passes of 20,000 frames:
 
 | What the effect adds | Mechanical cutter (before) | Laser (after) |
 | --- | ---: | ---: |
 | Draw calls | 80 | 1 |
-| Triangles | 1,840 | 400 |
-| Script time per frame | 19.8 and 20.7 µs | 7.4 and 8.6 µs |
+| Triangles | 1,840 | 440 |
+| `UnitSystem.update` time per frame | 19.8 and 20.7 µs | 8.2, 9.5 and 10.6 µs |
 
-Single passes of the idle scene ranged from 5.6 to 13.1 µs, so differences under about 2 µs are
-noise. The laser is one instanced mesh, so its draw calls stay at 1 for any number of drones; the
-cutter drew four meshes per drone, each with its own geometry and materials.
+The idle scene's own median moved between 5.9 and 10.1 µs from one run to the next, so differences
+under about 3 µs are noise: the laser costs roughly half the cutter's update time, no finer than that. The laser is one instanced mesh, so its draw calls stay at 1 for any number of drones: 40
+drones add 1 draw call and 880 triangles. The cutter drew four meshes per drone, each with its own
+geometry and materials.
 
-Finding the rock face happens once when a drone starts mining, not per frame. On a 9,680-triangle
-rock it takes about 91 µs, against about 4,500 µs for casting the same 16 rays with
-`THREE.Raycaster`, because the rock is cut by the beam's vertical plane once and the rays are then
-cast against that outline in 2D.
+Finding the rock face happens once when a drone starts mining, not per frame.
+`bun tools/verify/bench-workface.ts` times it on a 9,680-triangle rock: about 100 µs a trace, against
+about 9,100 µs for casting the same 32 rays with `THREE.Raycaster`. The rock is cut by the beam's
+vertical plane once and the rays are then cast against that outline in 2D. A trace that finds only a
+sliver of face tries two more aims, so the worst case is three times that.
