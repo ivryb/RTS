@@ -11,3 +11,4 @@ playwright-report/
 .wrangler/
 meshy_output/
 art/workbench/
+__pycache__/

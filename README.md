@@ -6,6 +6,8 @@ The game is still early. The combat foundation works; Titanium harvesting and de
 
 The main game uses the approved New terrain: oxide mountains, sheltered groves and walkable grass. The [terrain hub](prototypes/terrain-playground/README.md) retains Old/New comparisons using the same production generation and rendering.
 
+Play the latest build at https://dune77.ivrybn.workers.dev. Every push to `main` deploys there once the build and tests pass in GitHub Actions.
+
 ## Run it locally
 
 Requirements:
