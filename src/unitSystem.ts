@@ -12,6 +12,7 @@ import {
 import { BEHEMOTH_DAMAGE_DELAY_SECONDS, behemothVolleySeed } from "./behemothAttack";
 import { BUILDING_CATALOG } from "./buildingCatalog";
 import { sampleHeight, type GeneratedMap } from "./map";
+import { disposeModel } from "./modelAssets";
 import { createLocalMatchSession, type MatchFrame, type MatchSession } from "./matchSession";
 import {
   UNIT_CATALOG,
@@ -83,6 +84,10 @@ export interface WorldBuilding {
   health: number;
 }
 
+/**
+ * Returns a building's model. Its geometry, materials and textures may be shared with other
+ * buildings of its kind, so UnitSystem never edits or disposes them.
+ */
 export type BuildingPresentationFactory = (
   building: BuildingState,
 ) => THREE.Group | Promise<THREE.Group>;
@@ -230,6 +235,8 @@ interface BuildingPresentation {
     idleRotation: number;
     elapsed: number;
   };
+  /** Set on a placeholder that UnitSystem made itself; loaded models belong to their factory. */
+  ownsModel?: true;
   destruction?: {
     elapsed: number;
     initialScaleY: number;
@@ -404,23 +411,28 @@ const disposeEntityOverlays = ({
   }
 };
 
-const disposeModel = (root: THREE.Object3D) => {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
+/**
+ * Gives a model its own see-through copies of its materials, so it can fade while every other
+ * model of its kind keeps the shared originals. Returns each copy with its starting opacity.
+ */
+const useFadeMaterials = (root: THREE.Object3D, startOpacity = 1) => {
+  const copies = new Map<THREE.Material, THREE.Material>();
+  const copy = (material: THREE.Material) => {
+    let faded = copies.get(material);
+    if (!faded) {
+      faded = material.clone();
+      faded.transparent = true;
+      faded.depthWrite = false;
+      faded.opacity *= startOpacity;
+      copies.set(material, faded);
+    }
+    return faded;
+  };
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
-    geometries.add(object.geometry);
-    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-      materials.add(material);
-    }
+    object.material = Array.isArray(object.material) ? object.material.map(copy) : copy(object.material);
   });
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) {
-    for (const value of Object.values(material)) {
-      if (value instanceof THREE.Texture) value.dispose();
-    }
-    material.dispose();
-  }
+  return [...copies.values()].map((material) => ({ material, opacity: material.opacity }));
 };
 
 const sampleTerrainNormal = (
@@ -2163,10 +2175,7 @@ export class UnitSystem {
     void pending.then(
       (root) => {
         this.pendingBuildings.delete(building.id);
-        if (this.disposed || !this.currentBuildings.has(building.id)) {
-          disposeModel(root);
-          return;
-        }
+        if (this.disposed || !this.currentBuildings.has(building.id)) return;
         this.attachBuilding(building.id, root);
       },
       () => {
@@ -2195,6 +2204,7 @@ export class UnitSystem {
     placeholder.position.y = height / 2;
     fallback.add(placeholder);
     this.attachBuilding(id, fallback);
+    this.buildingById.get(id)!.ownsModel = true;
   }
 
   private renderBuilding(root: THREE.Object3D, building: BuildingState) {
@@ -2322,35 +2332,28 @@ export class UnitSystem {
     if (attackableIndex >= 0) this.attackables.splice(attackableIndex, 1);
     const selectableIndex = this.selectables.indexOf(root);
     if (selectableIndex >= 0) this.selectables.splice(selectableIndex, 1);
+    disposeEntityOverlays(presentation);
     if (animate) {
-      disposeEntityOverlays(presentation);
       presentation.selectionRing.visible = false;
       presentation.healthBar.root.visible = false;
       if (presentation.rangeIndicator) presentation.rangeIndicator.visible = false;
-      const materials = new Set<THREE.Material>();
-      presentation.visualRoot.traverse((object) => {
-        if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Sprite)) return;
-        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-          materials.add(material);
-        }
-      });
+      // Every building of a kind shares its materials, so the fade runs on this building's own copies.
       presentation.destruction = {
         elapsed: 0,
         initialScaleY: presentation.visualRoot.scale.y,
-        materials: [...materials].map((material) => {
-          const opacity = material.opacity;
-          material.transparent = true;
-          material.depthWrite = false;
-          return { material, opacity };
-        }),
+        materials: useFadeMaterials(presentation.visualRoot),
       };
       return wasSelected;
     }
-    disposeEntityOverlays(presentation);
-    disposeModel(presentation.visualRoot);
-    root.removeFromParent();
-    this.buildingById.delete(id);
+    this.releaseBuilding(id, presentation);
     return wasSelected;
+  }
+
+  private releaseBuilding(id: string, presentation: BuildingPresentation) {
+    for (const { material } of presentation.destruction?.materials ?? []) material.dispose();
+    if (presentation.ownsModel) disposeModel(presentation.visualRoot);
+    presentation.root.removeFromParent();
+    this.buildingById.delete(id);
   }
 
   private updateBuildingDestruction(
@@ -2367,9 +2370,7 @@ export class UnitSystem {
       entry.material.opacity = entry.opacity * (1 - progress);
     }
     if (progress < 1) return;
-    disposeModel(presentation.visualRoot);
-    presentation.root.removeFromParent();
-    this.buildingById.delete(id);
+    this.releaseBuilding(id, presentation);
   }
 
   private setUnitVisible(id: string, visible: boolean) {
@@ -2405,7 +2406,7 @@ export class UnitSystem {
       elapsed: 0,
       fadeStart,
       hideAt: fadeStart + CORPSE_FADE_SECONDS,
-      materials: this.prepareCorpseMaterials(presentation),
+      materials: useFadeMaterials(presentation.visualRoot, CORPSE_START_OPACITY),
     };
     presentation.root.visible = true;
   }
@@ -2441,31 +2442,6 @@ export class UnitSystem {
     presentation.root.visible = false;
     for (const entry of death.materials ?? []) entry.material.dispose();
     presentation.death = undefined;
-  }
-
-  private prepareCorpseMaterials(presentation: UnitPresentation) {
-    const clones = new Map<THREE.Material, THREE.Material>();
-    presentation.visualRoot.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      const clone = (material: THREE.Material) => {
-        let copy = clones.get(material);
-        if (!copy) {
-          copy = material.clone();
-          copy.transparent = true;
-          copy.depthWrite = false;
-          copy.opacity *= CORPSE_START_OPACITY;
-          clones.set(material, copy);
-        }
-        return copy;
-      };
-      object.material = Array.isArray(object.material)
-        ? object.material.map(clone)
-        : clone(object.material);
-    });
-    return [...clones.values()].map((material) => ({
-      material,
-      opacity: material.opacity,
-    }));
   }
 
   private renderUnit(id: string, alpha: number, deltaSeconds: number) {
