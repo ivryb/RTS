@@ -9,7 +9,7 @@ test("artillery uploads only active effects and stops after they expire", () => 
   const effects = world.children.filter((object) => object instanceof THREE.Mesh
     || object instanceof THREE.Points || object instanceof THREE.LineSegments);
   const versions = () => effects.flatMap((effect) =>
-    Object.values(effect.geometry.attributes).map((attribute) =>
+    Object.values<THREE.BufferAttribute | THREE.InterleavedBufferAttribute>(effect.geometry.attributes).map((attribute) =>
       attribute instanceof THREE.BufferAttribute ? attribute.version : attribute.data.version));
   const initial = versions();
   barrage.update(0.1);

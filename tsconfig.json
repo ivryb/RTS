@@ -6,7 +6,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "types": ["vite/client"],
+    "types": ["vite/client", "bun"],
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
@@ -15,12 +15,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": [
-    "src",
-    "tools/ui-review/review.ts",
-    "tools/ui-review/scene.ts",
-    "tools/ui-review/states.ts",
-    "prototypes/terrain-playground/**/*.ts",
-    "prototypes/procedural-buildings/**/*.ts"
-  ]
+  "include": ["src", "tests", "tools", "prototypes", "vite.config.ts"]
 }

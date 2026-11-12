@@ -45,7 +45,7 @@ const coarseGrid = (heights: Float32Array) =>
 
 test('option 2 retains its exact terrain and landmarks', () => {
   for (const baseline of highlandsBaseline) {
-    const landscape = createLandscape(baseline.seed, 'ridges');
+    const landscape = createWeatheredHighlands(baseline.seed);
     const heights = coarseGrid(sampleGrid(landscape));
     expect(heights).toHaveLength(baseline.heights.length);
     expect(Math.max(...heights.map((h, i) => Math.abs(h - baseline.heights[i])))).toBeLessThan(0.005);

@@ -94,6 +94,21 @@ const commandCenterAt = (id: string, x: number, z: number): BuildingState => ({
   rallyPoint: toSimPoint(x + 10, z),
 });
 
+// A finished building that never shoots: the command-center kind has no weapon, so a fixture
+// named "turret-1" stays a passive obstacle or target.
+const passiveBuilding = <Fields extends Pick<BuildingState, "id" | "position" | "radius">>(
+  fields: Fields & Partial<BuildingState>,
+) => ({
+  kind: "command-center",
+  lifecycle: "active",
+  constructionProgress: 1,
+  ownerId: "neutral",
+  rotation: 0,
+  health: 2_500,
+  maxHealth: 2_500,
+  ...fields,
+}) satisfies BuildingState;
+
 const matchCommandCenter = (
   id: string,
   ownerId: string,
@@ -838,11 +853,11 @@ describe("unit simulation", () => {
   });
 
   test("replaces every old group order when a formation slot is blocked", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "obstacle-1",
       position: toSimPoint(0, 0),
       radius: 400,
-    };
+    });
     const units = ["ghostrunner-1", "ghostrunner-2"].map((id, index) => {
       const position = toSimPoint(-4, index * 0.8);
       return {
@@ -884,11 +899,11 @@ describe("unit simulation", () => {
   });
 
   test("moves a unit out of an invalid building margin instead of leaving it stuck", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "command-center-1",
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const simulation = createSimulation(2.2, 0, [building]);
 
     expect(simulation.dispatch("player-1", {
@@ -905,11 +920,11 @@ describe("unit simulation", () => {
   });
 
   test("snaps a blocked move destination to reachable ground", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "command-center-1",
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const simulation = createSimulation(-6, 0, [building]);
 
     expect(simulation.dispatch("player-1", {
@@ -1114,11 +1129,11 @@ describe("unit simulation", () => {
   });
 
   test("routes around a building instead of crossing its footprint", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "command-center-1",
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const simulation = createSimulation(-6, 0, [building]);
     simulation.dispatch("player-1", {
       type: "move",
@@ -1138,11 +1153,11 @@ describe("unit simulation", () => {
   });
 
   test("approaches a building and enters the attack state", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "turret-1",
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const simulation = createSimulation(-8, 0, [building]);
     expect(simulation.dispatch("player-1", {
       type: "attack",
@@ -1158,14 +1173,14 @@ describe("unit simulation", () => {
   });
 
   test("gives melee attack slots enough arrival margin to survive small collision pushes", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const units = Array.from({ length: 12 }, (_, index) => unitAt(
       `ghostrunner-${index + 1}`,
       -9 - Math.floor(index / 4),
@@ -1191,14 +1206,14 @@ describe("unit simulation", () => {
   });
 
   test("routes a second melee attacker around an occupied building edge", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const front = unitAt("ghostrunner-1", -3, 0, true, 450);
     const behind = unitAt("ghostrunner-2", -4.05, 0, true, 450);
     const simulation = new LocalUnitSimulation([front, behind], [building]);
@@ -1226,14 +1241,14 @@ describe("unit simulation", () => {
   });
 
   test("immediately assigns every available approach spot in a ten-unit attack", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "command-center-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 5.58 * POSITION_SCALE,
-    };
+    });
     const units = Array.from({ length: 10 }, (_, index) => {
       const unit = unitAt(
         `ghostrunner-${index + 1}`,
@@ -1268,14 +1283,14 @@ describe("unit simulation", () => {
   });
 
   test("stages excess melee attackers around a full building edge", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const units = Array.from({ length: 48 }, (_, index) => unitAt(
       `ghostrunner-${index + 1}`,
       -12 - Math.floor(index / 8),
@@ -1309,14 +1324,14 @@ describe("unit simulation", () => {
   });
 
   test("holds overflow attackers in place while the attack ring is full", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const units = Array.from({ length: 48 }, (_, index) => unitAt(
       `ghostrunner-${index + 1}`,
       -12 - Math.floor(index / 8),
@@ -1354,14 +1369,14 @@ describe("unit simulation", () => {
   });
 
   test("promotes a staged melee attacker when an occupied spot becomes free", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const units = Array.from({ length: 48 }, (_, index) => unitAt(
       `ghostrunner-${index + 1}`,
       -12 - Math.floor(index / 8),
@@ -1403,7 +1418,7 @@ describe("unit simulation", () => {
   });
 
   test("gives Hornets separate firing positions around a building", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
@@ -1411,7 +1426,7 @@ describe("unit simulation", () => {
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
       attackRadius: 1.5 * POSITION_SCALE,
-    };
+    });
     const hornets = [-3, 0, 3].map((z, index) => {
       const hornet = unitAt(`hornet-${index + 1}`, -20, z, true, 1_309);
       hornet.speed = 8.5 * POSITION_SCALE;
@@ -1442,7 +1457,7 @@ describe("unit simulation", () => {
   });
 
   test("does not leave a ranged attacker moving forever behind an occupied firing line", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
@@ -1450,7 +1465,7 @@ describe("unit simulation", () => {
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
       attackRadius: 1.5 * POSITION_SCALE,
-    };
+    });
     const hornets = [
       unitAt("hornet-1", -15.3, -1.45, true, 1_309),
       unitAt("hornet-2", -15.3, 1.45, true, 1_309),
@@ -1481,7 +1496,7 @@ describe("unit simulation", () => {
   });
 
   test("finishes a ranged building approach before switching to attack", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
@@ -1489,7 +1504,7 @@ describe("unit simulation", () => {
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
       attackRadius: 1.5 * POSITION_SCALE,
-    };
+    });
     const hornets = [
       unitAt("hornet-1", -15.3, -1.3, true, 1_309),
       unitAt("hornet-2", -15.3, 1.3, true, 1_309),
@@ -1516,7 +1531,7 @@ describe("unit simulation", () => {
 
     const firstAttack = rearStates.findIndex(({ attacking }) => attacking);
     expect(firstAttack).toBeGreaterThanOrEqual(0);
-    expect(rearStates.slice(firstAttack)).toEqual(rearStates.slice(firstAttack).map((unit) =>
+    expect(rearStates.slice(firstAttack)).toEqual(rearStates.slice(firstAttack).map(() =>
       expect.objectContaining({ moving: false, attacking: true })));
   });
 
@@ -1551,12 +1566,12 @@ describe("unit simulation", () => {
   });
 
   test("settles a ranged unit just inside its displayed maximum range", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "turret-1",
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
       attackRadius: 1.5 * POSITION_SCALE,
-    };
+    });
     const hornet = unitAt("hornet-1", -20, 0, true, 1_309);
     hornet.attackRange = UNIT_CATALOG.hornet.attackRange! * POSITION_SCALE;
     const simulation = new LocalUnitSimulation([hornet], [building]);
@@ -1577,7 +1592,7 @@ describe("unit simulation", () => {
   });
 
   test("keeps a ranged unit attacking after nearby units separate from it", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
@@ -1585,7 +1600,7 @@ describe("unit simulation", () => {
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
       attackRadius: 1.5 * POSITION_SCALE,
-    };
+    });
     const hornet = unitAt("hornet-1", -20, 0, true, 1_309);
     hornet.attackRange = 14 * POSITION_SCALE;
     hornet.attackDamage = 30;
@@ -1608,11 +1623,11 @@ describe("unit simulation", () => {
   });
 
   test("immediately attacks from a valid direct-fire position", () => {
-    const building = {
+    const building = passiveBuilding({
       id: "turret-1",
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const hornet = unitAt("hornet-1", -8, 0, true, 1_309);
     hornet.attackRange = UNIT_CATALOG.hornet.attackRange! * POSITION_SCALE;
     const simulation = new LocalUnitSimulation([hornet], [building]);
@@ -1631,14 +1646,14 @@ describe("unit simulation", () => {
   });
 
   test("keeps multiple in-range Hornets firing from their current positions", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 2_500,
       maxHealth: 2_500,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const hornets = [-3, 0, 3].map((z, index) => {
       const hornet = unitAt(`hornet-${index + 1}`, -8, z, true, 1_309);
       hornet.attackRange = 14 * POSITION_SCALE;
@@ -1662,14 +1677,14 @@ describe("unit simulation", () => {
   });
 
   test("resolves direct building damage and emits deterministic combat events", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 100,
       maxHealth: 100,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const hornet = unitAt("hornet-1", -(16 - 0.15), 0, true, 1_309);
     hornet.attackRange = 14 * POSITION_SCALE;
     hornet.attackDamage = 60;
@@ -2024,14 +2039,14 @@ describe("unit simulation", () => {
   });
 
   test("reloads ranged weapons while units are idle", () => {
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 100,
       maxHealth: 100,
       position: toSimPoint(0, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const hornet = unitAt("hornet-1", -(16 - 0.15), 0, true, 1_309);
     hornet.attackRange = 14 * POSITION_SCALE;
     hornet.attackDamage = 30;
@@ -2109,7 +2124,7 @@ describe("unit simulation", () => {
       -25 + index % 8,
       -10 + Math.floor(index / 8),
     ));
-    const buildings: BuildingState[] = Array.from({ length: 20 }, (_, index) => ({
+    const buildings = Array.from({ length: 20 }, (_, index) => passiveBuilding({
       id: `obstacle-${index + 1}`,
       position: toSimPoint(0, -15 + index * 1.5),
       radius: 550,
@@ -2158,14 +2173,14 @@ describe("unit simulation", () => {
     const secondTarget = unitAt("hornet-1", 12, 0);
     secondTarget.health = secondTarget.maxHealth = 180;
     const safeUnit = unitAt("ghostrunner-3", 15, 0);
-    const building: BuildingState = {
+    const building = passiveBuilding({
       id: "turret-1",
       ownerId: "player-2",
       health: 280,
       maxHealth: 280,
       position: toSimPoint(15, 0),
       radius: 2 * POSITION_SCALE,
-    };
+    });
     const friendlyBuilding: BuildingState = {
       ...building,
       id: "turret-2",

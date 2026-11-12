@@ -74,8 +74,12 @@ const units = PLAYERS.flatMap((playerId, playerIndex) => Array.from(
 ));
 const buildings: BuildingState[] = Array.from({ length: 40 }, (_, index) => ({
   id: `building-${index}`,
+  kind: "command-center",
+  lifecycle: "active",
+  constructionProgress: 1,
   ownerId: PLAYERS[index % PLAYERS.length],
   position: toSimPoint(-27 + index % 10 * 6, -9 + Math.floor(index / 10) * 6),
+  rotation: 0,
   radius: 1_500,
   health: 2_500,
   maxHealth: 2_500,
@@ -157,7 +161,7 @@ const runHybridPathingAndSchema = () => {
       })).byteLength;
     }, 0));
   }
-  return {
+  const result = {
     navigation: { setupMs: round(setup.ms), commandMs: round(command.ms), ...summarizeSteps(steps) },
     schema: {
       initialBytesFourViews: [...initial.values()].reduce((sum, frame) => sum + frame.byteLength, 0),

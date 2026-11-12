@@ -21,7 +21,7 @@ export function createWeatheredHighlands(seed: number) {
   const clearings: Clearing[]=[];
   const channels: Channel[]=[];
   const ascents: Ascent[]=[];
-  const points: Point[]=[];
+  const points: Clearing[]=[];
   const room = (x:number,z:number,radius:number) => {const p={...transform(x,z),radius}; clearings.push(p);points.push(p);return p;};
   const connect = (a:Point,b:Point,width:number,bend:number) => {
     const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);

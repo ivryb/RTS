@@ -9,7 +9,8 @@ test('two-player reference keeps its exact terrain and sites',()=>{
   for(const item of reference){
     const l=generateMapLayout({generator:'procedural',seed:item.seed,players:2});
     expect(createHash('sha256').update(new Uint8Array(l.heights.buffer)).digest('hex')).toBe(item.hash);
-    expect(l.sites).toEqual(item.sites);
+    // JSON imports type role as a plain string, so compare in the reference's shape.
+    expect<typeof item.sites>(l.sites).toEqual(item.sites);
   }
 },60000);
 

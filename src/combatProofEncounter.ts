@@ -4,9 +4,12 @@ import { BUILDING_DEFINITIONS } from "./sim/construction";
 import { UNIT_DEFINITIONS, type UnitKind } from "./sim/unitDefinitions";
 import type { UnitSpawn, WorldBuilding } from "./unitSystem";
 
+/** Encounter units always belong to a player. */
+type OwnedUnitSpawn = UnitSpawn & { ownerId: string };
+
 export interface CombatProofEncounter {
   focus: { x: number; z: number };
-  units: UnitSpawn[];
+  units: OwnedUnitSpawn[];
   buildings: WorldBuilding[];
 }
 
@@ -47,7 +50,7 @@ const unitAt = (
   position: { x: number; z: number },
   facing: number,
   guardMode?: UnitSpawn["guardMode"],
-): UnitSpawn => ({
+): OwnedUnitSpawn => ({
   id,
   kind,
   ownerId,
