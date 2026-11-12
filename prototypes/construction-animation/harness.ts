@@ -96,6 +96,14 @@ const completionPanels: Panel[] = [
   })),
 ];
 
+const destroyedPanels: Panel[] = [
+  { label: "Drone working · 40%", state: constructing(0.4) },
+  ...[0.1, 0.2, 0.3, 0.6].map((seconds) => ({
+    label: `Destroyed at 40% · +${seconds} s`,
+    state: { ...constructing(0.4, false, 0), lifecycle: "destroyed" as const, sinceLifecycleChange: seconds },
+  })),
+];
+
 /** One build from placement to completion, with the drone leaving for 1.5 s on the way. */
 const filmState = (seconds: number): SiteState => {
   if (seconds < 1) return constructing(0, false);
@@ -105,6 +113,10 @@ const filmState = (seconds: number): SiteState => {
   return completed(seconds - 12.5);
 };
 const FILM_SECONDS = 14.5;
+
+/** Twelve seconds of a Command Center build at its real pace: 60 s for the whole building. */
+const excerptState = (seconds: number): SiteState => constructing(0.3 + seconds / 60);
+const EXCERPT_SECONDS = 12;
 
 const params = new URLSearchParams(location.search);
 const optionName = params.get("option") ?? "current";
@@ -199,7 +211,9 @@ const applyState = (site: Site, state: SiteState, seconds: number) => {
   const positions = site.beam.geometry.getAttribute("position");
   const { x, z } = site.model.root.position;
   positions.setXYZ(0, site.drone.position.x, site.drone.position.y + 1.05, site.drone.position.z);
-  positions.setXYZ(1, x, site.handle.beamTargetY ?? site.ground + 0.8, z);
+  const target = site.handle.beamTarget;
+  if (target) positions.setXYZ(1, target.x, target.y, target.z);
+  else positions.setXYZ(1, x, site.handle.beamTargetY ?? site.ground + 0.8, z);
   positions.needsUpdate = true;
 };
 
@@ -278,6 +292,8 @@ const stripShots: Record<string, { panels: Panel[]; focus: "both" | "turret" | "
   "states-turret": { panels: statePanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   completion: { panels: completionPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "completion-turret": { panels: completionPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  destroyed: { panels: destroyedPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
+  "destroyed-turret": { panels: destroyedPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
 };
 
 const focusPoint = (which: "both" | "turret" | "command-center") => which === "turret"
@@ -318,9 +334,10 @@ if (shot in stripShots) {
   renderStrip(sites, panels, focusPoint(which), viewHeight);
 } else if (shot.startsWith("film")) {
   const which = shot === "film-turret" ? "turret" : shot === "film-command-center" ? "command-center" : "both";
+  // The Command Center does not fit a 720 px frame at the closest zoom, so its film stands back a little.
   const viewHeight = which === "both"
     ? innerHeight / GAMEPLAY_PIXELS_PER_METRE
-    : CLOSE_VIEW_HEIGHT * innerHeight / 900;
+    : which === "command-center" ? 16 : CLOSE_VIEW_HEIGHT * innerHeight / 900;
   const sites = [
     await createSite("command-center", commandCenterAt.x, commandCenterAt.z, Math.PI / 4),
     await createSite("turret", turretAt.x, turretAt.z, 0),
@@ -329,10 +346,11 @@ if (shot in stripShots) {
   const camera = cameraFor(target, viewHeight, innerWidth / innerHeight);
   aimSun(target);
   sceneName.textContent = sketch.title;
-  window.__sketchFrameCount = Math.round(FILM_SECONDS * FILM_FPS);
+  const excerpt = which === "command-center";
+  window.__sketchFrameCount = Math.round((excerpt ? EXCERPT_SECONDS : FILM_SECONDS) * FILM_FPS);
   window.__sketchFrame = (index) => {
     const seconds = index / FILM_FPS;
-    const state = filmState(seconds);
+    const state = excerpt ? excerptState(seconds) : filmState(seconds);
     for (const site of sites) applyState(site, state, seconds);
     sketch.flush?.(seconds);
     renderer.render(scene, camera);

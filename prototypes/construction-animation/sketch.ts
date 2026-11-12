@@ -38,6 +38,8 @@ export interface ConstructionSite {
   update(state: SiteState, time: number): void;
   /** World height the Scout Drone beam should end at; the harness uses ground + 0.8 without it. */
   beamTargetY?: number;
+  /** World point the beam should end at instead, for looks whose work moves around the site. */
+  beamTarget?: THREE.Vector3;
   dispose(): void;
 }
 

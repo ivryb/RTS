@@ -26,6 +26,8 @@ const strips: Record<string, number> = {
   "states-turret": 3240,
   completion: 3240,
   "completion-turret": 3240,
+  destroyed: 3240,
+  "destroyed-turret": 3240,
 };
 
 for (const [shot, width] of Object.entries(strips)) {
@@ -36,7 +38,7 @@ for (const [shot, width] of Object.entries(strips)) {
   });
 }
 
-for (const shot of ["film", "film-turret"]) {
+for (const shot of ["film", "film-turret", "film-command-center"]) {
   if (only && !only.includes(shot)) continue;
   test(`${option} ${shot}`, async ({ page }) => {
     await open(page, shot, 1280, 720);
@@ -53,7 +55,7 @@ for (const shot of ["film", "film-turret"]) {
         timeout: 120_000,
       });
     }
-    // Real speed: 30 frames per second, the Turret's own 10 s build.
+    // Real speed at 30 frames per second: the Turret's own 10 s build, or 12 s of the Command Center's 60 s.
     execFileSync("ffmpeg", [
       "-y", "-loglevel", "error", "-framerate", "30", "-i", `${frames}/%04d.jpg`,
       "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", `${outputDirectory}/${shot}.mp4`,
