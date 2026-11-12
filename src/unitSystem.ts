@@ -11,8 +11,7 @@ import {
 } from "./behemothBarrage";
 import { BEHEMOTH_DAMAGE_DELAY_SECONDS, behemothVolleySeed } from "./behemothAttack";
 import { BUILDING_CATALOG } from "./buildingCatalog";
-import type { ScaffoldKitLoader } from "./construction/scaffold";
-import { ConstructionSites, type ConstructionSite } from "./constructionSites";
+import { ConstructionSites, type ConstructionSite, type ScaffoldKitLoader } from "./constructionSites";
 import { sampleHeight, type GeneratedMap } from "./map";
 import { disposeModel } from "./modelAssets";
 import { createLocalMatchSession, type MatchFrame, type MatchSession } from "./matchSession";

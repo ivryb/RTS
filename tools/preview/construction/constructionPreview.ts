@@ -125,6 +125,18 @@ const cutPanels: Panel[] = [0.3, 0.4, 0.62, 0.74, 0.92].map((progress) => ({
   state: constructing(progress),
 }));
 
+/** The cut climbing past the Command Center's shoulders, where faint grid patches once showed. */
+const shoulderPanels: Panel[] = [0.37, 0.39, 0.4, 0.41, 0.43].map((progress) => ({
+  label: percent(progress),
+  state: constructing(progress),
+}));
+
+/** The last moments of the scaffold's drop, a sixtieth of a second apart. */
+const dropPanels: Panel[] = [26, 27, 28, 29, 30].map((frame) => ({
+  label: `Complete · +${(frame / 60).toFixed(3)} s`,
+  state: completed(frame / 60),
+}));
+
 /** One build from placement to completion, with the drone leaving for 1.5 s on the way. */
 const filmState = (seconds: number): SiteState => {
   if (seconds < 1) return constructing(0, false);
@@ -325,6 +337,9 @@ const stripShots: Record<string, { panels: Panel[]; focus: Focus; viewHeight: nu
   "first-layer-turret": { panels: firstLayerPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   "cuts-turret": { panels: cutPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   "cuts-command-center": { panels: cutPanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
+  shoulders: { panels: shoulderPanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
+  "drop-turret": { panels: dropPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
+  drop: { panels: dropPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
 };
 
 const focusPoint = (which: Focus) => which === "turret"
@@ -364,11 +379,22 @@ if (shot in stripShots) {
   const { panels, focus: which, viewHeight } = stripShots[shot]!;
   sceneName.textContent = `Construction · ${shot} · ${viewHeight.toFixed(1)} m view`;
   renderStrip(await standardSites(), panels, focusPoint(which), viewHeight);
+} else if (shot === "barrels") {
+  // The Turret turned to face the camera, cut at the heights of its two barrels: the deck
+  // must leave the air between them open.
+  const site = await createSite("turret", turretAt.x, turretAt.z, Math.PI);
+  sceneName.textContent = "Construction · the cut between the Turret's barrels";
+  renderStrip(
+    [site],
+    [0.72, 0.78, 0.83, 0.88, 0.93].map((progress) => ({ label: percent(progress), state: constructing(progress, false) })),
+    { x: turretAt.x + 0.5, z: turretAt.z + 0.9 },
+    CLOSE_VIEW_HEIGHT * 0.5,
+  );
 } else if (shot === "fit") {
   // What nobody authors per building: other turns of the building, a slope, a neighbour.
   const turns = [0, 30, 45, 77, 180];
-  const spacing = 19;
-  const row = (index: number) => ({ x: focus.x - 30 + index * spacing * 0.7, z: focus.z + 22 - index * spacing * 0.7 });
+  const spacing = 16;
+  const row = (index: number) => ({ x: focus.x - 34 + index * spacing * 0.7, z: focus.z + 26 - index * spacing * 0.7 });
   const sites: Site[] = [];
   for (const [index, turn] of turns.entries()) {
     const at = row(index);
@@ -376,7 +402,7 @@ if (shot in stripShots) {
     sites.push(await createSite("turret", at.x + 7.2, at.z + 7.2, THREE.MathUtils.degToRad(turn)));
   }
   const target = row(2);
-  const camera = cameraFor({ x: target.x + 3, z: target.z + 3 }, 46, innerWidth / innerHeight);
+  const camera = cameraFor({ x: target.x + 3, z: target.z + 3 }, 40, innerWidth / innerHeight);
   aimSun(target);
   sites.forEach((site, index) => applyState(site, constructing(0.45, index % 4 < 2), time));
   construction.flush(time);

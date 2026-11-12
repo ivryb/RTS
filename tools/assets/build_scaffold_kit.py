@@ -170,10 +170,11 @@ block('Pad / steel road plate', (BAY/2, -BAY/2, (PAD_TOP-SKIRT)/2), (BAY, BAY, P
 
 piece('ScaffoldPadCut')
 # The same plate cut on the diagonal, with its right angle at the pivot. Any triangle is a
-# sheared copy of it, so a few of them make up a plate trimmed to a slanted side of a pad.
-corners = [(0, 0), (0, -BAY), (BAY, 0)]
-kit.solid('Pad / cut road plate', [at((x, y, -SKIRT)) for x, y in corners],
-          [at((x, y, PAD_TOP)) for x, y in corners], cut_plate, 0)
+# sheared copy of it, so a few of them, fanned around one corner, make up a plate trimmed to a
+# slanted side of a pad. It has a wall only under its long edge, which lies on the plate's
+# outline: walls under the other two would meet inside the plate and shade a line across it.
+low, high = [(0, -BAY, -SKIRT), (BAY, 0, -SKIRT)], [(0, 0, PAD_TOP), (0, -BAY, PAD_TOP), (BAY, 0, PAD_TOP)]
+kit.mesh('Pad / cut road plate', [at(p) for p in high+low], [(0, 1, 2), (1, 3, 4, 2)], cut_plate, closed=False)
 
 piece('ScaffoldCurb')
 curb = [(-.11, PAD_TOP), (-.11, PAD_TOP+.20), (.11, PAD_TOP+.20), (.11, PAD_TOP)]
@@ -233,6 +234,14 @@ for name in names:
         bpy.ops.object.mode_set(mode='OBJECT')
         obj = next(o for o in bpy.context.scene.objects if o not in before)
     obj.name = obj.data.name = name
+    if name == 'ScaffoldPadCut':
+        # Each face keeps to the middle of its own patch of the atlas. The game lays these
+        # triangles edge to edge, and at an edge a patch blends into its neighbours' texels.
+        uv = obj.data.uv_layers.active.data
+        for polygon in obj.data.polygons:
+            middle = sum((uv[i].uv for i in polygon.loop_indices), Vector((0, 0)))/polygon.loop_total
+            for i in polygon.loop_indices:
+                uv[i].uv = middle+(uv[i].uv-middle)*.4
     obj.data.transform(Matrix.Translation(-pieces[name][0]))
     obj.vertex_groups.clear()
     obj.parent = root

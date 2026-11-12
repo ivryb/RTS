@@ -6,6 +6,7 @@ The accepted production buildings are command center `field-ivory` and turret **
 
 - `build_command_center.py`: named command-center assemblies and design variations.
 - `build_turret.py`: fixed base, overlapping rotating bearing, head, and muzzle anchor.
+- `build_scaffold_kit.py`: the posts, rails, braces, feet, pad plates, kerbs, and lamps of the construction scaffold, as separate meshes on one atlas. The game fits them to any building; see [Construction animation](../../docs/construction_animation.md).
 - `building_parts.py`: shared plates, solids, shells, turned profiles, rods, rings, and surface UVs.
 - `building_materials/`: the seeded palette and authored PBR panel finishes.
 - `building_bake.py`: shared atlas baking, preserving source colors, normals, roughness, metalness, emission, and contact shading.

@@ -46,6 +46,31 @@
       ],
       "archived_meshy_file": "assets/source/meshy/archive/turret-runtime-2026-10-06.glb",
       "reference_images": "assets/source/meshy/archive/turret-reference"
+    },
+    {
+      "slug": "scaffold-kit",
+      "design": "construction scaffold pieces, fitted to any building by src/constructionSites.ts",
+      "accepted_at": "2026-11-12",
+      "generator": "tools/assets/build_scaffold_kit.py",
+      "runtime_file": "assets/models/scaffold-kit.glb",
+      "size_bytes": 48280,
+      "sha256": "e6d302f7919e48b21bfc7467f772427fb9f8a407ddac5aa0e36ac1b9719c53ac",
+      "triangles": 215,
+      "meshes": 8,
+      "materials": 1,
+      "atlas_size": 512,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "ScaffoldKit",
+        "ScaffoldPost",
+        "ScaffoldRail",
+        "ScaffoldBrace",
+        "ScaffoldFoot",
+        "ScaffoldPad",
+        "ScaffoldPadCut",
+        "ScaffoldCurb",
+        "ScaffoldBeacon"
+      ]
     }
   ]
 }

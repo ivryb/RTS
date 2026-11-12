@@ -23,6 +23,8 @@ WorkerMatchSession ---> matchWorker ---> LocalUnitSimulation
 
 Three.js owns presentation only. Projectiles, animations, health bars, selection state, and effects visualize authoritative state and events without deciding gameplay outcomes.
 
+`src/constructionSites.ts` owns how a building looks while it is under construction: a scaffold around the site, the model rising inside it behind a cut, and the scaffold dropping at completion. `UnitSystem` hands it each site's progress, health and whether a drone is working. [Construction animation](construction_animation.md) describes the look, its cost, and its preview scene.
+
 ## Terrain
 
 `src/map.ts` requests Shifting Frontiers from `src/mapGenerators/`, then calls the pure `createTerrainEnvironment` pipeline for the approved New terrain. It returns the revised `MapLayout`, deterministic rock/plant placements and ground-cover fields. The main game and terrain hub share that result, `src/environmentProps.ts` for instanced models, and `src/terrainRendering/environmentMaterial.ts` for the scanned material. `src/terrain.ts` adds the game surface and skirt. Production code loads the six environment GLBs and nine textures from `assets/`, with no workbench or prototype dependency.
@@ -43,7 +45,7 @@ The planned backend is Cloudflare PartyServer with one Durable Object per match.
 
 ## Tools and prototypes
 
-- `tools/preview/` renders production terrain, buildings, units, and effects for visual checks.
+- `tools/preview/` renders production terrain, buildings, units, and effects for visual checks; `tools/preview/construction/` does the same for buildings under construction.
 - `tools/assets/` prepares and inspects source assets used by the game.
 - `prototypes/terrain-playground/` is the terrain experiment hub, using `src/mapGenerators/` and `src/terrainRendering/`.
 - `prototypes/procedural-buildings/` showcases production buildings with their shared materials and archived references, using the production model loader.

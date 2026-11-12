@@ -36,6 +36,10 @@ const stills: Record<string, number> = {
   "first-layer-turret": 3240,
   "cuts-turret": 3240,
   "cuts-command-center": 5200,
+  shoulders: 5200,
+  "drop-turret": 3240,
+  drop: 3240,
+  barrels: 3240,
   fit: 2400,
   slope: 3240,
 };

@@ -28,7 +28,7 @@ box 'bun run dev >/tmp/vite.log 2>&1 & sleep 5; bun run preview:capture:units'
 box pull art/workbench/renders/previews/
 ```
 
-For terrain experiments, use the existing [terrain hub](prototypes/terrain-playground/README.md). For production rendering, use the lightweight preview scenes instead of the full game: `bun run preview:capture` captures terrain, buildings, and units as full-resolution overview, gameplay, and close images; the focused `:terrain`, `:buildings`, and `:units` commands capture one scene. They reuse production terrain and model primitives and write to `art/workbench/renders/previews/`. The `verify-dune77` skill drives the live game.
+For terrain experiments, use the existing [terrain hub](prototypes/terrain-playground/README.md). For production rendering, use the lightweight preview scenes instead of the full game: `bun run preview:capture` captures terrain, buildings, and units as full-resolution overview, gameplay, and close images; the focused `:terrain`, `:buildings`, and `:units` commands capture one scene, and `preview:capture:construction` captures buildings under construction, as [construction animation](docs/construction_animation.md) describes. They reuse production terrain and model primitives and write to `art/workbench/renders/previews/`. The `verify-dune77` skill drives the live game.
 
 Verify with deterministic simulation tests and targeted Playwright or preview scripts, not Browser Use.
 
