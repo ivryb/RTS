@@ -6,10 +6,10 @@ import { generateMap } from "../src/map";
 test("artillery uploads only active effects and stops after they expire", () => {
   const world = new THREE.Group();
   const barrage = new BehemothBarrage(world, generateMap(77));
-  const effects = world.children.filter((object) => object instanceof THREE.Mesh
+  const effects: (THREE.Mesh | THREE.Points | THREE.LineSegments)[] = world.children.filter((object) => object instanceof THREE.Mesh
     || object instanceof THREE.Points || object instanceof THREE.LineSegments);
   const versions = () => effects.flatMap((effect) =>
-    Object.values<THREE.BufferAttribute | THREE.InterleavedBufferAttribute>(effect.geometry.attributes).map((attribute) =>
+    Object.values(effect.geometry.attributes).map((attribute) =>
       attribute instanceof THREE.BufferAttribute ? attribute.version : attribute.data.version));
   const initial = versions();
   barrage.update(0.1);
