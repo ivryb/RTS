@@ -783,6 +783,36 @@ describe("unit presentation timing", () => {
     system.dispose();
   });
 
+  test("a destroyed building sinks and leaves while the player has a unit selected", async () => {
+    const ghostrunner = unit("ghostrunner");
+    const building = activeBuilding("turret-target");
+    const session = new TestSession(frame(1, ghostrunner, building));
+    const world = new THREE.Group();
+    const system = new UnitSystem(world, map, [spawn(ghostrunner)], [], session, () => {
+      const root = new THREE.Group();
+      root.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial()));
+      return root;
+    });
+    system.attachGhostrunner(ghostrunner.id, new THREE.Group(), [new THREE.AnimationClip("Idle", 1, [])], options);
+    system.update(0);
+    system.select([ghostrunner.id]);
+    const root = system.attackables.find((candidate) => candidate.userData.buildingId === building.id)!;
+
+    session.frames.push(frame(2, ghostrunner, [], [{
+      type: "building-died",
+      tick: 1,
+      id: building.id,
+      attackerId: ghostrunner.id,
+    }]));
+    system.update(0);
+    expect(system.attackables).not.toContain(root);
+    system.update(0.4);
+    expect(root.getObjectByName("Building visual")?.scale.y).toBeLessThan(1);
+    system.update(0.5);
+    expect(root.parent).toBeNull();
+    system.dispose();
+  });
+
   test("shows its range, aims, then fires a synchronized heavy Turret projectile", async () => {
     const intruder = unit("ghostrunner");
     const turret = activeBuilding("enemy-turret", "turret", {

@@ -2005,13 +2005,15 @@ export class UnitSystem {
     if (frame.full) {
       const buildingIds = new Set(frame.buildings.map((building) => building.id));
       for (const id of this.currentBuildings.keys()) {
+        // Remove first: `selectionChanged ||= remove()` skipped the removal whenever a selected
+        // unit had already set the flag, leaving destroyed buildings standing.
         if (!buildingIds.has(id)) {
-          selectionChanged ||= this.removeBuildingPresentation(id, buildingDeaths.has(id));
+          selectionChanged = this.removeBuildingPresentation(id, buildingDeaths.has(id)) || selectionChanged;
         }
       }
     }
     for (const id of frame.removedBuildingIds ?? []) {
-      selectionChanged ||= this.removeBuildingPresentation(id, buildingDeaths.has(id));
+      selectionChanged = this.removeBuildingPresentation(id, buildingDeaths.has(id)) || selectionChanged;
     }
     for (const building of frame.buildings) {
       if (this.selectedIds.has(building.id)) {
