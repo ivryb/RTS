@@ -406,6 +406,7 @@ export class ScoutHarvestPresentation {
   private readonly trail = new THREE.Vector3();
   private readonly seed: number;
   private readonly sweepSeconds: number;
+  private readonly wander: number;
 
   constructor(
     private readonly root: THREE.Group,
@@ -423,11 +424,12 @@ export class ScoutHarvestPresentation {
     this.cargo.visible = false;
     this.cargo.name = "Titanium cargo";
     root.add(this.cargo);
-    // Drones on one deposit must not sweep in step, so each gets its own phase and tempo.
+    // Drones on one deposit must not sweep in step, so each gets its own phase, tempo and wander.
+    // The three come from different bits of the seed: two drones whose phases happen to match
+    // still drift apart.
     this.seed = unitSeed(unitId);
-    // The tempo comes from other bits of the seed than the phase, so two drones whose phases
-    // happen to match still drift apart.
-    this.sweepSeconds = SWEEP_SECONDS * (0.75 + 0.5 * ((this.seed * 7919.13) % 1));
+    this.sweepSeconds = SWEEP_SECONDS * (0.7 + 0.6 * ((this.seed * 7919.13) % 1));
+    this.wander = 0.37 + 0.3 * ((this.seed * 131.7) % 1);
   }
 
   /**
@@ -451,9 +453,14 @@ export class ScoutHarvestPresentation {
     this.firing = true;
   }
 
-  /** How far up the face the contact is at `time`: it eases between bottom (0) and top (1) and back. */
+  /**
+   * How far up the face the contact is at `time`, from 0 (bottom) to 1 (top). It swings up and
+   * down, and a slower second swing moves where each stroke turns, so a drone does not repeat
+   * itself and no two drones move alike for long.
+   */
   private sweep(time: number) {
-    return 0.5 - 0.5 * Math.cos((time / this.sweepSeconds + this.seed) * Math.PI * 2);
+    const turn = (time / this.sweepSeconds + this.seed) * Math.PI * 2;
+    return 0.5 - 0.36 * Math.cos(turn) - 0.14 * Math.cos(turn * this.wander + this.seed * 40);
   }
 
   /** For a Scout that is no longer drawn, and so no longer updated. */

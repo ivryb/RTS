@@ -47,7 +47,7 @@ const vertexShader = /* glsl */ `
   // Glows on the rock are drawn this much nearer the camera, so its surface does not slice them.
   const float SURFACE_LIFT = 0.28;
   // The faint bloom is lifted further: a contact just behind the rock's outline still lights its edge.
-  const float BLOOM_LIFT = 0.9;
+  const float BLOOM_LIFT = 1.1;
 
   float hash(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -79,8 +79,10 @@ const vertexShader = /* glsl */ `
       vAlong = (corner.y * 0.5 + 0.5) * length(along);
     } else if (part < 4.5) {
       float flicker = 0.86 + 0.14 * sin(time * 47.0 + seed * 40.0) * sin(time * 31.0 + seed * 17.0);
-      point = part < 2.5 ? towardCamera(endView, BLOOM_LIFT) + vec3(corner * BLOOM_RADIUS * flicker, 0.0)
-        : part < 3.5 ? towardCamera(endView, SURFACE_LIFT) + vec3(corner * CONTACT_RADIUS * flicker, 0.0)
+      // A short beam gets a smaller glow, or a drone close to its rock wears the glow on its nose.
+      float reach = clamp(distance(beamStart, beamEnd) / 1.6, 0.5, 1.0) * flicker;
+      point = part < 2.5 ? towardCamera(endView, BLOOM_LIFT) + vec3(corner * BLOOM_RADIUS * reach, 0.0)
+        : part < 3.5 ? towardCamera(endView, SURFACE_LIFT) + vec3(corner * CONTACT_RADIUS * reach, 0.0)
         : startView + vec3(corner * EMITTER_RADIUS * flicker, 0.0);
     } else {
       // Sparks need no state: each one's whole flight follows from the clock and its number.
@@ -140,13 +142,13 @@ const fragmentShader = /* glsl */ `
       float core = 1.0 - smoothstep(0.18, 0.4, across);
       float sheath = 1.0 - smoothstep(0.3, 1.0, across);
       sheath *= sheath;
-      float pulse = 0.8 + 0.2 * sin(vAlong * 11.0 - time * 34.0 + vSeed * 20.0);
+      float pulse = 0.72 + 0.28 * sin(vAlong * 7.0 - time * 30.0 + vSeed * 20.0);
       light = BEAM * sheath * 0.9 * pulse + BEAM_CORE * core;
       // The blue sheath half covers the sand: blue light merely added to orange sand turns grey,
       // and a sheath that covers it fully reads as a solid rod.
       cover = max(core * 0.9, sheath * 0.5);
     } else if (vPart < 2.5) {
-      light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.32;
+      light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.45;
     } else if (vPart < 4.5) {
       float radius = length(vCorner);
       float glow = pow(max(0.0, 1.0 - radius), 2.2);

@@ -40,10 +40,10 @@ test("a mining Scout Drone fires a laser at the rock, and stops it to haul or on
   const hauling = scoutIn(await waitForSnapshot(page, (snap) => scoutIn(snap).harvest?.phase === "to-dropoff", 60_000));
   expect(hauling.cargoTitanium).toBeGreaterThan(0);
   expect(scoutIn(await waitForSnapshot(page, (snap) => !scoutIn(snap).miningLaser)).miningLaser).toBeUndefined();
+  await page.evaluate(([x, z]) => window.__dune77!.view(x, z, 3), [mining.x, mining.z] as const);
   await page.screenshot({ path: `${evidenceDir}/game-hauling.png`, timeout: 120_000 });
 
   // Second trip, closest zoom, then a move order while the beam is on.
-  await page.evaluate(([x, z]) => window.__dune77!.view(x, z, 3), [mining.x, mining.z] as const);
   const contacts: number[] = [];
   await waitForSnapshot(page, (snap) => Boolean(scoutIn(snap).miningLaser), 90_000);
   await page.screenshot({ path: `${evidenceDir}/game-mining-closest-zoom.png`, timeout: 120_000 });
