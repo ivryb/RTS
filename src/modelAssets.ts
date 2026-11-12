@@ -162,44 +162,79 @@ export const loadDemoAsset = async (asset: DemoAsset) => {
   return { animations: source.animations, instance, model };
 };
 
-export const loadBuildingModel = async (kind: BuildingKind) => {
-  const asset = demoAssets.find((candidate) => candidate.building?.kind === kind);
-  if (!asset) throw new Error(`Missing building model for ${kind}`);
-  const { instance, model } = await loadDemoAsset(asset);
-  instance.name = asset.name;
-  model.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
-  });
-  return instance;
-};
+type LoadedAsset = Awaited<ReturnType<typeof loadDemoAsset>>;
 
-const findUnitAsset = (kind: UnitKind) => {
-  const asset = demoAssets.find((candidate) => candidate.unitKind === kind);
-  if (!asset) throw new Error(`Missing unit asset for ${kind}`);
+const findAsset = (matches: (asset: DemoAsset) => boolean, name: string) => {
+  const asset = demoAssets.find(matches);
+  if (!asset) throw new Error(`Missing model for ${name}`);
   return asset;
 };
 
+const buildingAssets = {
+  "command-center": findAsset((asset) => asset.building?.kind === "command-center", "command-center"),
+  turret: findAsset((asset) => asset.building?.kind === "turret", "turret"),
+} satisfies Record<BuildingKind, DemoAsset>;
+
 const unitAssets = {
-  ghostrunner: findUnitAsset("ghostrunner"),
-  "scout-drone": findUnitAsset("scout-drone"),
-  hornet: findUnitAsset("hornet"),
-  behemoth: findUnitAsset("behemoth"),
+  ghostrunner: findAsset((asset) => asset.unitKind === "ghostrunner", "ghostrunner"),
+  "scout-drone": findAsset((asset) => asset.unitKind === "scout-drone", "scout-drone"),
+  hornet: findAsset((asset) => asset.unitKind === "hornet", "hornet"),
+  behemoth: findAsset((asset) => asset.unitKind === "behemoth", "behemoth"),
 } satisfies Record<UnitKind, DemoAsset>;
 
-/** One factory owns one world's shared model sources and clones them for trained units. */
-export const createUnitModelFactory = (): UnitPresentationFactory => {
-  const sources = new Map<UnitKind, Promise<Awaited<ReturnType<typeof loadDemoAsset>>>>();
-  return async ({ kind }): Promise<LoadedUnitPresentation> => {
-    const asset = unitAssets[kind];
-    if (!asset.presentation) throw new Error(`Missing unit presentation for ${kind}`);
-    let source = sources.get(kind);
+/** Frees the geometry, materials and textures under a root. */
+export const disposeModel = (root: THREE.Object3D) => {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    geometries.add(object.geometry);
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      materials.add(material);
+    }
+  });
+  for (const geometry of geometries) geometry.dispose();
+  for (const material of materials) {
+    for (const value of Object.values(material)) {
+      if (value instanceof THREE.Texture) value.dispose();
+    }
+    material.dispose();
+  }
+};
+
+/**
+ * One match's models. Each file is fetched and parsed once, and every building or unit gets a
+ * clone that shares its geometry, materials and textures, so they exist once on the GPU however
+ * many use them. The library owns those resources: a presentation never disposes them, and one
+ * that needs a different material clones it first. `dispose` frees them when the match ends.
+ */
+export const createModelLibrary = () => {
+  const sources = new Map<DemoAsset, Promise<LoadedAsset>>();
+  const load = (asset: DemoAsset) => {
+    let source = sources.get(asset);
     if (!source) {
       source = loadDemoAsset(asset);
-      sources.set(kind, source);
+      sources.set(asset, source);
     }
-    const loaded = await source;
+    return source;
+  };
+
+  const building = async (kind: BuildingKind) => {
+    const asset = buildingAssets[kind];
+    const root = (await load(asset)).instance.clone(true);
+    root.name = asset.name;
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.castShadow = true;
+      object.receiveShadow = true;
+    });
+    return root;
+  };
+
+  const unit: UnitPresentationFactory = async ({ kind }): Promise<LoadedUnitPresentation> => {
+    const asset = unitAssets[kind];
+    if (!asset.presentation) throw new Error(`Missing unit presentation for ${kind}`);
+    const loaded = await load(asset);
     const root = kind === "ghostrunner"
       ? cloneSkeleton(loaded.instance) as THREE.Group
       : loaded.instance.clone(true);
@@ -218,4 +253,13 @@ export const createUnitModelFactory = (): UnitPresentationFactory => {
       options: asset.presentation,
     };
   };
+
+  const dispose = () => {
+    for (const source of sources.values()) {
+      void source.then(({ instance }) => disposeModel(instance), () => {});
+    }
+    sources.clear();
+  };
+
+  return { building, unit, dispose };
 };

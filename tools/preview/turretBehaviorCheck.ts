@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { generateMap } from "../../src/map";
 import type { MatchFrame, MatchSession } from "../../src/matchSession";
-import { loadBuildingModel } from "../../src/modelAssets";
+import { createModelLibrary } from "../../src/modelAssets";
 import { POSITION_SCALE, toSimPoint, type BuildingState, type UnitState } from "../../src/sim/units";
 import { UnitSystem } from "../../src/unitSystem";
 
@@ -19,8 +19,9 @@ function named(root: THREE.Object3D, name: string) {
 export async function checkTurretBehavior() {
   const map = generateMap(77);
   const results = [];
+  const models = createModelLibrary();
   for (const rotation of [0, Math.PI / 4, Math.PI]) {
-    const root = await loadBuildingModel("turret");
+    const root = await models.building("turret");
     const head = named(root, "TurretHead");
     const base = named(root, "TurretBase");
     const muzzle = named(head, "TurretMuzzle");

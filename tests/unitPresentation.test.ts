@@ -707,84 +707,80 @@ describe("unit presentation timing", () => {
     expect(buildingHealth.visible).toBe(true);
   });
 
-  test("collapses and fades a destroyed building after authoritative removal", async () => {
+  test("a destroyed building fades on its own materials and leaves the model it shares untouched", async () => {
     const ghostrunner = unit("ghostrunner");
-    const building = activeBuilding("turret-new");
+    const doomed = activeBuilding("turret-doomed");
+    const survivor = activeBuilding("turret-survivor", "turret", {
+      position: { x: -10 * POSITION_SCALE, z: 2 * POSITION_SCALE },
+    });
+    // Mirrors the match's model library: every building is a clone of one loaded source.
+    const texture = new THREE.Texture();
+    const source = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 2, 2),
+      new THREE.MeshStandardMaterial({ map: texture }),
+    );
+    source.name = "Building model mesh";
+    const disposed = new Set<string>();
+    source.geometry.addEventListener("dispose", () => disposed.add("geometry"));
+    source.material.addEventListener("dispose", () => disposed.add("material"));
+    texture.addEventListener("dispose", () => disposed.add("texture"));
     const session = new TestSession(frame(1, ghostrunner, []));
     const world = new THREE.Group();
-    const system = new UnitSystem(
-      world,
-      map,
-      [spawn(ghostrunner)],
-      [],
-      session,
-      async (state) => {
-        const root = new THREE.Group();
-        root.name = `${state.kind} model`;
-        const model = new THREE.Mesh(
-          new THREE.BoxGeometry(2, 2, 2),
-          new THREE.MeshStandardMaterial(),
-        );
-        model.name = "Building model mesh";
-        root.add(model);
-        return root;
-      },
-    );
+    const system = new UnitSystem(world, map, [spawn(ghostrunner)], [], session, async () => {
+      const root = new THREE.Group();
+      root.add(source.clone());
+      return root;
+    });
 
-    session.frames.push(frame(2, ghostrunner, building));
+    session.frames.push(frame(2, ghostrunner, [doomed, survivor]));
     system.update(0);
     await Promise.resolve();
 
-    const root = world.getObjectByName("turret model");
-    expect(root).toBeDefined();
-    expect(root?.userData.buildingId).toBe(building.id);
-    expect(root?.position.x).toBe(10);
-    expect(root?.position.z).toBe(2);
-    expect(root?.rotation.y).toBe(building.rotation);
-    expect(system.attackables).toContain(root!);
-    const selectionRing = root!.getObjectByName("Selection ring") as THREE.Mesh;
-    const healthFill = root!.getObjectByName("Health bar fill") as THREE.Sprite;
-    const model = root!.getObjectByName("Building model mesh") as THREE.Mesh;
-    let selectionGeometryDisposed = false;
-    let healthMaterialDisposed = false;
-    let modelGeometryDisposed = false;
-    let modelMaterialDisposed = false;
+    const rootOf = (id: string) => system.selectables.find((root) => root.userData.buildingId === id)!;
+    const meshOf = (root: THREE.Object3D) => root.getObjectByName("Building model mesh") as THREE.Mesh<
+      THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+    const doomedRoot = rootOf(doomed.id);
+    const survivorRoot = rootOf(survivor.id);
+    expect(meshOf(doomedRoot).geometry).toBe(meshOf(survivorRoot).geometry);
+    expect(meshOf(doomedRoot).material.map).toBe(meshOf(survivorRoot).material.map);
+    const selectionRing = doomedRoot.getObjectByName("Selection ring") as THREE.Mesh;
+    let selectionRingDisposed = false;
     selectionRing.geometry.addEventListener("dispose", () => {
-      selectionGeometryDisposed = true;
-    });
-    healthFill.material.addEventListener("dispose", () => {
-      healthMaterialDisposed = true;
-    });
-    model.geometry.addEventListener("dispose", () => {
-      modelGeometryDisposed = true;
-    });
-    (model.material as THREE.Material).addEventListener("dispose", () => {
-      modelMaterialDisposed = true;
+      selectionRingDisposed = true;
     });
 
-    session.frames.push(frame(3, ghostrunner, [], [{
+    session.frames.push(frame(3, ghostrunner, [survivor], [{
       type: "building-died",
       tick: 2,
-      id: building.id,
+      id: doomed.id,
       attackerId: ghostrunner.id,
     }]));
     system.update(0);
-
-    expect(world.getObjectByName("turret model")).toBe(root);
-    expect(system.attackables).not.toContain(root!);
-    expect(selectionGeometryDisposed).toBe(true);
-    expect(healthMaterialDisposed).toBe(true);
-    expect(modelGeometryDisposed).toBe(false);
-    expect(modelMaterialDisposed).toBe(false);
+    expect(system.attackables).not.toContain(doomedRoot);
+    expect(selectionRingDisposed).toBe(true);
 
     system.update(0.4);
-    expect(root!.getObjectByName("Building visual")?.scale.y).toBeLessThan(1);
-    expect((model.material as THREE.Material).opacity).toBeLessThan(1);
-
+    const fading = meshOf(doomedRoot).material;
+    let fadingDisposed = false;
+    fading.addEventListener("dispose", () => {
+      fadingDisposed = true;
+    });
+    expect(doomedRoot.getObjectByName("Building visual")?.scale.y).toBeLessThan(1);
+    expect(fading).not.toBe(source.material);
+    expect(fading.map).toBe(texture);
+    expect(fading.opacity).toBeLessThan(1);
     system.update(0.5);
-    expect(world.getObjectByName("turret model")).toBeUndefined();
-    expect(modelGeometryDisposed).toBe(true);
-    expect(modelMaterialDisposed).toBe(true);
+    expect(doomedRoot.parent).toBeNull();
+    expect(fadingDisposed).toBe(true);
+
+    const survivorMesh = meshOf(survivorRoot);
+    expect(survivorRoot.parent).toBe(world);
+    expect(survivorRoot.visible).toBe(true);
+    expect(survivorMesh.material.opacity).toBe(1);
+    expect(survivorMesh.material.transparent).toBe(false);
+    expect(survivorMesh.material.depthWrite).toBe(true);
+    expect(disposed.size).toBe(0);
+    system.dispose();
   });
 
   test("shows its range, aims, then fires a synchronized heavy Turret projectile", async () => {

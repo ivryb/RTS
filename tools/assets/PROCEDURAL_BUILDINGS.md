@@ -38,7 +38,7 @@ box blender --background --python-exit-code 1 --python tools/assets/check_turret
 
 The turret check sends horizontal rays through 45 bearing heights at 12 viewing angles and eight head rotations. It also checks ground contact, a stationary base, and an unobstructed muzzle that turns with the head. Adding `--lift-head .30` deliberately reproduces the levitation defect and must fail. Check the baked model in low-angle and gameplay views as well; passing geometry checks is not visual acceptance.
 
-For runtime behavior, run `await (await import('/tools/preview/turretBehaviorCheck.ts')).checkTurretBehavior()` in the preview scene's browser console. It loads the production GLB through `loadBuildingModel` and drives `UnitSystem` through idle scanning, eight target directions at three building rotations, muzzle launches, and return to idle. It checks that the foundation stays fixed and that projectile travel matches the barrel direction.
+For runtime behavior, run `await (await import('/tools/preview/turretBehaviorCheck.ts')).checkTurretBehavior()` in the preview scene's browser console. It loads the production GLB through the match's model library (`createModelLibrary`) and drives `UnitSystem` through idle scanning, eight target directions at three building rotations, muzzle launches, and return to idle. It checks that the foundation stays fixed and that projectile travel matches the barrel direction.
 
 Use the production `tools/preview/?scene=buildings&seed=77` scene for overview, gameplay, and close views. Presentation tests verify aim and projectile alignment with the authored muzzle.
 
