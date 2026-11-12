@@ -32,72 +32,73 @@ One shared faction is enough for the first playable version. Asymmetry should co
 
 The repository contains a deterministic 1v1 combat proof. It is playable, but it is not yet a complete skirmish.
 
-- The player starts with one Command Center and three Ghostrunners.
+- The player starts with one Command Center, one Scout Drone, and three Ghostrunners.
 - The enemy has one Command Center, two Turrets, two Ghostrunners, and one Hornet.
 - Enemy guards hold position and attack targets that enter range. There is no strategic AI.
 - Command Centers train all four current unit types through independent five-slot queues.
 - Scout Drones construct Turrets and additional Command Centers on valid terrain.
+- Scouts harvest finite Titanium Deposits and haul cargo to completed friendly Command Centers.
 - Units can move, attack, and stop. Command Centers have selectable rally points.
 - Combat, construction, production, deaths, and match results are authoritative simulation events.
 - Destroying the enemy's final active or unfinished Command Center wins. Simultaneous elimination is a draw.
 - The same seeded encounter can restart after resolution.
 
-There are no resource costs, fog of war, roads, water, deposits, or strategic AI yet. Training time temporarily replaces unit cost.
+There are no resource costs, fog of war, roads, water, or strategic AI yet. Titanium collection is playable; spending and economy balance are deferred. Training time temporarily replaces unit cost.
 
 ### Current units
 
 | Unit | Role | Health | Speed | Weapon |
 | --- | --- | ---: | ---: | --- |
 | Ghostrunner | Fast melee attacker | 140 | 9 | 20 damage every 1.1 seconds |
-| Scout Drone | Unarmed flying scout and builder | 45 | 10 | None |
+| Scout Drone | Unarmed scout, builder, and miner | 45 | 10 | None |
 | Hornet | Flying ranged attacker | 180 | 8.5 | 30 damage every 0.8 seconds, range 14 |
 | Behemoth | Heavy tracked siege unit | 900 | 5 | 140 area damage every 2 seconds, range 7 to 22, radius 4 |
 
 The Behemoth uses attack-ground and damages friendly units and buildings inside its blast. The Hornet fires directly at units and buildings. The Ghostrunner uses model animations for idle, movement, attack, and death.
 
-Current training times are 8 seconds for a Scout Drone, 12 for a Ghostrunner, 20 for a Hornet, and 35 for a Behemoth. A player may have at most three Scout Drones alive or queued.
+Current training times are 1 second for a Scout Drone, 2 for a Ghostrunner, 3 for a Hornet, and 4 for a Behemoth. A player may have at most three Scout Drones alive or queued.
 
 ### Current buildings
 
 | Building | Role | Health | Construction | Weapon |
 | --- | --- | ---: | ---: | --- |
-| Command Center | Produces every current unit and anchors defeat | 2,500 | 60 seconds | None |
+| Command Center | Trains units, accepts Titanium deliveries, and anchors defeat | 2,500 | 60 seconds | None |
 | Turret | Simple defensive structure | 900 | 10 seconds | 25 damage every 0.6 seconds, range 18 |
 
 A Scout Drone creates a vulnerable construction site and travels to its edge. Construction pauses if the assigned drone moves, stops, or dies. Any friendly Scout Drone can resume the site. A completed Turret automatically attacks the nearest hostile unit in range. Direct-fire projectile damage resolves on the deterministic impact tick, when the rendered projectile reaches its target. Turret projectiles use the Hornet's glow treatment at a heavier scale.
 
 This is ground construction. Buildings do not arrive from orbit in the current game.
 
+### Titanium harvesting
+
+Select a Scout and right-click a Titanium Deposit. The Scout travels to an accessible exposed face, extracts ore, carries it to the nearest reachable completed friendly Command Center, and repeats. The first pass carries 20 Titanium per trip and extracts 4 per second; these are provisional tuning values. The stockpile increases on delivery, not extraction.
+
+A new Command Center near ore shortens later hauling trips. Unfinished and enemy buildings cannot accept deliveries. A worker without an available drop-off waits with its cargo. Move, stop, or build orders interrupt harvesting without deleting carried ore; a later gather order resumes the work. A destroyed worker loses its cargo. Depletion stops extraction while retaining the rock footprint.
+
+Starting bases and expansions have deposits with nearby clear ground for Command Centers. The approved ore family has three compositions: three knuckles, split lens, and eroded window. All use warm sandstone shoulders with dark exposed mineral faces. There is no separate mine building.
+
 ### Current controls and presentation
 
 - Left click or drag to select. Shift adds to the selection.
-- Right click moves, attacks, resumes construction, or sets a rally point.
+- Right click moves, attacks, harvests ore, resumes construction, or sets a rally point.
 - `A`, `B`, `M`, and `S` select attack, build, move, and stop actions.
 - Selection rings, range boundaries, health bars, projectiles, and animations present authoritative state without deciding outcomes.
 
 See `README.md` for the complete controls.
 
-### Current graph-driven terrain
+### Live-match terrain
 
-The current map is not assembled from random hill blobs. It starts from a seeded gameplay graph and compiles that plan into one shared height field.
+The game uses seeded Shifting Frontiers from the terrain hub, including shared rock/sand rendering and embedded outcrops. Its territory graph places sites, elevations, mountains and ramps before shaping the surface.
 
-1. `src/mapTopology.ts` places player starts and builds hidden Voronoi regions and adjacency edges.
-2. The graph selects elevated regions, route loops, access points, and chokepoints before visual shaping.
-3. `src/graphTerrain.ts` assigns each region to lowland, a walkable mesa, or a blocked mountain.
-4. Seeded warping turns straight region borders into organic contours without inventing detached terrain islands.
-5. Mesas receive broad walkable slopes and flat tops. Mountains receive taller rocky profiles and remain blocked.
-6. The generator validates two routes between player bases, connected walkable regions, reachable mesa access, and physically blocked mountains.
-7. Rendering and Recast navigation consume the same height field and mountain mask.
+The current encounter uses six-player terrain for a local 1v1 combat proof. The enemy occupies the nearest expansion instead of another player start, keeping combat testing nearby. All units, including Scout Drones and Hornets, obey ground routes around mountains and across usable ramps. Rendering and Recast share the elevation mesh and blocked-rock mask.
 
-The current match uses a 396 by 396 world-unit, six-start terrain layout. The game encounter remains a local 1v1 proof and places the enemy on the nearest connected terrain node instead of another player start, bypassing the normal base separator for faster combat testing. Normal multiplayer starts keep their separator regions. Each start has a flat construction area. Validation uses the largest current ground-unit clearance and the production slope limit.
-
-Roads, water, Titanium Deposits, ruins, vegetation, and neutral sites are planned layers. They are not part of the current generator.
+Other map families remain available in the [terrain hub](prototypes/terrain-playground/README.md). Roads, water, ruins and vegetation remain planned match layers. See [terrain generation](docs/terrain_generation.md) for ownership and validation.
 
 ### Current technical shape
 
 - TypeScript, Vite, and Three.js render the browser game with an orthographic camera and WebGL 2.
 - A Web Worker runs the authoritative simulation at fixed 0.1-second ticks.
-- `src/sim/` owns movement, construction, production, combat, and victory.
+- `src/sim/` owns movement, harvesting, cargo, resource stockpiles, construction, production, combat, and victory.
 - Recast provides static terrain routes and updates local tiles when buildings appear or disappear.
 - Game-owned movement preserves deterministic formations, collision resolution, and attack positions.
 - `MatchSession` separates the renderer from local authority and a future remote server.
@@ -111,7 +112,7 @@ Production code lives under `src/`. Maintained visual and asset utilities live u
 The next goal is a repeatable match against a basic strategic AI. It should add:
 
 - Energy and Titanium economy
-- Titanium Deposits and automated mines
+- Resource costs and harvesting balance
 - Solar Arrays and at least one military production building
 - Fog of war and exploration
 - Roads, water, and resource-driven expansion
@@ -126,7 +127,7 @@ The slice succeeds when fighting the AI for ten to fifteen minutes produces mean
 
 The economy has two resources.
 
-**Titanium** pays for units, buildings, repairs, and upgrades. Automated Titanium Mines sit directly on finite deposits. Deposits should last long enough to avoid constant rebuilding but eventually force expansion.
+**Titanium** will pay for units, buildings, repairs, and upgrades. Scout Drones harvest finite deposits and deliver to completed Command Centers. Players expand by building new Command Centers closer to fresh ore. Deposits should last long enough to avoid constant reassignment but eventually force expansion.
 
 **Energy** comes from the Command Center and power structures. The preferred model is capacity rather than a second stockpile: advanced buildings and units reserve power while active. This needs a prototype before it becomes final.
 
@@ -162,7 +163,7 @@ The graph remains authoritative. New layers must preserve its routes, starting a
 2. Scout routes, crossings, deposits, and enemy movement.
 3. Expand toward additional resources and defensible ground.
 4. Build an army that answers the opponent's composition.
-5. Attack production, power, mines, and Command Centers.
+5. Attack production, power, mining Scouts, and Command Centers.
 6. Establish another Command Center when the economy can support it.
 7. Destroy every enemy Command Center.
 
@@ -187,7 +188,6 @@ The intended counter structure is readable rather than perfectly circular. Range
 
 - Solar Array for cheap exposed power
 - Generator or Reactor for compact higher-output power
-- Titanium Mine for automated extraction
 - Barracks for infantry
 - Vehicle Bay for vehicles and siege units
 - Mercenary Camp as a neutral capturable or usable site
@@ -197,7 +197,7 @@ The intended counter structure is readable rather than perfectly circular. Range
 
 A possible three-stage structure replaces historical ages:
 
-1. **Stranded:** basic infantry, mines, solar power, and defenses
+1. **Stranded:** basic infantry, Scout harvesting, solar power, and defenses
 2. **Connected:** vehicles, better power, advanced weapons, and additional Command Centers
 3. **Dominance:** heavy armor, siege systems, and late-game technology
 

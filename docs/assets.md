@@ -16,6 +16,19 @@ The original Meshy command center and turret are retained as explicit reference 
 
 ## Model workflow
 
+New buildings, props, and resources are generated procedurally. A Blender Python generator in `tools/assets/` builds named geometry and source materials, bakes one PBR atlas through [`building_bake.py`](../tools/assets/building_bake.py), and exports a runtime GLB with a ground pivot. Editable `.blend` files and renders stay in `art/workbench/`; the generator is the reproducible source.
+
+1. Write or extend a generator, reusing the shared geometry parts and palette described below.
+2. Run Blender outside any sandbox. A `--draft` pass that skips baking is enough for shape review.
+3. Compare candidate GLBs in the real game before copying anything into `assets/`. For Titanium Deposits, `bun tools/verify/capture-ore.mjs --model <glb> --out <dir>` serves the candidate in place of every production ore model and captures gameplay and close views.
+4. Copy the accepted GLB to `assets/models/` and record its generator, size, hash, and triangle count in the matching manifest.
+
+Terrain models and vegetation follow the same rule from a different start: CC0 Poly Haven scans reshaped by repeatable scripts, recorded in the [terrain manifest](../assets/models/terrain/manifest.json).
+
+### Meshy units
+
+The current units come from Meshy. Use it for organic and humanoid models that need rigs, which the procedural generators do not cover.
+
 1. Start from an approved image in `art/`.
 2. Create the model manually in Meshy with Smart Topology.
 3. Retexture it from the approved image.
@@ -37,6 +50,10 @@ The production command center uses the **ivory shoulders** design. The productio
 Generated PBR maps, editable Blender assemblies, and the appendable material library stay under `art/workbench/`. The scripts and palette are the reproducible sources; only accepted GLBs are copied into `assets/models/`.
 
 [`tools/assets/building_parts.py`](../tools/assets/building_parts.py) provides shared authored geometry primitives—plates, solids, profile shells, turned profiles, rods, rings, and panel UVs. [`building_bake.py`](../tools/assets/building_bake.py) bakes these surfaces into a portable PBR atlas. Building-specific assemblies stay with each generator; subsequent buildings reuse this geometry vocabulary and material palette. The [building showcase](../prototypes/procedural-buildings/README.md) displays accepted buildings together and provides optional archived Meshy comparisons. Retired body and shoulder studies stay in the workbench.
+
+## Titanium outcrops
+
+The main game uses three locally authored compositions: **three knuckles**, **split lens**, and **eroded window**. `tools/assets/build_titanium_ore.py` builds their fractured shapes and bakes one PBR material per asset. The source Cliff Side color, normal, and roughness maps and CC0 provenance live under `assets/source/polyhaven/titanium/`; exported model details are recorded in `assets/models/titanium-manifest.json`. Workbench renders compare source and reimported GLBs, while the main game verifies their scale beside Scout Drones and Command Centers.
 
 ## Terrain textures
 

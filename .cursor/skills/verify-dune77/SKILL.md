@@ -28,7 +28,7 @@ the live game.
 2. If none is running (or you need isolation from the user's session), start one
    on a dedicated verification port with strictPort so it cannot silently drift:
    ```sh
-   (nohup pnpm run dev --port 5175 --strictPort < /dev/null > /tmp/dune77-verify-dev.log 2>&1 &)
+   (nohup bun run dev --port 5175 --strictPort < /dev/null > /tmp/dune77-verify-dev.log 2>&1 &)
    ```
 3. Ready when the log shows `VITE ... ready` **and** the port answers:
    ```sh
@@ -62,7 +62,7 @@ Harness: Playwright specs in `tools/verify/specs/` against the shared helpers in
 `tools/verify/helpers.ts`. Run:
 
 ```sh
-VERIFY_BASE_URL=http://localhost:5175 pnpm exec playwright test \
+VERIFY_BASE_URL=http://localhost:5175 bunx playwright test \
   --config tools/verify/playwright.config.ts --reporter=line --grep "<name>"
 ```
 
@@ -133,9 +133,9 @@ never delete it during teardown). Standards:
 ## Other surfaces (reuse, do not duplicate)
 
 - **Simulation logic** (combat math, production, construction, victory): headless
-  and fast — `pnpm test:unit` (`bun test tests/*.test.ts`, ~50 s). Prefer this
+  and fast — `bun run test:unit` (`bun test tests/*.test.ts`, ~50 s). Prefer this
   for rule changes; it drives `UnitSystem` directly without a browser.
-- **Terrain/building/unit visuals**: `pnpm preview:capture` (or `:terrain`,
+- **Terrain/building/unit visuals**: `bun run preview:capture` (or `:terrain`,
   `:buildings`, `:units`) renders production assets via
   `tools/preview/` and writes to `art/workbench/renders/previews/`. Requires a
   dev server on port 5173; the Playwright specs poll `window.__previewReady`.

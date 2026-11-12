@@ -19,7 +19,7 @@ WorkerMatchSession ---> matchWorker ---> LocalUnitSimulation
    UnitSystem and Three.js
 ```
 
-`src/sim/` owns commands, movement, construction, production, combat, and victory. It runs on fixed ticks and does not depend on Three.js or browser input. `src/matchSession.ts` is the boundary between the renderer and either a local worker or a future remote match server.
+`src/sim/` owns commands, movement, harvesting, cargo, Titanium stockpiles, construction, production, combat, and victory. It runs on fixed ticks and does not depend on Three.js or browser input. `src/matchSession.ts` is the boundary between the renderer and either a local worker or a future remote match server.
 
 Three.js owns presentation only. Projectiles, animations, health bars, selection state, and effects visualize authoritative state and events without deciding gameplay outcomes.
 
@@ -29,7 +29,9 @@ Three.js owns presentation only. Projectiles, animations, health bars, selection
 
 The final heightfield and obstacle mask feed rendering, Recast and construction placement. Mountains, substantial rubble and tree trunks block movement and building footprints; grass and low shrubs remain walkable. Grass beds follow the local ground normal while preserving their root spread.
 
-`src/sim/navigation.ts` builds Recast navigation from the actual elevation mesh, excluding blocked-rock triangles, and updates building obstacles. All current units use this ground navigation, including Scout Drones and Hornets. Simulation still owns movement and combat.
+`src/mapGenerators/titaniumDeposits.ts` places finite resources beside usable base and expansion clearings; `src/orePresentation.ts` owns their models, picking, and Scout work/cargo visuals.
+
+`src/sim/navigation.ts` builds Recast navigation from the actual elevation mesh, excluding blocked-rock triangles, and updates building and ore obstacles. All current units use this ground navigation, including Scout Drones and Hornets. Simulation still owns movement and combat.
 
 The local combat proof uses six-player terrain but places the enemy at the nearest expansion to the player for quick combat testing. It does not use the remote enemy player start. For terrain experiments, shared changes and validation, read [terrain generation](terrain_generation.md).
 

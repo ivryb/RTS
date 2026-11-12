@@ -5,12 +5,18 @@ Dune77 is a fast browser RTS whose gameplay is developed through focused playabl
 ## Language
 
 **Combat proof**:
-A short playable encounter that proves selection, Scout Drone construction, time-based unit production, and combat against a preconfigured enemy force and base. It does not require a resource economy or a strategic AI opponent.
+A short playable encounter that proves selection, Scout Drone harvesting and construction, time-based unit production, and combat against a preconfigured enemy force and base. It collects Titanium but does not yet price construction or training, or include a strategic AI opponent.
 _Avoid_: MVP match, full game loop
 
 **Scout Drone**:
-The player's unarmed scout and builder. It creates and works on construction sites and is produced by the Command Center.
+The player's unarmed scout, builder, and miner. Its current movement follows ground navigation, despite its hovering appearance. It creates and works on construction sites, harvests Titanium Deposits, and carries ore to completed friendly Command Centers. It is produced by the Command Center.
 _Avoid_: Villager, orbital designator
+
+**Titanium Deposit**:
+A finite, neutral ore outcrop. Scouts extract Titanium from accessible positions outside its blocked footprint. Depletion leaves the rock in place.
+
+**Titanium cargo**:
+Ore carried by a Scout. It enters the player stockpile only after delivery to a completed friendly Command Center. Destroying a loaded Scout loses its cargo.
 
 **Construction site**:
 A vulnerable, incomplete building created by a Scout Drone's build order. It becomes operational only after a Scout Drone finishes constructing it.
@@ -49,3 +55,15 @@ _Avoid_: Road, graph edge
 
 **Cliff border**:
 The unwalkable transition between authored elevation levels. Its visual rocks, broken edge, and debris may be irregular without introducing additional gameplay elevations.
+
+**Map family**:
+A seeded set of layout rules, such as Frontier strongholds or Shifting frontiers. Changing the seed produces a new layout within those rules; changing the family changes the rules themselves.
+
+**Map layout**:
+The deterministic data produced by a map generator: terrain fields, sites and entrances. It is separate from rendering and from a running match.
+
+**Terrain hub**:
+The shared playground for comparing map families and terrain appearance. Its base and supply markers describe intended roles; they are not match entities. For implementation and validation, read [terrain generation](docs/terrain_generation.md).
+
+**Embedded outcrop**:
+Rock relief formed within the terrain height field, with a buried shoulder and exposed core. Textured dust and fragments around its contact are presentation; they do not by themselves create a movement obstacle.

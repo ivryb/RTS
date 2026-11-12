@@ -1,8 +1,8 @@
 # Dune77
 
-Dune77 is a browser-based RTS set in a sun-scorched cyberpunk wasteland. The current build is a deterministic combat proof: train units, construct a forward base, and destroy the enemy Command Center.
+Dune77 is a browser-based RTS set in a sun-scorched cyberpunk wasteland. The current build is a deterministic combat proof: mine Titanium with Scouts, train units, construct a forward base, and destroy the enemy Command Center.
 
-The game is still early. The combat foundation works; the economy, fog of war, strategic AI, and full multiplayer match remain future work. See [`draft.md`](draft.md) for the game design and [`BACKLOG.md`](BACKLOG.md) for deferred features.
+The game is still early. The combat foundation works; Titanium harvesting and delivery work; resource spending, fog of war, strategic AI, and full multiplayer matches remain future work. See [`draft.md`](draft.md) for the game design and [`BACKLOG.md`](BACKLOG.md) for deferred features.
 
 The main game uses the approved New terrain: oxide mountains, sheltered groves and walkable grass. The [terrain hub](prototypes/terrain-playground/README.md) retains Old/New comparisons using the same production generation and rendering.
 
@@ -11,7 +11,7 @@ The main game uses the approved New terrain: oxide mountains, sheltered groves a
 Requirements:
 
 - Node.js 22 or newer
-- Bun 1.3 or newer
+- Bun 1.4.2 or newer
 
 ```sh
 bun install
@@ -26,10 +26,12 @@ No environment variables are required to run the game. Meshy API tooling is opti
 
 - Left click or drag to select units and buildings.
 - Hold Shift to add to the selection.
-- Right click to move, attack, resume construction, or set a rally point.
+- Right click to move, attack, mine ore with Scouts, resume construction, or set a rally point.
 - Press `A` for attack, `B` for build, `M` for move, and `S` for stop.
 - Press `R` to restart after the match ends.
 - Drag with the middle mouse button to pan. Use the wheel to zoom.
+
+Select the starting Scout and right-click a Titanium Deposit to begin harvesting. Loaded Scouts automatically deliver to the nearest reachable completed friendly Command Center. Build another Command Center near fresh ore to shorten later trips. The Titanium counter records delivered cargo; construction and training do not consume it in this first pass.
 
 ## Checks
 
