@@ -60,7 +60,8 @@ void main() {
     vStrength *= (1.0 - age) * smoothstep(0.0, 0.1, age);
     lift = 0.2;
   } else if (vKind < 2.5) {
-    vStrength *= pow(0.5 + 0.5 * sin(uTime * 4.2 + seed), 5.0);
+    // A lamp never goes fully dark, so a waiting site reads as waiting in any single frame.
+    vStrength *= 0.3 + 0.7 * pow(0.5 + 0.5 * sin(uTime * 4.2 + seed), 5.0);
   } else {
     float age = aState.z;
     center += aMotion.xyz * (1.0 - (1.0 - age) * (1.0 - age));
