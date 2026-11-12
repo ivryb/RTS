@@ -3,7 +3,7 @@ import * as THREE from "three";
 /**
  * Shows a building only up to a rising cut height. Below the cut it is the finished model,
  * with its newest band still bare steel. For a short way above the cut only an open steel
- * frame of the hull stands; everything higher is discarded. The main hull's opening is closed
+ * frame of the hull's outer walls stands; everything higher is discarded. The main hull's opening is closed
  * by a deck (`deck.ts`); a thin part the deck leaves alone, such as a mast, is capped here.
  * It expects the baked atlas of `tools/assets/building_bake.py` (contact shading in the red
  * channel of the roughness map) and falls back to the plain band without it.
@@ -30,7 +30,7 @@ const PROGRAM_KEY = "d77-construction-reveal";
 export const structureGlsl = /* glsl */ `
 const vec3 SITE_STEEL = vec3(0.045, 0.038, 0.031);
 const vec3 SITE_RIB = vec3(0.15, 0.1, 0.052);
-const vec3 SITE_GIRDER = vec3(0.3, 0.19, 0.085);
+const vec3 SITE_FRAME = vec3(0.14, 0.112, 0.086);
 const vec3 SITE_HOT_RIB = vec3(0.44, 0.17, 0.04);
 const vec3 SITE_HOT_SEAM = vec3(2.6, 1.05, 0.26);
 // Beams on a square grid, pitch metres apart and half metres wide either side of their line,
@@ -61,20 +61,22 @@ vec2 siteLocal(vec2 world) {
   vec2 offset = world - uSiteFrame.xy;
   return vec2(uSiteFrame.z * offset.x - uSiteFrame.w * offset.y, uSiteFrame.w * offset.x + uSiteFrame.z * offset.y);
 }
-// Returns the metres a fragment stands above the cut. Up there only an open frame is kept, for
-// uSiteFraming.x metres: members uSiteFraming.y apart, fixed in the building's own frame, so
-// the frame stands still while the cut climbs through it. Walls keep uprights and ties, floors
-// a grid of joists.
-float siteClip() {
+// Returns the metres a fragment stands above the cut. Up there nothing is kept but, where
+// framed, an open steel frame of the walls for uSiteFraming.x metres: uprights and ties
+// uSiteFraming.y apart, fixed in the building's own frame, so the frame stands still while the
+// cut climbs through it. Level floors are left out: they would lie over the deck like a mesh.
+float siteClip(bool framed) {
   float above = vSitePosition.y - uSiteCut;
   vec2 local = siteLocal(vSitePosition.xz);
-  if (above > uSiteFraming.x || dot(local, local) > uSiteReach * uSiteReach) discard;
+  if (dot(local, local) > uSiteReach * uSiteReach) discard;
   if (above > 0.0) {
-    bool wall = abs(normalize(cross(dFdx(vSitePosition), dFdy(vSitePosition))).y) < 0.7;
-    // A floor's joists lie twice as far apart as a wall's uprights, or the two blur into a mesh.
-    float pitch = wall ? uSiteFraming.y : uSiteFraming.y * 2.0;
+    if (!framed || above > uSiteFraming.x) discard;
+    if (abs(normalize(cross(dFdx(vSitePosition), dFdy(vSitePosition))).y) > 0.92) discard;
+    float pitch = uSiteFraming.y;
     vec3 across = abs(fract(vec3(local.x, vSitePosition.y, local.y) / pitch + 0.5) - 0.5) * pitch;
-    if (min(min(across.x, across.z), wall ? across.y : pitch) > uSiteFraming.y * 0.1) discard;
+    // Members thicken from nothing at the frame's top, so the frame grows instead of popping in.
+    float grown = 1.0 - smoothstep(0.55, 1.0, above / uSiteFraming.x);
+    if (min(min(across.x, across.z), across.y) > pitch * 0.1 * grown) discard;
   }
   return above;
 }
@@ -105,7 +107,9 @@ float siteFloor = smoothstep(0.8, 0.95, siteUp) * siteSealed * siteBeams(siteLoc
 diffuseColor.rgb = mix(diffuseColor.rgb, mix(SITE_STEEL, SITE_RIB, siteFloor), siteBare * 0.94);
 metalnessFactor *= 1.0 - siteBare;
 if (siteAbove > 0.0) {
-  diffuseColor.rgb = SITE_GIRDER;
+  // Only the hull's outer walls are framed ahead of the cut, in the same bare steel.
+  if (siteSealed > 0.5) discard;
+  diffuseColor.rgb = SITE_FRAME;
   metalnessFactor = 0.0;
 }
 `;
@@ -157,14 +161,15 @@ export const createReveal = (root: THREE.Object3D, visual: THREE.Object3D): Reve
     },
   };
 
-  // The shadow pass uses the same cut, so a half-built site casts a half-height shadow.
+  // The shadow pass uses the same cut, so a half-built site casts a half-height shadow. The
+  // frame above the cut casts none: a lattice this fine only speckles the ground.
   const depth = new THREE.MeshDepthMaterial({ name: "Construction cut shadow" });
   depth.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     trackPosition(shader);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\n${clipGlsl}`)
-      .replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\nsiteClip();");
+      .replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\nsiteClip(false);");
   };
   depth.customProgramCacheKey = () => `${PROGRAM_KEY}-depth`;
 
@@ -185,7 +190,7 @@ export const createReveal = (root: THREE.Object3D, visual: THREE.Object3D): Reve
         .replace("#include <common>", `#include <common>\n${sharedFragment}`)
         .replace(
           "#include <clipping_planes_fragment>",
-          "#include <clipping_planes_fragment>\nfloat siteAbove = siteClip();",
+          "#include <clipping_planes_fragment>\nfloat siteAbove = siteClip(true);",
         )
         .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>\n${bareSteel}`)
         .replace("#include <emissivemap_fragment>", `#include <emissivemap_fragment>\n${hotSeam}`)

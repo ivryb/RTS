@@ -12,7 +12,7 @@ const TOWARD_CAMERA = new THREE.Vector2(Math.SQRT1_2, Math.SQRT1_2);
 const OPEN_FACING = 0.3;
 /** Half the gap left between two road plates of the pad. */
 const JOINT = 0.015;
-/** Metres the pad, its kerbs and the feet sink to clear the ground, lamps on their jacks included. */
+/** Metres the pad and its kerbs sink to clear the ground. */
 const PAD_DEPTH = 0.34;
 /** Share of the drop by which the walls have gone into the pad, and after which the pad itself sinks. */
 const WALLS_DOWN = 0.72;
@@ -24,8 +24,11 @@ const pieceNames = ["Post", "Rail", "Brace", "Foot", "Pad", "PadCut", "Curb", "B
 type PieceName = typeof pieceNames[number];
 /** Members a hit can knock loose; posts, feet and the pad always stand. */
 const loose: Partial<Record<PieceName, "hangs" | "falls">> = { Rail: "hangs", Brace: "falls" };
-/** The pad and what lies on it. Everything else is a wall, and drops into the pad first. */
-const onTheGround: ReadonlySet<PieceName> = new Set(["Foot", "Pad", "PadCut", "Curb"]);
+/**
+ * The pad and its kerbs. Everything else is a wall, feet included, and drops into the pad
+ * first: a dark foot left on the pad after its post had gone read as a stray dot.
+ */
+const onTheGround: ReadonlySet<PieceName> = new Set(["Pad", "PadCut", "Curb"]);
 
 export interface Cage {
   /** World positions of the lamp lenses, one on every corner. */
@@ -397,7 +400,7 @@ export class Scaffolding {
           batch.setGeometryAt(wallPart.geometryId, walls.geometry);
           // More places smoke as health falls, spread around the scaffold rather than bunched.
           breaks.length = 0;
-          const smoking = Math.min(failed.length, Math.ceil(damage * MOST_BREAKS));
+          const smoking = Math.min(failed.length, 1 + Math.ceil(damage * (MOST_BREAKS - 1)));
           for (let index = 0; index < smoking; index += 1) {
             const matrix = failed[Math.floor(index * failed.length / smoking)]!;
             breaks.push(new THREE.Vector3(0.5, 0, 0).applyMatrix4(matrix).add(origin));

@@ -11,11 +11,11 @@ A physical scaffold stands around the site from the moment it is placed. The rea
 | State | What the player sees |
 | --- | --- |
 | Just placed, 0%, no drone yet | The scaffold at full size on a dusty plate pad with striped kerbs. Cyan lamps on the posts blink slowly. No sparks, no building. |
-| Drone working | The finished model is shown up to a horizontal cut at `progress × height`. The newest band under the cut is bare steel. A dark deck of girders and joists closes the cut, its rim carries a hot seam, and weld arcs with falling sparks hop around the hull at that height. For up to 0.7 m above the cut the hull stands as an open ochre steel frame, so the next course shows its shape before it is clad. The drone's beam ends at the cut. In the first 0.9 s of work the first layer spreads out from under the beam as a growing disc. |
-| Paused, no drone working | Arcs, seam and glow go out, the deck turns dark steel, and the lamps blink. Nothing moves except the lamps. |
+| Drone working | The finished model is shown up to a horizontal cut at `progress × height`. The newest band under the cut is bare steel. A dark deck of girders and joists closes the cut, its rim carries a hot seam, and weld arcs with falling sparks hop around the hull at that height. For up to 0.7 m above the cut the hull's outer walls stand as an open frame of the same bare steel, so the next course shows its shape before it is clad. The drone's beam ends at the cut. In the first 0.9 s of work the first layer spreads out from under the beam as a growing disc, and the frame goes up after it. |
+| Paused, no drone working | Arcs, seam and glow go out, the deck turns dark steel, and the lamps blink. Nothing moves except the lamps, whose glow is never drawn smaller than 34 px across, so the state reads at default zoom. |
 | Damaged before completion | Rails and braces hang or go missing in proportion to lost health, and dark smoke rises where they broke, from more places as health falls. Posts, feet and the pad always stand. The game's health bar still carries the exact value. |
 | Destroyed before completion | The scaffold drops into the ground in 0.24 s with a skirt of dust. The building stays cut at the height it had reached, with its deck and frame, and fades out over the 0.8 s every destroyed building takes. D77-6 owns what happens to that stump. |
-| Completion | The building is the untouched model from the first frame. The scaffold's walls drop into the pad, the pad sinks after them, all within 0.5 s, and the dust is gone by 0.9 s. One second after completion nothing of the site is left. |
+| Completion | The building is the untouched model from the first frame. The scaffold's walls and feet drop into the pad, the pad and its kerbs sink after them, all within 0.5 s, and the dust is gone by 0.9 s. One second after completion nothing of the site is left. |
 
 The scaffold is ochre bronze with graphite braces, from the Aged desert palette, so it never reads as part of the ivory building. It casts a shadow. The cut building casts only the shadow of its built part and its frame.
 
@@ -52,9 +52,9 @@ Measured in the construction preview with 5 Command Centers and 5 Turrets under 
 | Draw calls, 10 sites | 196 | 200 |
 | Draw calls, 10 sites, in a browser without `WEBGL_multi_draw` | 196 | 238 |
 | Triangles, 10 sites | 5,978,671 | 6,035,351 |
-| CPU per frame for 10 sites | 0.0017 ms | 0.025 ms |
-| Preparing a site | 0 ms | up to 2.1 ms (Command Center), 0.4 ms (Turret) |
-| Measuring a building kind, once | none | 19 to 21 ms |
+| CPU per frame for 10 sites | 0.0017 ms | 0.023 ms |
+| Preparing a site | 0 ms | up to 1.3 ms (Command Center), 0.4 ms (Turret) |
+| Measuring a building kind, once | none | 15 to 21 ms |
 
 A finished building costs nothing extra. The four extra draw calls are shared by every site, so they do not grow with the number of sites: one for all scaffolds, one for their shadow, one for all decks, and one for all sparks, lamps, dust and smoke. The per-frame CPU cost is spark placement.
 
@@ -79,11 +79,11 @@ box pull art/workbench/renders/previews/construction/
 
 - `gameplay`, `turret-close`, `command-center-close`: both buildings at 0, 15, 50, 85 and 100%, at the game's default zoom (43.1 m view height) and its closest (14.4 m).
 - `states`, `states-turret`, `states-command-center`: just placed, drone working, paused, damaged, destroyed before completion.
-- `completion`, `completion-turret`, `drop`, `drop-turret`: the moment of completion and the last frames of the scaffold's drop.
-- `destroyed`, `destroyed-turret`, `damage`, `damage-turret`: a site at 40% losing health, and after it is destroyed.
+- `completion`, `completion-turret`, `completion-command-center`, `drop`, `drop-turret`: the moment of completion and the last frames of the scaffold's drop.
+- `destroyed`, `destroyed-turret`, `destroyed-command-center`, `damage`, `damage-turret`, `damage-command-center`: a site at 40% losing health, and after it is destroyed.
 - `first-layer`, `first-layer-turret`, `cuts-turret`, `cuts-command-center`, `shoulders`, `barrels`: the cut at the heights where it once looked wrong.
 - `fit`, `slope`: buildings turned 0, 30, 45, 77 and 180 degrees side by side, and a Command Center on the steepest slope placement allows.
-- `film`, `film-turret`, `film-command-center`, `film-loss`, `film-loss-turret`: a build at real Turret speed with the drone leaving for 1.5 s, 12 s of a Command Center build at its real pace, and a site shot at and destroyed.
+- `film`, `film-turret`, `film-command-center`, `film-opening-command-center`, `film-loss`, `film-loss-turret`: a build at real Turret speed with the drone leaving for 1.5 s, 12 s of a Command Center build at its real pace, the first 3 s of one, and a site shot at and destroyed.
 - `perf`: the cost table above, written to `perf.json`.
 
 A new building needs no work here, but look at it in `gameplay` and `fit` once: the outline assumes one main hull around the model's vertical axis.

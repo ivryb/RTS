@@ -151,6 +151,11 @@ const FILM_SECONDS = 14.5;
 const excerptState = (seconds: number): SiteState => constructing(0.3 + seconds / 60);
 const EXCERPT_SECONDS = 12;
 
+/** The first three seconds of a Command Center build at its real pace: placed, then the first layer. */
+const openingState = (seconds: number): SiteState =>
+  seconds < 0.5 ? constructing(0, false) : constructing((seconds - 0.5) / 60);
+const OPENING_SECONDS = 3;
+
 /** A site shot at while it is built, then destroyed at 40%. */
 const lossState = (seconds: number): SiteState => {
   if (seconds < 3) return constructing(0.25 + seconds * 0.05, true, 1 - seconds * 0.3);
@@ -239,9 +244,10 @@ const createSite = async (kind: BuildingKind, x: number, z: number, rotation: nu
 const applyState = (site: Site, state: SiteState, seconds: number) => {
   site.handle.update(state, seconds);
   // The game fades what a destroyed site leaves standing, as `updateBuildingDestruction` does.
-  site.handle.fadeStump(state.lifecycle === "destroyed"
-    ? Math.max(0, 1 - state.sinceLifecycleChange / STUMP_FADE_SECONDS)
-    : 1);
+  const stump = state.lifecycle === "destroyed" ? 1 - state.sinceLifecycleChange / STUMP_FADE_SECONDS : 1;
+  site.handle.fadeStump(Math.max(0, stump));
+  // Once it has faded, the game removes the building.
+  site.root.visible = stump > 0;
   site.beam.visible = state.working && state.lifecycle === "constructing";
   site.drone.visible = site.beam.visible;
   if (!site.beam.visible) return;
@@ -328,6 +334,9 @@ const stripShots: Record<string, { panels: Panel[]; focus: Focus; viewHeight: nu
   "states-turret": { panels: statePanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   "states-command-center": { panels: statePanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
   completion: { panels: completionPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
+  "completion-command-center": { panels: completionPanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
+  "destroyed-command-center": { panels: destroyedPanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
+  "damage-command-center": { panels: damagePanels, focus: "command-center", viewHeight: CLOSE_VIEW_HEIGHT },
   "completion-turret": { panels: completionPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
   destroyed: { panels: destroyedPanels, focus: "both", viewHeight: GAMEPLAY_VIEW_HEIGHT },
   "destroyed-turret": { panels: destroyedPanels, focus: "turret", viewHeight: CLOSE_VIEW_HEIGHT },
@@ -444,7 +453,9 @@ if (shot in stripShots) {
   sceneName.textContent = "Construction";
   const [stateAt, length] = shot.startsWith("film-loss")
     ? [lossState, LOSS_SECONDS]
-    : shot === "film-command-center" ? [excerptState, EXCERPT_SECONDS] : [filmState, FILM_SECONDS];
+    : shot === "film-opening-command-center"
+      ? [openingState, OPENING_SECONDS]
+      : shot === "film-command-center" ? [excerptState, EXCERPT_SECONDS] : [filmState, FILM_SECONDS];
   window.__constructionFrameCount = Math.round(length * FILM_FPS);
   window.__constructionFrame = (index) => {
     const seconds = index / FILM_FPS;
@@ -456,7 +467,7 @@ if (shot in stripShots) {
       ? "Complete"
       : state.lifecycle === "destroyed"
         ? "Destroyed"
-        : `${Math.round(state.progress * 100)}% · ${state.working ? "drone working" : state.progress ? "paused, no drone" : "just placed"}${state.health < 1 ? ` · ${percent(state.health)} health` : ""}`]);
+        : `${percent(state.progress)} · ${state.working ? "drone working" : state.progress ? "paused, no drone" : "just placed"}${state.health < 1 ? ` · ${percent(state.health)} health` : ""}`]);
   };
   window.__constructionFrame(0);
 } else if (shot === "perf") {
