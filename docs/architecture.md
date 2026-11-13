@@ -31,7 +31,7 @@ Three.js owns presentation only. Projectiles, animations, health bars, selection
 
 The final heightfield and obstacle mask feed rendering, Recast and construction placement. Mountains, substantial rubble and tree trunks block movement and building footprints; grass and low shrubs remain walkable. Grass beds follow the local ground normal while preserving their root spread.
 
-`src/mapGenerators/titaniumDeposits.ts` places finite resources beside usable base and expansion clearings; `src/orePresentation.ts` owns their models, picking, and Scout work/cargo visuals.
+`src/mapGenerators/titaniumDeposits.ts` places finite resources beside usable base and expansion clearings; `src/orePresentation.ts` owns their models, picking, and Scout work/cargo visuals. A mining Scout's laser finds the rock by slicing the deposit's actual mesh, so a new deposit model needs no tuning; `src/miningLaser.ts` draws every laser in one instanced draw call.
 
 `src/sim/navigation.ts` builds Recast navigation from the actual elevation mesh, excluding blocked-rock triangles, and updates building and ore obstacles. All current units use this ground navigation, including Scout Drones and Hornets. Simulation still owns movement and combat.
 

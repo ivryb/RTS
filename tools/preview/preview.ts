@@ -8,17 +8,22 @@ import type { UnitKind } from "../../src/sim/unitDefinitions";
 import { BehemothBarrage, BEHEMOTH_LAUNCH_OFFSETS } from "../../src/behemothBarrage";
 import { findSceneCenter } from "./demoModels";
 import { generateMap, sampleHeight } from "../../src/map";
-import { demoAssets, loadDemoAsset } from "../../src/modelAssets";
+import { createModelLibrary, demoAssets, loadDemoAsset } from "../../src/modelAssets";
 import { createTerrain } from "../../src/terrain";
 import { createEnvironmentProps } from "../../src/environmentProps";
+import type { MatchFrame, MatchSession } from "../../src/matchSession";
+import { createTrainedUnitState } from "../../src/sim/production";
+import { POSITION_SCALE } from "../../src/sim/simulationConstants";
+import { UnitSystem } from "../../src/unitSystem";
 import "./preview.css";
 
-type PreviewScene = "terrain" | "buildings" | "units";
+type PreviewScene = "terrain" | "buildings" | "units" | "mining";
 
 declare global {
   interface Window {
     __previewReady?: boolean;
     __previewStepEffect?: (seconds: number) => void;
+    __previewMeasure?: (frames: number) => { updateMs: number; calls: number; triangles: number };
   }
 }
 
@@ -26,6 +31,7 @@ const params = new URLSearchParams(location.search);
 const requestedScene = params.get("scene");
 const requestedEffect = params.get("effect");
 const previewScene: PreviewScene = requestedScene === "buildings" || requestedScene === "units"
+  || requestedScene === "mining"
   ? requestedScene
   : "terrain";
 const map = generateMap(Number(params.get("seed")) || 77);
@@ -158,6 +164,56 @@ if (previewScene === "units" && requestedEffect === "behemoth-barrage") {
   effectFocus = effectTime < 0.3 ? effectOrigin : effectMidpoint;
 }
 
+// Scout Drones parked around one Titanium Deposit, drawn by the production UnitSystem from a
+// scripted frame. ?drones=N sets the crowd, ?mining=0 leaves them idle as the cost baseline, and
+// ?deposit=N uses the map's Nth deposit instead of the nearest; 0, 1 and 2 show the three rock models.
+// ?approach=M stands the drones M metres outside the deposit's footprint instead of the simulation's 1.
+let miningSystem: UnitSystem | undefined;
+if (previewScene === "mining") {
+  const deposit = params.has("deposit")
+    ? map.titaniumDeposits[Number(params.get("deposit"))]
+    : [...map.titaniumDeposits].sort((a, b) =>
+      Math.hypot(a.position.x / POSITION_SCALE - focus.x, a.position.z / POSITION_SCALE - focus.z)
+      - Math.hypot(b.position.x / POSITION_SCALE - focus.x, b.position.z / POSITION_SCALE - focus.z))[0];
+  if (!deposit) throw new Error("This map has no Titanium Deposit");
+  const count = Math.max(1, Number(params.get("drones")) || 3);
+  const extracting = params.get("mining") !== "0";
+  const units = Array.from({ length: count }, (_, index) => {
+    // A few drones stand on the camera's side of the rock; a crowd rings it.
+    const angle = count > 6 ? index / count * Math.PI * 2 : Math.PI / 4 + (index - (count - 1) / 2) * 0.9;
+    const scout = createTrainedUnitState({
+      id: `scout-drone-${index + 1}`, kind: "scout-drone", ownerId: "local-player",
+      position: deposit.position, facing: 0,
+    });
+    const distance = deposit.radius + scout.radius + (Number(params.get("approach") ?? 1)) * POSITION_SCALE;
+    const position = {
+      x: Math.round(deposit.position.x + Math.sin(angle) * distance),
+      z: Math.round(deposit.position.z + Math.cos(angle) * distance),
+    };
+    return {
+      ...scout, position, target: position, order: "gather" as const, cargoTitanium: index % 3 * 6,
+      harvest: { depositId: deposit.id, phase: extracting ? "extracting" as const : "to-deposit" as const, workPosition: position },
+    };
+  });
+  const frame: MatchFrame = {
+    version: 1, tick: 0, full: true, units, buildings: [], titaniumDeposits: map.titaniumDeposits, events: [],
+  };
+  const session: MatchSession = {
+    submit: () => ({ commandId: "preview", status: "accepted" }),
+    advance: () => {},
+    readFrame: (afterVersion) => afterVersion < frame.version ? frame : undefined,
+  };
+  const world = new THREE.Group();
+  scene.add(world);
+  miningSystem = new UnitSystem(world, map, [], [], session, undefined, createModelLibrary().unit);
+  // Its warm-up draws the scene, which needs the shadow map this page otherwise renders only on request.
+  renderer.shadowMap.needsUpdate = true;
+  await miningSystem.prepareRendering(renderer, scene, new THREE.OrthographicCamera());
+  effectFocus = { x: deposit.position.x / POSITION_SCALE, z: deposit.position.z / POSITION_SCALE };
+  for (let elapsed = 0; elapsed < 1; elapsed += 1 / 60) miningSystem.update(1 / 60);
+  previewEffectTime = 1;
+}
+
 const orderMarkers: OrderMarker[] = [];
 if (previewScene === "units" && requestedEffect === "orders") {
   for (const [index, kind] of (["destination", "attack"] as const).entries()) {
@@ -248,12 +304,14 @@ if (previewScene === "units" && requestedEffect === "range-terrain") {
 
 const viewHeights = previewScene === "terrain"
   ? [300, 80, 24]
+  // The game camera shows 43 m at its default zoom and 14.4 m at its closest.
+  : previewScene === "mining" ? [43, 22, 14.4]
   : previewScene === "buildings"
     ? [76, 40, 32]
     : requestedEffect === "range-terrain" ? [70, 42, 20] : requestedEffect === "behemoth-barrage" ? [28, 14, 7] : [34, 17, 10];
 const cameraFocus = previewScene === "buildings"
   ? { x: focus.x - 13.5, z: focus.z - 5 }
-  : previewScene === "units"
+  : previewScene === "units" || previewScene === "mining"
     ? effectFocus ?? { x: focus.x, z: focus.z + 0.8 }
     : terrainFocus;
 sun.target.position.set(cameraFocus.x, 0, cameraFocus.z);
@@ -275,6 +333,7 @@ const cameras = viewHeights.map((viewHeight, index) => {
     360,
   );
   const elevation = requestedEffect === "orders-hill" || requestedEffect === "attack-target"
+    || previewScene === "mining"
     ? sampleHeight(map, target.x, target.z) + 1 : 0;
   camera.position.set(target.x + 46, 58 + elevation, target.z + 46);
   camera.lookAt(target.x, elevation, target.z);
@@ -293,6 +352,11 @@ const render = () => {
 };
 
 window.__previewStepEffect = (seconds: number) => {
+  if (miningSystem) {
+    for (; previewEffectTime < seconds; previewEffectTime += 1 / 60) miningSystem.update(1 / 60);
+    render();
+    return;
+  }
   if (orderMarkers.length && seconds > previewEffectTime) {
     for (const marker of orderMarkers) marker.animate(seconds - previewEffectTime);
     previewEffectTime = seconds;
@@ -316,12 +380,26 @@ window.__previewStepEffect = (seconds: number) => {
   render();
 };
 
+if (miningSystem) {
+  const system = miningSystem;
+  // Counts come from the default-zoom panel alone; the update time excludes drawing.
+  window.__previewMeasure = (frames) => {
+    const started = performance.now();
+    for (let index = 0; index < frames; index += 1) system.update(1 / 60);
+    const updateMs = (performance.now() - started) / frames;
+    renderer.setViewport(0, 0, Math.round(panelWidth), innerHeight);
+    renderer.setScissor(0, 0, Math.round(panelWidth), innerHeight);
+    renderer.render(scene, cameras[0]!);
+    return { updateMs, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
+  };
+}
+
 const labels = document.querySelector("#labels")!;
 viewHeights.forEach((height, index) => {
   const label = document.createElement("div");
   label.className = "preview-label";
   label.style.left = `${(index + 0.5) / 3 * 100}%`;
-  label.textContent = `${["Overview", "Gameplay", "Close"][index]} · ${height} m`;
+  label.textContent = `${(previewScene === "mining" ? ["Default zoom", "Mid zoom", "Closest zoom"] : ["Overview", "Gameplay", "Close"])[index]} · ${height} m`;
   labels.append(label);
   if (index) {
     const divider = document.createElement("div");

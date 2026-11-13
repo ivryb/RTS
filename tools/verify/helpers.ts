@@ -1,44 +1,16 @@
 import type { Page } from "@playwright/test";
+import type { UnitSystem } from "../../src/unitSystem";
 
-export interface UnitSnapshot {
-  id: string;
-  kind: string;
-  ownerId: string;
-  x: number;
-  z: number;
-  health: number;
-  maxHealth: number;
-  order: string;
-  moving: boolean;
-  attacking: boolean;
-}
-
-export interface BuildingSnapshot {
-  id: string;
-  kind: string;
-  ownerId: string;
-  lifecycle: string;
-  constructionProgress: number;
-  x: number;
-  z: number;
-  health: number;
-  maxHealth: number;
-  productionQueue?: { id: string; kind: string }[];
-}
-
-export interface MatchSnapshot {
-  tick: number;
-  outcome?: string;
-  units: UnitSnapshot[];
-  buildings: BuildingSnapshot[];
-  selected: { unitIds: string[]; buildingIds: string[] };
-}
+/** The match state the game's `?verify=1` hook reports: whatever `UnitSystem.inspect` returns. */
+export type MatchSnapshot = ReturnType<UnitSystem["inspect"]>;
+export type BuildingSnapshot = MatchSnapshot["buildings"][number];
 
 declare global {
   interface Window {
     __dune77?: {
       ready: () => Promise<void>;
       inspect: () => MatchSnapshot | null;
+      /** Centres the camera on a ground point; zoom 1 is the default view. Framing only, never an order. */
       view: (x: number, z: number, zoom?: number) => void;
       programs: () => string[];
       project: (x: number, z: number, y?: number) => {

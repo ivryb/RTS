@@ -2,6 +2,7 @@ import { AttackAreaMarker } from "./attackAreaMarker";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import * as THREE from "three";
 import { OrderMarker } from "./orderMarker";
+import { MiningLasers } from "./miningLaser";
 import { OrePresentation, ScoutHarvestPresentation, type OreModelLoader } from "./orePresentation";
 import { SCOUT_TITANIUM_CAPACITY, type TitaniumDepositState } from "./sim/harvesting";
 import {
@@ -203,7 +204,6 @@ interface UnitPresentation {
   healthBar: HealthBarPresentation;
   constructionBeam?: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   harvesting?: ScoutHarvestPresentation;
-  miningContact?: { depositId: string; x: number; z: number; point: THREE.Vector3 };
   state: "idle" | "move" | "attack" | "death";
   death?: {
     elapsed: number;
@@ -732,6 +732,7 @@ export class UnitSystem {
   private readonly session: MatchSession;
   private readonly ore: OrePresentation;
   private readonly oreReady: Promise<void>;
+  private readonly miningLasers: MiningLasers;
   private readonly currentDeposits = new Map<string, TitaniumDepositState>();
   private playerTitanium: Readonly<Record<string, number>> = {};
   private readonly buildingById = new Map<string, BuildingPresentation>();
@@ -827,6 +828,7 @@ export class UnitSystem {
     this.constructionSites = new ConstructionSites(world, loadScaffoldKit);
     for (const deposit of map.titaniumDeposits ?? []) this.currentDeposits.set(deposit.id, deposit);
     this.ore = new OrePresentation(world, map, [...this.currentDeposits.values()], loadOreModels);
+    this.miningLasers = new MiningLasers(world);
     this.oreReady = this.ore.ready.then(() => {
       if (this.disposed) return;
       this.selectables.push(...this.ore.selectables);
@@ -932,6 +934,7 @@ export class UnitSystem {
     this.muzzleFlashPool.push(flash);
     warmup.add(new THREE.Mesh(this.laserGeometry, this.laserMaterial), flash.sprite);
     warmup.add(this.behemothBarrage.prepareRendering());
+    this.miningLasers.prepareRendering();
     const presentation = this.presentations.values().next().value;
     if (presentation) {
       const healthBar = presentation.healthBar.root.clone(true);
@@ -1045,6 +1048,11 @@ export class UnitSystem {
   ) {
     const constructionBeam = createConstructionBeam();
     this.world.add(constructionBeam);
+    // The front face of the tool head, in the model's own space: its nose points along -x.
+    const nozzle = new THREE.Object3D();
+    nozzle.name = "ScoutLaserNozzle";
+    nozzle.position.set(-0.5, 0, 0);
+    visual.add(nozzle);
     this.attachUnit(id, root, options, {
       hover: {
         visual,
@@ -1057,7 +1065,7 @@ export class UnitSystem {
       },
       attack: "none",
       constructionBeam,
-      harvesting: new ScoutHarvestPresentation(root, this.world),
+      harvesting: new ScoutHarvestPresentation(root, nozzle, this.ore, this.miningLasers, id),
     });
   }
 
@@ -1622,7 +1630,16 @@ export class UnitSystem {
       titaniumDeposits: [...this.currentDeposits.values()].map(deposit => ({
         ...deposit, x: deposit.position.x / POSITION_SCALE, z: deposit.position.z / POSITION_SCALE,
       })),
-      units: [...this.current].map(([id, frame]) => ({ id, ...frame })),
+      units: [...this.current].map(([id, frame]) => {
+        const harvesting = this.presentations.get(id)?.harvesting;
+        return {
+          id,
+          ...frame,
+          miningLaser: harvesting?.firing
+            ? { from: harvesting.emitter.toArray(), to: harvesting.contact.toArray() }
+            : undefined,
+        };
+      }),
       buildings: [...this.currentBuildings.values()].map((building) => ({
         id: building.id,
         kind: building.kind,
@@ -1678,6 +1695,7 @@ export class UnitSystem {
     for (const [id, presentation] of this.buildingById) {
       this.updateConstruction(id, presentation, alpha, deltaSeconds);
     }
+    this.miningLasers.begin(deltaSeconds);
     for (const [id, presentation] of this.presentations) {
       if (!presentation.root.visible) continue;
       this.renderUnit(id, alpha, deltaSeconds);
@@ -1764,6 +1782,7 @@ export class UnitSystem {
     this.disposed = true;
     this.session.dispose?.();
     this.ore.dispose();
+    this.miningLasers.dispose();
     for (const presentation of this.presentations.values()) {
       presentation.mixer?.stopAllAction();
       presentation.harvesting?.dispose();
@@ -2593,15 +2612,6 @@ export class UnitSystem {
     }
     const { y, normal } = presentation.ground;
     presentation.root.position.set(x, y, z);
-    if (miningDeposit) {
-      const contact = presentation.miningContact;
-      if (!contact || contact.depositId !== miningDeposit.id || contact.x !== x || contact.z !== z) {
-        const point = this.ore.workface(miningDeposit.id, new THREE.Vector3(x, y + 0.95, z));
-        presentation.miningContact = point ? { depositId: miningDeposit.id, x, z, point } : undefined;
-      }
-    } else presentation.miningContact = undefined;
-    presentation.harvesting?.update(current.health > 0 ? current.cargoTitanium : 0, current.health > 0 && Boolean(miningDeposit),
-      x, y, z, presentation.miningContact?.point, deltaSeconds);
     const constructionSite = current.constructionTargetId
       ? this.currentBuildings.get(current.constructionTargetId)
       : undefined;
@@ -2681,6 +2691,12 @@ export class UnitSystem {
         deltaSeconds,
       );
     }
+    // The cargo bin shows only on the way home: beside the laser it reads as a stray box. The
+    // laser waits for the drone to face the rock, so it never leaves the nozzle sideways.
+    presentation.harvesting?.update(
+      current.health > 0 && !miningDeposit ? current.cargoTitanium : 0,
+      current.health > 0 && facingTarget ? miningDeposit?.id : undefined,
+    );
     if (presentation.tracks) {
       const tracks = presentation.tracks;
       if (current.moving && tracks.lastX !== undefined && tracks.lastZ !== undefined) {

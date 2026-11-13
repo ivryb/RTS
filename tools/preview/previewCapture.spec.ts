@@ -66,6 +66,17 @@ test("capture unit order feedback", async ({ page }) => {
   await page.screenshot({ path: `${outputDirectory}/unit-orders-settled.jpg`, type: 'jpeg', quality: 92 });
 });
 
+for (const [name, drones] of [["mining-laser", 3], ["mining-laser-crowd", 20]] as const) {
+  test(`capture ${name}`, async ({ page }) => {
+    await page.goto(`/tools/preview/?scene=mining&seed=77&drones=${drones}`);
+    await page.waitForFunction(() => window.__previewReady === true);
+    await page.screenshot({ path: `${outputDirectory}/${name}.jpg`, type: "jpeg", quality: 92 });
+    // The scene opens one second in; about half a sweep later the contact has moved along the rock.
+    await page.evaluate(() => window.__previewStepEffect?.(1.9));
+    await page.screenshot({ path: `${outputDirectory}/${name}-later.jpg`, type: "jpeg", quality: 92 });
+  });
+}
+
 for (const effect of ["orders-hill", "orders-mountain", "attack-target", "health-bars", "ground-target", "range-terrain"]) {
   test(`capture ${effect} feedback`, async ({ page }) => {
     await page.goto(`/tools/preview/?scene=units&seed=77&effect=${effect}`);
