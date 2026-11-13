@@ -3,6 +3,7 @@ import type { UnitSystem } from "../../src/unitSystem";
 
 /** The match state the game's `?verify=1` hook reports: whatever `UnitSystem.inspect` returns. */
 export type MatchSnapshot = ReturnType<UnitSystem["inspect"]>;
+export type BuildingSnapshot = MatchSnapshot["buildings"][number];
 
 declare global {
   interface Window {
