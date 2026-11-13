@@ -8,7 +8,7 @@ import type { UnitKind } from "../../src/sim/unitDefinitions";
 import { BehemothBarrage, BEHEMOTH_LAUNCH_OFFSETS } from "../../src/behemothBarrage";
 import { findSceneCenter } from "./demoModels";
 import { generateMap, sampleHeight } from "../../src/map";
-import { createUnitModelFactory, demoAssets, loadDemoAsset } from "../../src/modelAssets";
+import { createModelLibrary, demoAssets, loadDemoAsset } from "../../src/modelAssets";
 import { createTerrain } from "../../src/terrain";
 import { createEnvironmentProps } from "../../src/environmentProps";
 import type { MatchFrame, MatchSession } from "../../src/matchSession";
@@ -205,7 +205,7 @@ if (previewScene === "mining") {
   };
   const world = new THREE.Group();
   scene.add(world);
-  miningSystem = new UnitSystem(world, map, [], [], session, undefined, createUnitModelFactory());
+  miningSystem = new UnitSystem(world, map, [], [], session, undefined, createModelLibrary().unit);
   // Its warm-up draws the scene, which needs the shadow map this page otherwise renders only on request.
   renderer.shadowMap.needsUpdate = true;
   await miningSystem.prepareRendering(renderer, scene, new THREE.OrthographicCamera());
