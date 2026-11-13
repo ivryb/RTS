@@ -228,7 +228,15 @@ const miningScene = async (scoutCount = 1, facing = true) => {
   const system = new UnitSystem(
     world, { ...map, titaniumDeposits: [deposit] } as GeneratedMap, [], [], session, undefined, undefined, boxRock,
   );
-  for (const scout of scouts) system.attachScoutDrone(scout.id, new THREE.Group(), new THREE.Group(), options);
+  for (const scout of scouts) {
+    // As the real model hangs: 1 m up inside its root, its nose (-x) turned to the root's forward.
+    const root = new THREE.Group();
+    const visual = new THREE.Group();
+    visual.position.y = 1;
+    visual.rotation.y = Math.PI / 2;
+    root.add(visual);
+    system.attachScoutDrone(scout.id, root, visual, options);
+  }
   await new Promise(resolve => setTimeout(resolve));
   if (facing) system.update(0.1);
   let version = 1;
@@ -245,15 +253,16 @@ const miningScene = async (scoutCount = 1, facing = true) => {
   };
 };
 
-test("a Scout extracting Titanium fires a laser from its body onto the rock face", async () => {
+test("a Scout extracting Titanium fires a laser from its nozzle onto the rock face", async () => {
   const { system, world, laser, lasersDrawn } = await miningScene();
   system.update(0.1);
   const beam = laser();
   expect(lasersDrawn()).toBe(true);
   expect(beam).toBeDefined();
-  // It leaves the drone, which stands at x 4.5 and faces the rock, and ends on the face, not in or past it.
-  expect(beam!.from[0]).toBeGreaterThan(3.5);
-  expect(beam!.from[0]).toBeLessThan(4.5);
+  // It leaves the nozzle, half a metre ahead of the drone, which stands at x 4.5 and faces the
+  // rock. It ends on the face, not in or past it.
+  expect(beam!.from[0]).toBeCloseTo(4, 1);
+  expect(beam!.from[2]).toBeCloseTo(0, 1);
   expect(beam!.to[0]).toBeCloseTo(ROCK_FACE, 4);
   expect(beam!.to[2]).toBeCloseTo(0, 1);
   expect(world.getObjectByName("Scout mineral cutter")).toBeUndefined();
@@ -345,7 +354,8 @@ test("authoritative mining and hauling show different physical work states and d
   system.update(0.1);
   expect(system.selectedUnits()[0]?.harvest?.phase).toBe("extracting");
   expect(world.getObjectByName("Construction beam")?.visible).toBe(false);
-  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(true);
+  // The bin is for the way home: a drone at the rock shows its laser, not its load.
+  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(false);
   expect(system.selectedGroups()[0]?.cargoTitanium).toBe(2);
   scout.cargoTitanium = 20;
   scout.moving = true;
