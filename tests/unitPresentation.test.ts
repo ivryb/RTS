@@ -671,7 +671,10 @@ describe("unit presentation timing", () => {
 
     system.update(0.5);
     expect(world.getObjectByName("site model")).toBeUndefined();
-    expect(finishedDisposed).toBe(true);
+    // The model belongs to its factory and may be shared: it gets its own material back, untouched.
+    expect(model.material).toBe(finished);
+    expect(finished.opacity).toBe(1);
+    expect(finishedDisposed).toBe(false);
   });
 
   test("keeps placement active until a queued build is authoritatively accepted", () => {

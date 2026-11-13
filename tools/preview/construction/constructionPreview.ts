@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { ConstructionSites, type ConstructionSite, type SiteState } from "../../../src/constructionSites";
 import { createEnvironmentProps } from "../../../src/environmentProps";
 import { generateMap, sampleHeight } from "../../../src/map";
-import { demoAssets, loadBuildingModel, loadDemoAsset } from "../../../src/modelAssets";
+import { createModelLibrary, demoAssets, loadDemoAsset } from "../../../src/modelAssets";
 import { BUILDING_DEFINITIONS } from "../../../src/sim/construction";
 import type { BuildingKind } from "../../../src/sim/units";
 import { createTerrain } from "../../../src/terrain";
@@ -206,11 +206,16 @@ scene.add(sun, sun.target);
 const construction = new ConstructionSites(scene);
 await construction.load();
 
-const scoutDrone = demoAssets.find((asset) => asset.unitKind === "scout-drone")!;
+// As in the game, every building of a kind is a clone of one loaded model.
+const models = createModelLibrary();
+const scoutDrone = await loadDemoAsset(demoAssets.find((asset) => asset.unitKind === "scout-drone")!);
+scoutDrone.model.traverse((object) => {
+  if (object instanceof THREE.Mesh) object.castShadow = true;
+});
 const groundAt = (x: number, z: number) => sampleHeight(map, x, z);
 
 const createSite = async (kind: BuildingKind, x: number, z: number, rotation: number): Promise<Site> => {
-  const root = await loadBuildingModel(kind);
+  const root = await models.building(kind);
   const visualRoot = new THREE.Group();
   visualRoot.name = "Building visual";
   for (const child of [...root.children]) visualRoot.add(child);
@@ -225,10 +230,7 @@ const createSite = async (kind: BuildingKind, x: number, z: number, rotation: nu
   const reach = BUILDING_DEFINITIONS[kind].radius + 1.4;
   const droneX = x + reach * 0.5;
   const droneZ = z + reach * 0.87;
-  const { instance: drone, model: droneModel } = await loadDemoAsset(scoutDrone);
-  droneModel.traverse((object) => {
-    if (object instanceof THREE.Mesh) object.castShadow = true;
-  });
+  const drone = scoutDrone.instance.clone(true);
   drone.position.set(droneX, groundAt(droneX, droneZ), droneZ);
   drone.rotation.y = Math.atan2(x - droneX, z - droneZ);
   scene.add(drone);
@@ -496,7 +498,7 @@ if (shot in stripShots) {
     const x = target.x - 32 + column * 16;
     const z = target.z + (index < 5 ? -9 : 9);
     if (!(kind in measureMs)) {
-      const model = await loadBuildingModel(kind);
+      const model = await models.building(kind);
       model.updateWorldMatrix(true, true);
       const started = performance.now();
       new ConstructionSites(new THREE.Group()).measure(kind, model, model);
