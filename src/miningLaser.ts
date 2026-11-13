@@ -127,7 +127,8 @@ const fragmentShader = /* glsl */ `
   varying float vSeed;
   varying float vLife;
   varying float vAlong;
-  const vec3 BEAM = vec3(1.0, 0.035, 0.02);
+
+  const vec3 BEAM = vec3(1.0, 0.07, 0.03);
   // Hot pink-white, not white: at the farthest zoom the core is all that is left of the beam, and
   // white there is the colour of selection rings and health bars.
   const vec3 BEAM_CORE = vec3(1.0, 0.74, 0.62);
@@ -144,19 +145,20 @@ const fragmentShader = /* glsl */ `
       light = mix(EMBER, MOLTEN, heat) * across * across * heat * heat * heat * 1.0;
     } else if (vPart < 1.5) {
       // A steady cutting beam: thin, straight and hot. Its light buzzes and twinkles in place.
-      // Anything that travels along it reads as the drone sending something into the rock.
+      // Anything that travels along it reads as the drone sending something into the rock, and
+      // a wider, brighter, more solid red reads as a weapon.
       float offAxis = vCorner.x * BEAM_HALF_WIDTH;
       float buzz = 0.84 + 0.16 * sin(time * 61.0 + vSeed * 30.0) * sin(time * 43.0 + vSeed * 11.0);
       float twinkle = sin(vAlong * 23.0 + vSeed * 40.0) * cos(time * 47.0 + vSeed * 13.0)
         + sin(vAlong * 41.0 + vSeed * 7.0) * cos(time * 71.0 + vSeed * 29.0);
-      float coreWidth = 0.013 * buzz;
+      float coreWidth = 0.01 * buzz;
       float core = exp(-offAxis * offAxis / (coreWidth * coreWidth)) * (0.9 + 0.05 * twinkle);
-      float halo = exp(-offAxis * offAxis / (0.036 * 0.036)) * (0.8 + 0.1 * twinkle) * buzz;
+      float halo = exp(-offAxis * offAxis / (0.026 * 0.026)) * (0.8 + 0.1 * twinkle) * buzz;
       // The wide glow is only added, so it shows over dark rock and fades out over bright sand.
       float glow = exp(-offAxis * offAxis / (0.075 * 0.075)) * buzz;
-      light = BEAM_CORE * core * 1.2 + BEAM * (halo * 0.9 + glow * 0.28);
+      light = BEAM_CORE * core * 0.95 + BEAM * (halo * 0.7 + glow * 0.16);
       // The halo covers the sand under it: red light merely added to orange sand washes out.
-      cover = max(core * 0.6, halo * 0.8);
+      cover = max(core * 0.5, halo * 0.55);
     } else if (vPart < 2.5) {
       light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.22;
     } else if (vPart < 4.5) {
@@ -165,8 +167,8 @@ const fragmentShader = /* glsl */ `
       float center = 1.0 - smoothstep(0.08, 0.3, radius);
       light = vPart < 3.5
         ? MOLTEN * glow * 0.75 + WHITE_HOT * center * 0.8
-        : BEAM * glow + BEAM_CORE * center * 0.9;
-      cover = vPart < 3.5 ? center * 0.6 : max(center * 0.8, glow * 0.5);
+        : BEAM * glow * 0.6 + BEAM_CORE * center * 0.55;
+      cover = vPart < 3.5 ? center * 0.6 : max(center * 0.5, glow * 0.3);
     } else {
       float across = 1.0 - abs(vCorner.x);
       float body = across * across * (1.0 - abs(vCorner.y));

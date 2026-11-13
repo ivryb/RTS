@@ -385,9 +385,6 @@ export class OrePresentation {
 }
 
 const SWEEP_SECONDS = 1.9;
-/** Where the beam leaves a Scout Drone: the tip of its nose, ahead of and above its ground position. */
-const EMITTER_FORWARD = 0.5;
-const EMITTER_HEIGHT = 0.97;
 
 /** A stable random number from 0 to 1 per unit. */
 const unitSeed = (id: string) => {
@@ -413,8 +410,10 @@ export class ScoutHarvestPresentation {
   private readonly sweepSeconds: number;
   private readonly wander: number;
 
+  /** `nozzle` sits on the drone's model where the beam leaves it. */
   constructor(
-    private readonly root: THREE.Group,
+    root: THREE.Group,
+    private readonly nozzle: THREE.Object3D,
     private readonly ore: OrePresentation,
     private readonly lasers: MiningLasers,
     unitId: string,
@@ -439,15 +438,15 @@ export class ScoutHarvestPresentation {
 
   /**
    * Shows `amount` of carried ore, and fires the laser at `depositId` for this frame when one is
-   * given. `lift` is how far the drone's body floats above its rest height just now.
+   * given. Call it after the drone's model has been posed for the frame.
    */
-  update(amount: number, depositId: string | undefined, lift: number) {
+  update(amount: number, depositId: string | undefined) {
     this.cargo.visible = amount > 0;
     this.firing = false;
     if (depositId === undefined) return;
-    const facing = this.root.rotation.y;
-    this.emitter.set(Math.sin(facing) * EMITTER_FORWARD, EMITTER_HEIGHT + lift, Math.cos(facing) * EMITTER_FORWARD)
-      .add(this.root.position);
+    // Read from the model, not worked out from the drone's position: the nozzle bobs and sways
+    // with the hovering body, and a beam that starts beside it looks detached.
+    this.nozzle.getWorldPosition(this.emitter);
     if (!this.ore.traceWorkface(depositId, this.emitter, this.face)) return;
     this.lasers.fire(
       this.emitter,
