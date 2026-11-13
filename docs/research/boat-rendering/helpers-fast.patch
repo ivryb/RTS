@@ -1,0 +1,42 @@
+diff --git a/tools/verify/helpers.ts b/tools/verify/helpers.ts
+index d598c8b..ff6a20a 100644
+--- a/tools/verify/helpers.ts
++++ b/tools/verify/helpers.ts
+@@ -52,12 +52,37 @@ declare global {
+  * Waits until simulation frames arrive AND model GLBs finish loading,
+  * otherwise raycast picking silently misses buildings that have no presentation yet. */
+ export async function openGame(page: Page, seed = 77) {
++  // D77-11 experiment only: RENDER_TWEAKS=fast renders without shadows, rocks, vegetation or MSAA.
++  const fast = process.env.RENDER_TWEAKS === "fast";
++  if (fast) await page.addInitScript(() => {
++    const hook = new EventTarget();
++    (window as any).__THREE_DEVTOOLS__ = hook;
++    hook.addEventListener("observe", ({ detail }: any) => { if (detail?.shadowMap && !(window as any).__benchRenderer) (window as any).__benchRenderer = detail; });
++    const getContext = HTMLCanvasElement.prototype.getContext as any;
++    (HTMLCanvasElement.prototype as any).getContext = function (type: string, options?: object) {
++      return getContext.call(this, type, this.id === "game" ? { ...options, antialias: false } : options);
++    };
++  });
+   await page.goto(`./?seed=${seed}&verify=1`);
+   await page.waitForFunction(() =>
+     Boolean(window.__dune77?.inspect()?.units.length),
+   );
+   await page.waitForLoadState("networkidle");
+   await page.evaluate(() => window.__dune77!.ready());
++  if (fast) await page.evaluate(() => {
++    const renderer = (window as any).__benchRenderer;
++    renderer.shadowMap.enabled = false;
++    const render = renderer.render.bind(renderer);
++    renderer.render = (scene: any, camera: any) => {
++      if (!scene.parent && !scene.userData.benchFast) {
++        scene.userData.benchFast = true;
++        const env = scene.getObjectByName("Terrain environment");
++        if (env) env.visible = false;
++        scene.traverse((o: any) => { for (const m of [o.material].flat()) if (m) m.needsUpdate = true; });
++      }
++      render(scene, camera);
++    };
++  });
+ }
+ 
+ export const snapshot = (page: Page) =>
