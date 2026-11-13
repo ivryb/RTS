@@ -1048,6 +1048,11 @@ export class UnitSystem {
   ) {
     const constructionBeam = createConstructionBeam();
     this.world.add(constructionBeam);
+    // The front face of the tool head, in the model's own space: its nose points along -x.
+    const nozzle = new THREE.Object3D();
+    nozzle.name = "ScoutLaserNozzle";
+    nozzle.position.set(-0.5, 0, 0);
+    visual.add(nozzle);
     this.attachUnit(id, root, options, {
       hover: {
         visual,
@@ -1060,7 +1065,7 @@ export class UnitSystem {
       },
       attack: "none",
       constructionBeam,
-      harvesting: new ScoutHarvestPresentation(root, this.ore, this.miningLasers, id),
+      harvesting: new ScoutHarvestPresentation(root, nozzle, this.ore, this.miningLasers, id),
     });
   }
 
@@ -2607,12 +2612,6 @@ export class UnitSystem {
     }
     const { y, normal } = presentation.ground;
     presentation.root.position.set(x, y, z);
-    // The laser waits for the drone to face the rock, so it never leaves the nose sideways.
-    presentation.harvesting?.update(
-      current.health > 0 ? current.cargoTitanium : 0,
-      current.health > 0 && facingTarget ? miningDeposit?.id : undefined,
-      presentation.hover ? presentation.hover.visual.position.y - presentation.hover.baseY : 0,
-    );
     const constructionSite = current.constructionTargetId
       ? this.currentBuildings.get(current.constructionTargetId)
       : undefined;
@@ -2692,6 +2691,12 @@ export class UnitSystem {
         deltaSeconds,
       );
     }
+    // The cargo bin shows only on the way home: beside the laser it reads as a stray box. The
+    // laser waits for the drone to face the rock, so it never leaves the nozzle sideways.
+    presentation.harvesting?.update(
+      current.health > 0 && !miningDeposit ? current.cargoTitanium : 0,
+      current.health > 0 && facingTarget ? miningDeposit?.id : undefined,
+    );
     if (presentation.tracks) {
       const tracks = presentation.tracks;
       if (current.moving && tracks.lastX !== undefined && tracks.lastZ !== undefined) {
