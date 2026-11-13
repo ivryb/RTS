@@ -37,7 +37,6 @@ const vertexShader = /* glsl */ `
   varying float vSeed;
   varying float vLife;
   varying float vAlong;
-  varying float vReach;
 
   // The ribbon is never narrower than this share of the view's half height (about 2 pixels), or
   // from far away the beam thins to a wire.
@@ -70,7 +69,6 @@ const vertexShader = /* glsl */ `
     vec3 point;
     vLife = 0.0;
     vAlong = 0.0;
-    vReach = 0.0;
     if (part < 1.5) {
       // Ribbons turned to the camera: the beam, and the cut still glowing behind the contact.
       bool trail = part < 0.5;
@@ -83,8 +81,7 @@ const vertexShader = /* glsl */ `
       float leastWidth = (isOrthographic ? 1.0 : -center.z) / projectionMatrix[1][1] * BEAM_LEAST_SCREEN;
       point = center + side * corner.x * (trail ? TRAIL_HALF_WIDTH : max(BEAM_HALF_WIDTH, leastWidth));
       if (trail) point = towardCamera(point, SURFACE_LIFT);
-      vReach = corner.y * 0.5 + 0.5;
-      vAlong = vReach * length(along);
+      vAlong = (corner.y * 0.5 + 0.5) * length(along);
     } else if (part < 4.5) {
       float flicker = 0.86 + 0.14 * sin(time * 47.0 + seed * 40.0) * sin(time * 31.0 + seed * 17.0);
       // A short beam gets a smaller glow, or a drone close to its rock wears the glow on its nose.
@@ -130,12 +127,10 @@ const fragmentShader = /* glsl */ `
   varying float vSeed;
   varying float vLife;
   varying float vAlong;
-  varying float vReach;
-
-  const vec3 BEAM = vec3(0.04, 0.55, 1.0);
-  // Pale blue, not white: at the farthest zoom the core is all that is left of the beam, and white
-  // there is the colour of selection rings and health bars.
-  const vec3 BEAM_CORE = vec3(0.5, 0.93, 1.0);
+  const vec3 BEAM = vec3(1.0, 0.035, 0.02);
+  // Hot pink-white, not white: at the farthest zoom the core is all that is left of the beam, and
+  // white there is the colour of selection rings and health bars.
+  const vec3 BEAM_CORE = vec3(1.0, 0.74, 0.62);
   const vec3 MOLTEN = vec3(1.0, 0.36, 0.05);
   const vec3 WHITE_HOT = vec3(1.0, 0.93, 0.74);
   const vec3 EMBER = vec3(0.9, 0.12, 0.02);
@@ -148,23 +143,20 @@ const fragmentShader = /* glsl */ `
       float heat = vCorner.y * 0.5 + 0.5;
       light = mix(EMBER, MOLTEN, heat) * across * across * heat * heat * heat * 1.0;
     } else if (vPart < 1.5) {
-      // A beam that is even along its length and steady in time reads as a solid stick. This one
-      // is a thin core that shimmers off its axis, with bright packets running to the rock.
-      float ends = sin(vReach * 3.14159);
-      float sway = (sin(vAlong * 9.0 + time * 38.0 + vSeed * 31.0) * 0.6
-        + sin(vAlong * 21.0 - time * 59.0 + vSeed * 17.0) * 0.4) * 0.011 * ends;
-      float offAxis = vCorner.x * BEAM_HALF_WIDTH - sway;
-      float packet = 0.5 + 0.5 * sin(vAlong * 8.0 - time * 44.0 + vSeed * 20.0);
-      packet = packet * packet * packet;
-      float ripple = 0.5 + 0.5 * sin(vAlong * 19.0 - time * 77.0 + vSeed * 9.0);
-      float energy = 0.3 + 0.55 * packet + 0.15 * ripple;
-      float flicker = 0.82 + 0.18 * sin(time * 61.0 + vSeed * 30.0) * sin(time * 43.0 + vSeed * 11.0);
-      float coreWidth = 0.014 * (0.75 + 0.5 * packet);
-      float core = exp(-offAxis * offAxis / (coreWidth * coreWidth)) * energy;
-      float halo = exp(-offAxis * offAxis / (0.055 * 0.055)) * (0.22 + 0.38 * packet);
-      light = (BEAM_CORE * core * 1.15 + BEAM * halo) * flicker;
-      // The halo part covers the sand: blue light merely added to orange sand turns grey.
-      cover = max(core * 0.6, halo * 0.45);
+      // A steady cutting beam: thin, straight and hot. Its light buzzes and twinkles in place.
+      // Anything that travels along it reads as the drone sending something into the rock.
+      float offAxis = vCorner.x * BEAM_HALF_WIDTH;
+      float buzz = 0.84 + 0.16 * sin(time * 61.0 + vSeed * 30.0) * sin(time * 43.0 + vSeed * 11.0);
+      float twinkle = sin(vAlong * 23.0 + vSeed * 40.0) * cos(time * 47.0 + vSeed * 13.0)
+        + sin(vAlong * 41.0 + vSeed * 7.0) * cos(time * 71.0 + vSeed * 29.0);
+      float coreWidth = 0.013 * buzz;
+      float core = exp(-offAxis * offAxis / (coreWidth * coreWidth)) * (0.9 + 0.05 * twinkle);
+      float halo = exp(-offAxis * offAxis / (0.036 * 0.036)) * (0.8 + 0.1 * twinkle) * buzz;
+      // The wide glow is only added, so it shows over dark rock and fades out over bright sand.
+      float glow = exp(-offAxis * offAxis / (0.075 * 0.075)) * buzz;
+      light = BEAM_CORE * core * 1.2 + BEAM * (halo * 0.9 + glow * 0.28);
+      // The halo covers the sand under it: red light merely added to orange sand washes out.
+      cover = max(core * 0.6, halo * 0.8);
     } else if (vPart < 2.5) {
       light = MOLTEN * pow(max(0.0, 1.0 - length(vCorner)), 2.0) * 0.22;
     } else if (vPart < 4.5) {
