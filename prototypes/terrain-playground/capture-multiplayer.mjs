@@ -175,7 +175,8 @@ try {
   const response = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
   check(response.ok, `Existing Vite server returned HTTP ${response.status}`);
   const { chromium } = await import('@playwright/test');
-  browser = await chromium.launch({ headless: true, args: ['--use-angle=metal'] });
+  const { chromiumArgs } = await import('../../tools/chromium.ts');
+  browser = await chromium.launch({ headless: true, args: chromiumArgs });
   manifest.browser = { name: 'chromium', version: browser.version(), platform: process.platform };
   const page = await browser.newPage({ viewport, deviceScaleFactor });
   page.on('request', request => {
