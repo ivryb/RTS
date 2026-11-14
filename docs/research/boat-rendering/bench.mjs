@@ -1,5 +1,5 @@
 // Frame-time benchmark for the live game on Boat. Usage (dev server on :5173):
-//   LABEL=base ARGS='["--use-angle=gl","--ignore-gpu-blocklist"]' VIEW=1280x720 SECONDS=15 TWEAKS=noshadow,pr0.5 node docs/research/boat-rendering/bench.mjs
+//   LABEL=base QUERY="seed=77&verify=1" ARGS='["--use-angle=gl","--ignore-gpu-blocklist"]' VIEW=1280x720 SECONDS=15 TWEAKS=noshadow,pr0.5 node docs/research/boat-rendering/bench.mjs
 // Reports frame intervals, main-thread time per frame (whole rAF callback and renderer.render alone),
 // and CPU seconds per Chromium thread over the recorded window, read from /proc.
 import { chromium } from "@playwright/test";
@@ -76,7 +76,7 @@ try {
   }, { tweaks });
 
   const started = Date.now();
-  await page.goto(`${process.env.VERIFY_BASE_URL ?? "http://localhost:5173"}/?seed=77&verify=1`);
+  await page.goto(`${process.env.VERIFY_BASE_URL ?? "http://localhost:5173"}/?${process.env.QUERY ?? "seed=77&verify=1"}`);
   await page.waitForLoadState("networkidle");
   const networkIdleMs = Date.now() - started;
   await page.waitForFunction(() => window.__dune77?.inspect()?.tick > 5, undefined, { timeout: 240_000 });

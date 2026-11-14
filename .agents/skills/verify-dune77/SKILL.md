@@ -95,30 +95,23 @@ stop, `R` restart match, wheel zoom, middle-drag pan, WASD/arrow pan.
 
 ## Render modes
 
-Boat has no GPU, so Chromium draws the game in software through Mesa's
-llvmpipe. Every launch takes its Chromium args from `tools/chromium.ts`;
-without them Chromium falls back to SwiftShader, ten times slower.
+Boat has no GPU, so Chromium draws the game in software (AGENTS.md, Visual
+testing). Each spec picks one of two modes through `openGame`.
 
 - **Light** (`openGame`'s default, URL `&render=light`): no shadows, rocks,
-  vegetation or antialiasing. About 14 frames per second at 1280 × 720 instead
-  of 2 to 3. The match bar shows a "Light render" tag, so every full-page
-  screenshot says which mode took it. The game honours the flag only together
-  with `verify=1`, so players never get it.
+  vegetation or antialiasing. About 13 frames per second at 1280 × 720 instead
+  of 2 to 3. A "Light render" tag under the match bar shows the mode in every
+  full-page screenshot. The game honours the flag only together with
+  `verify=1`, so players never get it.
 - **Full** (`openGame(page, seed, { render: "full" })`): what players see, at
   2 to 3 frames per second on Boat.
 
 A spec passes `{ render: "full" }` when an assertion or a capture depends on
-what light mode removes: a capture someone judges by eye, a shadow shader, or
-anything about rocks and vegetation. Picking is not such a dependency: clicks
-hit unit cylinders, building models and the terrain, which light mode keeps.
-
-| Spec | Mode | Why |
-| --- | --- | --- |
-| `select-and-move` | light | state and HUD only |
-| `train-scout-drone` | light | state and HUD only |
-| `tactical-hud` | light | HUD layout, minimap and selection |
-| `building-models` | full | its captures prove buildings look the same |
-| `construction` | full | its frames are judged by eye, and it expects the cut's shadow shader at startup |
+how the 3D world looks: shadows, shadow shaders, rocks, vegetation or edge
+smoothing, as in `building-models` and `construction`. The DOM HUD, the
+minimap, units and buildings are the same in both modes, and picking is too:
+clicks hit unit cylinders, building models and the terrain, which light mode
+keeps.
 
 Look-only checks belong in the preview captures, which always render at full
 quality and never read the flag.
@@ -163,9 +156,9 @@ never delete it during teardown). Standards:
 
 ## Gotchas
 
-- The verify config allows 5 minutes per spec, for full-render specs at 2 to 3
-  frames per second. Give `page.screenshot` a longer timeout than Playwright's
-  30 s default in those.
+- Full-render specs are slow on Boat (see "Render modes"), so the verify
+  config allows 5 minutes per spec. Give `page.screenshot` a longer timeout
+  than Playwright's 30 s default in those.
 - Clicking before models load selects nothing and reports no error — always go
   through `openGame` (waits `networkidle`).
 - A drag box in world coordinates selects nothing (screen axes are world

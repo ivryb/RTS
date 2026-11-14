@@ -25,7 +25,7 @@ bun run preview:capture:mountains --view '{"position":[-160,49,96],"target":[-13
 bun run preview:capture:mountains --baseline art/workbench/renders/terrain-playground/runs/<run>/manifest.json
 ```
 
-`--view` also accepts a camera JSON file. Use the reported defect's seed, player count and view; the default cameras are sample coverage, not a reproduction of every report. `--baseline` reuses the saved cameras, quality and viewport and rejects conflicting settings. It captures the current source with those settings; it does not restore the earlier implementation. Old/New share initial lighting and exact camera coordinates.
+`--view` also accepts a camera JSON file. Use the reported defect's seed, player count and view; the default cameras are sample coverage, not a reproduction of every report. `--baseline` reuses the saved cameras, quality and viewport and rejects conflicting settings. It captures the current source with those settings; it does not restore the earlier implementation. Old/New share initial lighting and exact camera coordinates. Boat captures before 2026-11-14 rendered through SwiftShader and later ones through llvmpipe, so a replay across that date differs by a few levels per pixel in grain alone.
 
 Each manifest records capture hashes, source snapshots, asset hashes, browser/renderer diagnostics and an **unreviewed** verdict. Source snapshots preserve local edits, but binary hashes alone cannot recreate overwritten assets. Preserve the exact used binaries when promoting a user-approved checkpoint. Keep approved evidence separate from experimental runs; retain useful comparison evidence and remove disposable captures after validation.
 

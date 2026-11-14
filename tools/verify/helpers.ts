@@ -54,9 +54,8 @@ declare global {
 /** Opens a deterministic match with the read-only verify hook enabled.
  * Waits until simulation frames arrive AND model GLBs finish loading,
  * otherwise raycast picking silently misses buildings that have no presentation yet.
- * `light` draws no shadows, rocks, vegetation or antialiasing, about six times faster on Boat,
- * and tags the match bar "Light render". A spec whose assertions or captures depend on what
- * players see passes `{ render: "full" }`. */
+ * `light` draws no shadows, rocks, vegetation or antialiasing and shows a "Light render" tag
+ * under the match bar; the verify-dune77 skill says when a spec needs `{ render: "full" }`. */
 export async function openGame(page: Page, seed = 77, { render = "light" }: { render?: "light" | "full" } = {}) {
   await page.goto(`./?seed=${seed}&verify=1${render === "light" ? "&render=light" : ""}`);
   await page.waitForFunction(() =>

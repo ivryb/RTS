@@ -4,7 +4,7 @@ import { chromiumArgs } from "../chromium.ts";
 export default defineConfig({
   testDir: ".",
   testMatch: "specs/*.spec.ts",
-  // Boat has no GPU: Mesa's llvmpipe draws the full render at 2 to 3 frames per second, light at about 14.
+  // Full-render specs are slow on Boat; see the verify-dune77 skill's render modes.
   timeout: process.platform === "darwin" ? 60_000 : 300_000,
   workers: 1,
   use: {
