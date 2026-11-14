@@ -54,9 +54,10 @@ Write one-off feature drives as a new spec file there (they double as
 regression proofs and are cheap to keep). The helpers encode everything that
 broke the first time — use them instead of raw Playwright calls:
 
-- `openGame(page, seed?)` — opens `/?seed=N&verify=1`, waits for sim frames
-  **and** model GLB fetches (`networkidle`). Skipping the model wait makes
-  raycast picking silently miss buildings.
+- `openGame(page, seed?, { render? })` — opens `/?seed=N&verify=1`, waits for
+  sim frames **and** model GLB fetches (`networkidle`). Skipping the model wait
+  makes raycast picking silently miss buildings. It opens the light render mode
+  unless the spec passes `{ render: "full" }`; see "Render modes" below.
 - `snapshot(page)` / `waitForSnapshot(page, predicate, timeout?)` — read-only
   match state from the `?verify=1` hook: `tick`, `outcome`, `units[]`
   (`id, kind, ownerId, x, z, health, order, moving, attacking`),
@@ -91,6 +92,29 @@ assertions go through `inspect()`.
 
 Keyboard shortcuts on `page.keyboard`: `A` attack, `B` build, `M` move, `S`
 stop, `R` restart match, wheel zoom, middle-drag pan, WASD/arrow pan.
+
+## Render modes
+
+Boat has no GPU, so Chromium draws the game in software (AGENTS.md, Visual
+testing). Each spec picks one of two modes through `openGame`.
+
+- **Light** (`openGame`'s default, URL `&render=light`): no shadows, rocks,
+  vegetation or antialiasing. About 13 frames per second at 1280 × 720 instead
+  of 2 to 3. A "Light render" tag under the match bar shows the mode in every
+  full-page screenshot. The game honours the flag only together with
+  `verify=1`, so players never get it.
+- **Full** (`openGame(page, seed, { render: "full" })`): what players see, at
+  2 to 3 frames per second on Boat.
+
+A spec passes `{ render: "full" }` when an assertion or a capture depends on
+how the 3D world looks: shadows, shadow shaders, rocks, vegetation or edge
+smoothing, as in `building-models` and `construction`. The DOM HUD, the
+minimap, units and buildings are the same in both modes, and picking is too:
+clicks hit unit cylinders, building models and the terrain, which light mode
+keeps.
+
+Look-only checks belong in the preview captures, which always render at full
+quality and never read the flag.
 
 ## Evidence
 
@@ -132,9 +156,9 @@ never delete it during teardown). Standards:
 
 ## Gotchas
 
-- Boat has no GPU. The verify config renders through Mesa's llvmpipe at 2–3
-  frames per second and allows 5 minutes per spec. Give `page.screenshot` a
-  longer timeout than Playwright's 30 s default.
+- Full-render specs are slow on Boat (see "Render modes"), so the verify
+  config allows 5 minutes per spec. Give `page.screenshot` a longer timeout
+  than Playwright's 30 s default in those.
 - Clicking before models load selects nothing and reports no error — always go
   through `openGame` (waits `networkidle`).
 - A drag box in world coordinates selects nothing (screen axes are world

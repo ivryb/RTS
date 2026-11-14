@@ -10,8 +10,8 @@ PROFILE_CPU=1 node tools/verify/profile-combat.mjs combat-cpu
 The script opens a fresh headless Chromium, selects the three starting Ghostrunners
 in seed 77 through mouse input, and sends them into the enemy defenses. It records
 an idle interval plus ten seconds of approach/combat, verifies that damage occurred,
-and closes its browser. On macOS it selects Metal instead of the headless shell's
-software renderer. `VERIFY_BASE_URL` can select another existing server.
+and closes its browser. It launches Chromium with the shared args in `tools/chromium.ts`
+and always renders at full quality. `VERIFY_BASE_URL` can select another existing server.
 
 Reports, screenshots, and optional DevTools CPU profiles are written under
 `art/workbench/performance/`. The JSON summary includes the GPU, frame intervals,

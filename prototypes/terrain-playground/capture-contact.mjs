@@ -1,6 +1,7 @@
 // Legacy Old-terrain diagnostic. Use capture-multiplayer.mjs for recorded visual comparisons.
 import {chromium} from '@playwright/test';
-const browser=await chromium.launch({headless:true,args:['--use-angle=metal']});
+import {chromiumArgs} from '../../tools/chromium.ts';
+const browser=await chromium.launch({headless:true,args:chromiumArgs});
 try{
  const page=await browser.newPage({viewport:{width:1600,height:1100}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});

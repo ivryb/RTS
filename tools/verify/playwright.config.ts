@@ -1,14 +1,14 @@
 import { defineConfig } from "@playwright/test";
+import { chromiumArgs } from "../chromium.ts";
 
 export default defineConfig({
   testDir: ".",
   testMatch: "specs/*.spec.ts",
-  // Boat has no GPU: Mesa's llvmpipe draws the full game at 2-3 frames per second.
+  // Full-render specs are slow on Boat; see the verify-dune77 skill's render modes.
   timeout: process.platform === "darwin" ? 60_000 : 300_000,
   workers: 1,
   use: {
-    // Avoid software WebGL stalls on macOS during input and screenshot checks.
-    launchOptions: { args: process.platform === "darwin" ? ["--use-angle=metal"] : ["--use-angle=gl", "--ignore-gpu-blocklist"] },
+    launchOptions: { args: chromiumArgs },
     baseURL: process.env.VERIFY_BASE_URL ?? "http://localhost:5173",
   },
 });

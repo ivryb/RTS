@@ -1,4 +1,5 @@
 import { chromium } from "@playwright/test";
+import { chromiumArgs } from "../chromium.ts";
 import { mkdir, writeFile } from "node:fs/promises";
 
 // Reuses the dev server. Each run gets a fresh browser and exercises real input.
@@ -7,8 +8,7 @@ const label = process.argv[2] ?? "combat";
 await mkdir(outputDirectory, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
-  // The headless shell otherwise uses CPU rendering on this Mac.
-  args: process.platform === "darwin" ? ["--use-angle=metal"] : [],
+  args: chromiumArgs,
 });
 
 try {
