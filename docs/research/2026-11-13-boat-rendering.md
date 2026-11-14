@@ -101,3 +101,22 @@ What these numbers don't cover: no GPU machine was tried, because that costs mon
 1. Build options A and B together, as one small change: Chromium args in the capture configs and scripts, and a verify-only light render flag that specs opt into. Recommended: yes.
 2. Rent a GPU machine (option F). Recommended: not now; revisit when a thread needs smooth films or real performance numbers more than occasionally.
 3. Whether vegetation should keep casting shadows, or get simpler geometry (option C), is an art and player-performance question. I recommend leaving it out of this task.
+
+## Approved design (2026-11-14)
+
+Ivan approved A and B, and C for behavioral specs only. The build does three things:
+
+1. **Captures use llvmpipe.** Every Chromium launch for captures on Linux passes `--use-angle=gl --ignore-gpu-blocklist`, from one shared constant. That covers the preview config, the UI review config, `profile-combat.mjs`, `capture-ore.mjs`, `doctor.mjs`, and the terrain-hub scripts. Those scripts now pass `--use-angle=metal` on Linux too, where it falls back to SwiftShader. Captures keep full quality.
+2. **A light render mode for behavioral specs.** A render flag that works only with `?verify=1` turns off shadows, rocks and vegetation, and antialiasing. That includes option C, since hidden vegetation casts no shadows. `openGame` turns it on by default. A spec that checks what players see opts out, and today that's `building-models.spec.ts`. Captures and the preview scenes never use it.
+3. **Docs follow.** The verify-dune77 skill, `tools/verify/playwright.config.ts`, `scripts/box-setup.sh`, and AGENTS.md's visual-testing section stop saying the game renders at 2 to 3 frames per second. They state which runs are light and which are full quality.
+
+Option F, the GPU machine, is not part of this build. Ivan didn't answer that question, so the recommendation stands: not now.
+
+The build is done when these checks pass:
+
+- The preview captures report llvmpipe as their renderer, and the suite runs in about 40 s instead of about 95 s.
+- In light mode the live game runs at about 14 frames per second at 1280 × 720, and the six verify specs take about 120 s instead of about 157 s.
+- `building-models.spec.ts` still renders shadows and vegetation.
+- Without `?verify=1` the game is unchanged.
+
+Nothing a player sees changes.
