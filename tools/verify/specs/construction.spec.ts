@@ -118,7 +118,7 @@ const followToCompletion = async (page: Page, site: BuildingSnapshot, name: stri
 const build = async (page: Page, kind: Kind) => {
   mkdirSync(evidenceDir, { recursive: true });
   const frames: Frame[] = [];
-  await openGame(page, 77);
+  await openGame(page, 77, { render: "full" });
   // Every construction material is named "Construction ...", and a program carries that name.
   const constructionPrograms = async () => (await page.evaluate(() => window.__dune77!.programs()))
     .filter((program) => program.startsWith("Construction"));
@@ -193,6 +193,7 @@ const build = async (page: Page, kind: Kind) => {
 };
 
 // Boat draws the game in software; a smaller window gives more frames of a ten-second build.
+// Full render: the frames are judged by eye, and the startup check expects the cut's shadow shader.
 test.use({ viewport: { width: 1000, height: 780 } });
 
 test("a Scout Drone builds a Turret inside a scaffold", async ({ page }) => {
@@ -207,7 +208,7 @@ test("a Scout Drone builds a Command Center inside a scaffold", async ({ page })
 test("a Turret site is followed from placement to completion at default zoom", async ({ page }) => {
   mkdirSync(evidenceDir, { recursive: true });
   const frames: Frame[] = [];
-  await openGame(page, 77);
+  await openGame(page, 77, { render: "full" });
   const site = await placeSite(page, "turret", 12);
   await look(page, site.x, site.z);
   await followToCompletion(page, site, "turret-uninterrupted-default", frames, frameSize("turret", "default"));

@@ -30,6 +30,8 @@ box pull art/workbench/renders/previews/
 
 For terrain experiments, use the existing [terrain hub](prototypes/terrain-playground/README.md). For production rendering, use the lightweight preview scenes instead of the full game: `bun run preview:capture` captures terrain, buildings, and units as full-resolution overview, gameplay, and close images; the focused `:terrain`, `:buildings`, and `:units` commands capture one scene, and `preview:capture:construction` captures buildings under construction, as [construction animation](docs/construction_animation.md) describes. They reuse production terrain and model primitives and write to `art/workbench/renders/previews/`. The `verify-dune77` skill drives the live game.
 
+Every Playwright launch takes its Chromium args from `tools/chromium.ts`, which select Mesa's llvmpipe on Boat; without them Chromium falls back to SwiftShader, ten times slower. Previews, the UI review, the terrain hub and the capture scripts always render at full quality. Only behavioral verify specs run in the faster light render mode, and the `verify-dune77` skill lists which specs use which.
+
 Verify with deterministic simulation tests and targeted Playwright or preview scripts, not Browser Use.
 
 ## Agent skills

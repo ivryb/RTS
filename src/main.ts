@@ -62,10 +62,22 @@ groundTint.value = `#${new THREE.Color(groundStyle.tint).getHexString(
 )}`;
 groundTintValue.value = groundTint.value;
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// Read before loadMap: it rewrites the URL to ?seed=N and drops the rest.
+const params = new URLSearchParams(location.search);
+const verifyEnabled = params.has("verify");
+// Behavioral verify specs add render=light: Boat has no GPU, and shadows, rocks, vegetation
+// and antialiasing are most of each software-drawn frame. Players never reach it.
+const lightRender = verifyEnabled && params.get("render") === "light";
+if (lightRender) {
+  const badge = Object.assign(document.createElement("span"), { className: "render-mode", textContent: "Light render" });
+  badge.title = "Verify only: no shadows, rocks, vegetation or antialiasing";
+  document.querySelector(".match-mode")!.after(badge);
+}
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lightRender });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !lightRender;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -107,8 +119,7 @@ const tacticalMap = new TacticalMap(
 );
 let world: THREE.Group | undefined;
 let activeMap: GeneratedMap | undefined;
-let currentSeed =
-  Number(new URLSearchParams(location.search).get("seed")) || 77;
+let currentSeed = Number(params.get("seed")) || 77;
 let visibleOutcome: MatchOutcome | undefined;
 let renderingReady = Promise.resolve();
 
@@ -156,6 +167,8 @@ const loadMap = (seed: number) => {
   });
   const { map } = loaded;
   world = loaded.world;
+  // Rocks and vegetation are scenery: the simulation and input never read their meshes.
+  if (lightRender) world.userData.environment.group.visible = false;
   activeMap = map;
   tacticalMap.setWorld(map, world.userData.unitSystem as UnitSystem);
   mapCamera.setTerrain(map);
@@ -215,11 +228,9 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
 });
 
-// Read-only diagnostics for verification tooling; inert without ?verify=1.
-// Checked before loadMap: it rewrites the URL and drops the verify param.
-const verifyEnabled = new URLSearchParams(location.search).has("verify");
 loadMap(currentSeed);
 
+// Read-only diagnostics for verification tooling; inert without ?verify=1.
 if (verifyEnabled) {
   (window as unknown as Record<string, unknown>).__dune77 = {
     ready: () => renderingReady,
