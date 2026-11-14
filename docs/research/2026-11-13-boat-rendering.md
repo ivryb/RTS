@@ -120,3 +120,28 @@ The build is done when these checks pass:
 - Without `?verify=1` the game is unchanged.
 
 Nothing a player sees changes.
+
+## Build results (2026-11-14)
+
+Measured on this worktree's Boat machine, the same `large` type as above, seed 77. The scripts are `build-measure.sh`, `build-alternate.sh` and `image-diff.py` in [boat-rendering/](boat-rendering/), and the raw logs and images are in `art/workbench/d77-11/` in the main checkout.
+
+| Measure | Before | After | How |
+| --- | --- | --- | --- |
+| Preview captures' renderer | SwiftShader | llvmpipe | WebGL renderer string under the preview config's args |
+| Preview suite, 14 captures at 3240 × 900 | 92 s | 53 s | one run each |
+| Live game at 1280 × 720, full render | 2.46, 2.33 fps | 2.0, 2.06 fps | sequential runs |
+| Same, alternating old and new code | 2.4, 2.4, 1.8 fps | 2.13, 2.13, 2.0 fps | three rounds on one machine |
+| Live game, light render | — | 12.85, 12.77 fps; 0.46 M triangles and 11 draw calls instead of 4.38 M and 108 | two runs |
+| The five light-mode tests, alternating old and new | 107, 114, 122 s | 46, 45, 48 s | three rounds |
+| Whole verify suite, 9 tests | 496, 506 s | 530, 566 s | sequential runs |
+| Full-render captures, before against after | — | mean difference 0.01 to 0.54 out of 255 | building-models' 9 captures |
+| Preview images, SwiftShader against llvmpipe | — | mean difference 1.8 to 4.4 out of 255 | all 17 images |
+
+The full-render frame rate didn't change: its code path is the same, and the alternating rounds overlap. The whole suite didn't get faster, because the two full-render specs take about 7.5 of its 8.5 to 9.5 minutes. `building-models` and the three `construction` tests run at full quality on purpose, and they varied by up to 50 s between runs, more than light mode saves on the other five tests (about 60 s). Light mode cuts the five behavioral tests by 58%.
+
+What limits each kind of run now:
+
+- **Light tests** take 7 to 12 s each, and most of that is startup: the bench's navigation-to-`ready()` time is 7.5 to 24 s in light mode, about the same as at full quality. In light mode the GPU process's main thread uses 0.46 cores and the llvmpipe threads 5 cores, so drawing is now limited by filling pixels rather than by the serial vertex stage. Frames land on 83 ms, which is five refresh intervals of headless Chromium's 60 Hz loop.
+- **Full-render specs** still draw at about 2 frames per second, limited by the serial stage this note describes above. Only a GPU would change that.
+
+`construction.spec.ts`, which merged after this study, also needs full rendering. Its startup check expects the "Construction cut shadow" shader program, which compiles only with shadow maps on, and its frames are judged by eye.

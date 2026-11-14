@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Prepares a Boat machine for `box`, which runs it whenever it changes: the Bun that package.json
 # pins, since the stock image's older one can't read bun.lock; Playwright's Chromium for the
-# preview and verify captures; and the Mac's Blender, with the Pillow and NumPy that the asset
-# generators' texture step runs under python3. Mesa's llvmpipe, which tools/chromium.ts selects
-# for every capture and spec, renders the game ten times faster than Chromium's SwiftShader.
+# preview and verify captures; the Mac's Blender, with the Pillow and NumPy that the asset
+# generators' texture step runs under python3; and Mesa's llvmpipe, which tools/chromium.ts
+# selects for every capture and spec.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 

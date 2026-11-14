@@ -70,8 +70,7 @@ const verifyEnabled = params.has("verify");
 const lightRender = verifyEnabled && params.get("render") === "light";
 if (lightRender) {
   const badge = Object.assign(document.createElement("span"), { className: "render-mode", textContent: "Light render" });
-  badge.title = "Verify only: no shadows, rocks, vegetation or antialiasing";
-  document.querySelector(".match-mode")!.after(badge);
+  document.body.append(badge);
 }
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lightRender });

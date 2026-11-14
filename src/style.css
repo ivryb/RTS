@@ -816,9 +816,15 @@ kbd {
 .unit-roster:has(.unit-card:nth-child(2)) .unit-card strong { font-size: 12px; }
 .unit-roster:has(.unit-card:nth-child(2)) .unit-card span { font-size: 10px; }
 
-/* Marks every capture taken in the verify-only light render mode. */
+/* Marks every capture taken in the verify-only light render mode, outside the HUD's layout. */
 .render-mode {
+  position: fixed;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
   padding: 2px 7px;
+  background: rgb(14 14 14 / 80%);
   border: 1px solid #d8a24a;
   border-radius: 3px;
   color: #d8a24a;
