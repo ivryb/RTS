@@ -1,5 +1,6 @@
 import {chromium} from '@playwright/test';
-const browser=await chromium.launch({headless:true,args:['--use-angle=metal']});
+import {chromiumArgs} from '../../tools/chromium.ts';
+const browser=await chromium.launch({headless:true,args:chromiumArgs});
 try {
   const page=await browser.newPage({viewport:{width:1700,height:1150}});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));

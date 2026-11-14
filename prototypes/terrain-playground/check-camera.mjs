@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { chromiumArgs } from '../../tools/chromium.ts';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
@@ -7,7 +8,7 @@ import assert from 'node:assert/strict';
 const output = resolve('art/workbench/renders/terrain-playground/camera-checks');
 mkdirSync(output, { recursive: true });
 const run = mkdtempSync(`${output}/game-`);
-const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal'] : [] });
+const browser = await chromium.launch({ headless: true, args: chromiumArgs });
 const errors = [];
 const checks = [];
 try {

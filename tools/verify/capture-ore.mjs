@@ -4,6 +4,7 @@
 import { mkdirSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
+import { chromiumArgs } from "../chromium.ts";
 
 const { values } = parseArgs({
   options: {
@@ -18,7 +19,7 @@ if (!values.out) throw new Error("--out <dir> is required");
 mkdirSync(values.out, { recursive: true });
 
 const views = [["gameplay", 1], ["close", 2.6]];
-const browser = await chromium.launch({ args: process.platform === "darwin" ? ["--use-angle=metal"] : [] });
+const browser = await chromium.launch({ args: chromiumArgs });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];

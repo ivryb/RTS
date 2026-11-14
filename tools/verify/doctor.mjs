@@ -3,9 +3,10 @@
 // Exits 0 and prints a JSON status when the page loads, the game boots, and the
 // ?verify=1 observation hook responds; exits 1 otherwise.
 import { chromium } from "@playwright/test";
+import { chromiumArgs } from "../chromium.ts";
 
 const baseURL = process.argv[2] ?? "http://localhost:5173";
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: chromiumArgs });
 try {
   const page = await browser.newPage();
   await page.goto(`${baseURL}/?seed=77&verify=1`, { timeout: 15_000 });
