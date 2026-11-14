@@ -60,7 +60,8 @@ test("buildings look the same in every presentation state", async ({ page }) => 
   test.setTimeout(600_000);
   mkdirSync(evidenceDir, { recursive: true });
   await page.setViewportSize({ width: 1280, height: 800 });
-  await openGame(page, 77);
+  // These captures are compared by eye with what players see.
+  await openGame(page, 77, { render: "full" });
   const opening = await snapshot(page);
   const home = opening.buildings.find((building) => building.id === "local-command-center")!;
   const enemy = opening.buildings.find((building) => building.id === "enemy-command-center")!;

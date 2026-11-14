@@ -815,3 +815,14 @@ kbd {
 .unit-roster:has(.unit-card:nth-child(2)) .unit-card > div:last-child { gap: 2px; }
 .unit-roster:has(.unit-card:nth-child(2)) .unit-card strong { font-size: 12px; }
 .unit-roster:has(.unit-card:nth-child(2)) .unit-card span { font-size: 10px; }
+
+/* Marks every capture taken in the verify-only light render mode. */
+.render-mode {
+  padding: 2px 7px;
+  border: 1px solid #d8a24a;
+  border-radius: 3px;
+  color: #d8a24a;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
