@@ -1,65 +1,88 @@
 {
-  "generator": "tools/assets/build_titanium_ore.py",
+  "generator": "tools/assets/build_titanium_three_knuckles.py",
+  "design": "docs/titanium_deposit.md",
   "source": "authored fractured solids; no scan geometry",
-  "texture_sources": "assets/source/polyhaven/titanium/source.json",
-  "references": "art/workbench/terrain-composite/ore-designs-v2",
+  "texture_sources": [
+    "assets/textures/terrain/oxide-cliff-color.webp",
+    "assets/textures/terrain/oxide-scree-color.webp",
+    "assets/textures/terrain/sand-scan.webp",
+    "assets/source/polyhaven/titanium/source.json"
+  ],
   "license": "CC BY-SA 4.0",
-  "format": "1 mesh, 1 standard PBR material, 1024px WebP color/normal/roughness-metallic",
-  "coordinates": "Y-up, centered X/Z, ground pivot Y=0; exposed workface local +Z",
+  "format": "meshes `full` and `depleted` sharing 1 standard PBR material and 1 WebP atlas: 1024px color, 512px normal and roughness-metallic",
+  "coordinates": "Y-up, centered X/Z, ground pivot Y=0",
   "assets": [
     {
-      "id": "three-knuckles",
-      "path": "assets/models/titanium-three-knuckles.glb",
-      "bytes": 845928,
-      "sha256": "a3f8b91bdfd6f465d3469407bb74a4cf7c3a05aaeb4925c64dcffdc2d29079a8",
-      "triangles": 8892,
-      "radius": 5.334596600275228,
-      "bounds_min": [
-        -4.958119869232178,
-        -2.695571856747847e-05,
-        -3.2218847274780273
-      ],
-      "bounds_max": [
-        4.958225727081299,
-        3.299999952316284,
-        3.221719741821289
-      ]
+      "seed": 5,
+      "path": "assets/models/titanium-deposit-5.glb",
+      "bytes": 787104,
+      "sha256": "67b5df043b543d7611ee44fce268a5a4d6ce9361e6d734fb6bc1adf688000bb2",
+      "ore_on_rock": 0.6211574433742392,
+      "ore_on_camera": 0.5537062125024192,
+      "states": {
+        "full": {
+          "triangles": 8598,
+          "radius": 5.349999854960025,
+          "height": 3.025552988052368,
+          "bearings_hit": 1.0,
+          "bearings_ore_first": 0.9027777777777778
+        },
+        "depleted": {
+          "triangles": 8598,
+          "radius": 5.349999854960025,
+          "height": 3.025552988052368,
+          "bearings_hit": 1.0,
+          "bearings_ore_first": 0.0
+        }
+      }
     },
     {
-      "id": "split-lens",
-      "path": "assets/models/titanium-split-lens.glb",
-      "bytes": 823232,
-      "sha256": "c7c7d0ce9670fbae9269463108cdc87ad4e5ab958df0c3d67c21a588dbe7726f",
-      "triangles": 9030,
-      "radius": 5.350046578099134,
-      "bounds_min": [
-        -4.715089797973633,
-        -0.000391209265217185,
-        -3.457397222518921
-      ],
-      "bounds_max": [
-        4.715089797973633,
-        2.971155881881714,
-        3.4574129581451416
-      ]
+      "seed": 1,
+      "path": "assets/models/titanium-deposit-1.glb",
+      "bytes": 762608,
+      "sha256": "060a7931b90cd599e96ee05aa54dd9171552b3f9c4af2628707d594278b55a93",
+      "ore_on_rock": 0.5329534424600911,
+      "ore_on_camera": 0.5314482508609751,
+      "states": {
+        "full": {
+          "triangles": 8600,
+          "radius": 5.349999998327204,
+          "height": 2.9268131256103516,
+          "bearings_hit": 1.0,
+          "bearings_ore_first": 0.875
+        },
+        "depleted": {
+          "triangles": 8600,
+          "radius": 5.349999998327204,
+          "height": 2.9268131256103516,
+          "bearings_hit": 1.0,
+          "bearings_ore_first": 0.0
+        }
+      }
     },
     {
-      "id": "eroded-window",
-      "path": "assets/models/titanium-eroded-window.glb",
-      "bytes": 923756,
-      "sha256": "dca9119e9b6120560d0e2ef18be7a7a1512a182ed5cbb05d5f137ce304c606fc",
-      "triangles": 10044,
-      "radius": 5.201218747018756,
-      "bounds_min": [
-        -4.999988079071045,
-        -2.2504079879581695e-06,
-        -3.1386139392852783
-      ],
-      "bounds_max": [
-        5.0,
-        2.9090070724487305,
-        3.1386096477508545
-      ]
+      "seed": 3,
+      "path": "assets/models/titanium-deposit-3.glb",
+      "bytes": 780524,
+      "sha256": "77846c53d00dc1e187217656d4824255344ffc000193a0c76079afaff674268c",
+      "ore_on_rock": 0.5462362354432385,
+      "ore_on_camera": 0.6045275590551181,
+      "states": {
+        "full": {
+          "triangles": 8599,
+          "radius": 5.3500001658011795,
+          "height": 3.090888500213623,
+          "bearings_hit": 1.0,
+          "bearings_ore_first": 0.75
+        },
+        "depleted": {
+          "triangles": 8599,
+          "radius": 5.3500001658011795,
+          "height": 3.090888500213623,
+          "bearings_hit": 1.0,
+          "bearings_ore_first": 0.0
+        }
+      }
     }
   ]
 }

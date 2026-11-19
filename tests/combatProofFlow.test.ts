@@ -38,9 +38,8 @@ const createUnitPresentation: UnitPresentationFactory = (unit): LoadedUnitPresen
 };
 
 const loadOreModels = async () => {
-  const root = new THREE.Group();
-  root.add(new THREE.Mesh(new THREE.BoxGeometry(5, 2, 5), new THREE.MeshStandardMaterial()));
-  return [root];
+  const rock = () => new THREE.Mesh(new THREE.BoxGeometry(5, 2, 5), new THREE.MeshStandardMaterial());
+  return [{ full: rock(), depleted: rock() }];
 };
 
 const settlePresentations = async (system: UnitSystem) => {

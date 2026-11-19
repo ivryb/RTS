@@ -234,9 +234,9 @@ test("gather orders affect only owned selected Scouts and reject exhausted ore",
 
 // A box of rock scaled to the deposit's 3 m footprint: flat faces 2.12 m from its centre, 1.65 m tall.
 const boxRock: OreModelLoader = async () => {
-  const model = new THREE.Group();
-  model.add(new THREE.Mesh(new THREE.BoxGeometry(10, 4, 10).translate(0, 2, 0), new THREE.MeshStandardMaterial()));
-  return [model];
+  const box = () => new THREE.Group().add(
+    new THREE.Mesh(new THREE.BoxGeometry(10, 4, 10).translate(0, 2, 0), new THREE.MeshStandardMaterial()));
+  return [{ full: box(), depleted: box() }];
 };
 const ROCK_FACE = 3 / Math.SQRT2;
 const ROCK_TOP = 4 * 3 / (5 * Math.SQRT2) - 0.05;
