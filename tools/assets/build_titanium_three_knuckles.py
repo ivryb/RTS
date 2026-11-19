@@ -1,36 +1,43 @@
 """Author the "Three knuckles" Titanium Deposit after its approved concept image.
 
-blender --background --threads 6 --python-exit-code 1 --python tools/assets/build_titanium_three_knuckles.py -- [--seed 1 2] [--out <dir>] [--draft]
+blender --background --threads 8 --python-exit-code 1 --python tools/assets/build_titanium_three_knuckles.py -- [--seed 5 1 3] [--out <dir>] [--draft]
 
-Concept: art/workbench/terrain-composite/ore-designs-v2/three-knuckles.png. Three blocky
-masses that touch, dominant behind, half-size and quarter-size in front. They are the broken
-top of one ore bed with a sandstone skin: the skin still caps their tops, corners and feet,
-and their broken-open faces are the ore itself. Mined out, each face is cut back into a
-dull hollow with sand on its floor, inside the same skin.
+Concept: art/workbench/terrain-composite/ore-designs-v2/three-knuckles.png. Three masses
+that touch: a long, low dominant one behind, a half-size and a quarter-size one in front of
+its ends. They are the broken top of one ore bed with a sandstone skin. The skin holds on
+part of each top, on corners, in a hem under the tops it covers and around the feet, where
+sand is banked against it; the broad faces between are the ore itself. Mined out, the ore
+is broken out block by block along the rock's joints, leaving stepped, dusty hollows with
+sand on their ledges inside the same skin.
 
-Each `--seed` composes a sibling outcrop. The first exports `full.glb` and `depleted.glb`,
-the next `full-b.glb` and `depleted-b.glb`. `--draft` stops before the bake and renders
-`draft-full.png` and `draft-depleted.png` from the game's camera. Nothing is written to
-assets/models; review with `bun tools/verify/capture-ore.mjs --model <glb> --out <dir>`.
+Each `--seed` composes a sibling outcrop and exports `seed-<n>/full.glb` and
+`seed-<n>/depleted.glb` under `--out` (default art/workbench/titanium-three-knuckles),
+with one atlas per seed shared by the two. Without `--seed` it builds VARIANTS, the three
+seeds the game's three variants are made from. `--draft` stops before the bake and renders
+`seed-<n>/draft-full.png` and `draft-depleted.png` from the game's camera, in about a
+minute a seed against two for a build. Nothing is written to assets/models; review with
+`bun tools/verify/capture-ore.mjs --model <glb> --out <dir>`.
 
 How a build goes:
-1. Masses. Each knuckle is a convex block placed by hand-chosen numbers that the seed
-   jitters: a tilted top, leaning sides, and a shoulder between them. A few cracks split it
-   into panels that sit a little proud of one another, and corners are chamfered or stepped.
-   Blocks, loose chips and banked sand are fused by a voxel remesh.
-2. Skin and ore. Every surface point knows the plane it lies on. Planes that face the
-   camera and sun lean toward ore, tops and backs toward crust, and noise makes the border
-   ragged, so the crust overlaps the ore in patches. Ore sits a few centimetres behind the
-   crust and breaks into flat cleavage chips; crust gets worn edges and blocky relief.
-3. Depleted. The same surface with every ore region drawn back into its block: a back
-   wall that leans, sand on the floor, the crust rim untouched.
+1. Masses. Each knuckle is a convex block placed by numbers the seed draws from hand-set
+   ranges: a top tilted a little toward the sun's glint, eight leaning sides with the
+   corner ones cut in, bevelled shoulders. A few cracks split it into panels that sit a
+   little off one another, and corners are chamfered or stepped. Blocks, loose chips and
+   banked sand are fused by a voxel remesh.
+2. Skin and ore. Every surface point knows the planes it lies on, and every plane mostly
+   keeps its skin or has mostly lost it; noise makes the border ragged, so the crust
+   overlaps the ore in flakes. Ore sits a few centimetres behind the crust and breaks into
+   flat cleavage chips; crust gets worn edges and blocky relief.
+3. Depleted. The same surface with every ore region stepped back into its mass along the
+   joints, the skin untouched.
 4. Runtime. The source is decimated to the triangle budget. Faces that show ore are copied
-   and moved to the hollow, so the two states share every other face. One atlas is baked
+   and moved toward the hollow, so the two states share every other face. One atlas is baked
    from the two high-poly sources with Cycles, and each state is exported as a face subset.
 
 The game never turns the model, the camera or the sun, so the half-vector between sun and
-camera is one fixed direction (GLINT). Each mass has an ore shoulder a few degrees off it:
-that is where the real sun sheen falls. Steeper ore carries its sheen in the base color.
+camera is one fixed direction (GLINT). Ore on the tops and on each mass's broad shoulder
+lies a few degrees off it, with polish that differs from chip to chip: that is where the
+real sun highlights fall. Steeper ore carries its sheen in the base color.
 """
 import argparse
 from collections import Counter, deque
@@ -58,8 +65,12 @@ GROUND_COLOR = 'assets/textures/terrain/sand-scan.webp'
 # The main game multiplies its 30 m sand tile by hsl(29, 94%, 75%); linear RGB here.
 GROUND_TINT = (.966, .51, .228)
 FOOTPRINT_RADIUS = 5.35
+# The game sets the model this far into the ground, so the sand around it is authored this high.
+GROUND = .05
 ATLAS = 1024
 TRIANGLES = 8600
+# The seeds the game's three variants are built from.
+VARIANTS = (5, 1, 3)
 # The model is authored on a stage turned 45 degrees from the game, where +X is screen
 # right and -Y is toward the camera; objects carry the turn until export applies it.
 STAGE_TURN = math.radians(45)
@@ -80,7 +91,7 @@ VIEW = unit(staged((.528, -.528, .666)))
 GLINT = unit(SUN + VIEW)
 UP = np.array((0., 0., 1.))
 # Linear RGB. Ore is neutral graphite with the faintest cool cast.
-ORE_TINT, ORE_VEIN = (1.05, 1, .94), (.6, .6, .6)
+ORE_TINT, ORE_VEIN = (1.05, 1, .94), (.82, .83, .85)
 CRUST_PALE, CRUST_RUST, HOLLOW = (.3, .17, .078), (.23, .11, .045), (.23, .15, .09)
 # Tried in game in earlier rounds: at .3 the metal reads as painted stone, at .6 shaded sides go near black.
 METALNESS = .45
@@ -91,7 +102,7 @@ OVERLAP = .04
 CRUST_THICKNESS = .055
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--seed', type=int, nargs='+', default=[1, 2], help='one composition per seed')
+parser.add_argument('--seed', type=int, nargs='+', default=list(VARIANTS), help='one composition per seed')
 parser.add_argument('--draft', action='store_true', help='render the high-poly sources from the game camera without baking')
 parser.add_argument('--out', type=Path, default=ROOT / 'art/workbench/titanium-three-knuckles')
 args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
@@ -372,19 +383,8 @@ class Soup:
 
 # --- The outcrop ---------------------------------------------------------------
 
-def blur(field, sigma):
-    radius = int(3 * sigma)
-    taps = np.exp(-.5 * (np.arange(-radius, radius + 1) / sigma) ** 2)
-    taps /= taps.sum()
-    for axis in (0, 1):
-        padded = np.pad(field, [(radius, radius) if a == axis else (0, 0) for a in (0, 1)], mode='edge')
-        field = sum(weight * np.take(padded, range(offset, offset + field.shape[axis]), axis=axis)
-                    for offset, weight in enumerate(taps))
-    return field
-
-
 class Piece:
-    """One convex panel of a mass. Each plane is [normal, offset, kind, lean toward ore]."""
+    """One convex panel of a mass. Each plane is [normal, offset, kind, how firmly its skin holds]."""
 
     def __init__(self, mass, planes, path=''):
         self.mass, self.planes, self.path = mass, planes, path
@@ -398,24 +398,31 @@ class Piece:
         bm.free()
         return points
 
+    def top_area(self):
+        """What the other planes leave of the first one, a mass's top."""
+        bm = self.solid()
+        area = max((face.calc_area() for face in bm.faces if face.normal.dot(Vector(self.planes[0][0])) > .999), default=0)
+        bm.free()
+        return area
+
     def freeze(self):
         self.normals = np.array([plane[0] for plane in self.planes])
         self.offsets = np.array([plane[1] for plane in self.planes])
         self.kinds = np.array([plane[2] for plane in self.planes])
-        self.leans = np.array([plane[3] for plane in self.planes])
+        self.skins = np.array([plane[3] for plane in self.planes])
 
 
 class Mass:
-    """One knuckle: a convex block, split by a few cracks into panels that each sit slightly
-    off the others, with chamfered and stepped corners.
+    """One knuckle: a low convex block with eight leaning sides, the corner ones cut well in,
+    and bevels of differing depth between the top and the sides, so its plan and its shoulders
+    are blunt. A `squat` mass leans its sides back further and bevels every shoulder deeper.
+    A few cracks split it into panels that each sit slightly off the others.
 
-    `sides` are (bearing, slope, lean toward ore, corner cut) in degrees and metres, bearings
-    in the block's own frame where -90 faces the camera. `shoulders` are (bearing on the
-    stage, slope, lean, depth): bevels cut that deep into the block's highest corner.
     `cracks` are (bearing, slope, across, along, height, panels): a plane through that
-    point in the block's frame, splitting the panels whose path starts with `panels`."""
+    point in the block's frame, where -90 faces the camera, splitting the panels whose path
+    starts with `panels`."""
 
-    def __init__(self, rng, center, yaw, half, height, sides, shoulders, cracks, bite, breaks):
+    def __init__(self, rng, center, yaw, half, height, squat, cracks, bite, breaks):
         self.center, self.height, self.bite = np.array((*center, 0.)), height, bite
         # The block's middle line runs this far each way from its center.
         self.spine = max(half[0] - half[1], 0) * .8
@@ -423,26 +430,54 @@ class Mass:
         self.across = np.array((-math.sin(yaw), math.cos(yaw), 0))
         # Cleavage runs along the block and dips to one side, like the concept's long diagonal cracks.
         self.grain = unit(self.along * math.cos(dip := rng.uniform(.3, .5)) - UP * math.sin(dip) + self.across * rng.uniform(-.15, .15))
-        # Tops dip away from the camera and to one side, like beds tilted together.
-        top = tilt(unit(UP + self.along * .1 + self.across * .1), rng, .07)
+        size = min(half) / 1.9
+        # Tops lean a little toward the glint: the camera sees more of them, and their ore flashes.
+        top = tilt(unit(UP + (GLINT - UP * GLINT[2]) * rng.uniform(.1, .25)), rng, .05)
         # Every block goes on below the ground, so no edge shows on a slope.
-        planes = [[top, top @ (self.center + UP * height), TOP, -.65], [-UP, 1.2, BASE, 0]]
-        for bearing, slope, lean, cut in sides:
-            local = math.radians(bearing)
-            reach = abs(half[0] * math.cos(local)) + abs(half[1] * math.sin(local)) - cut
-            normal = facing(local + yaw + rng.uniform(-.06, .06), math.radians(slope + rng.uniform(-3, 3)))
+        planes = [[top, top @ (self.center + UP * height), TOP, 0], [-UP, 1.2, BASE, 0]]
+        # Four sides and four cut corners as (bearing, slope range, cut). The front leans back, so sun and camera both reach it.
+        for bearing, slopes, cut in ((-90, (70, 78), 0), (0, (66, 78), 0), (90, (76, 84), 0), (180, (66, 78), 0),
+                                     (-45, (70, 78), 1), (45, (74, 82), 1), (135, (74, 82), 1), (-135, (70, 78), 1)):
+            local = math.radians(bearing + rng.uniform(-9, 9) * (2 if cut else 1))
+            reach = abs(half[0] * math.cos(local)) + abs(half[1] * math.sin(local)) - cut * rng.uniform(.15, .45) * size
+            normal = facing(local + yaw, math.radians(rng.uniform(*slopes) - 9 * squat))
             foot = self.center + np.array((math.cos(local + yaw), math.sin(local + yaw), 0)) * reach
-            planes.append([normal, normal @ foot, SIDE, lean])
+            # The skin has gone from the broad front and back, and holds on most corners and on some ends.
+            held = rng.random() < (.85 if cut else .6 if bearing in (0, 180) else 0)
+            planes.append([normal, normal @ foot, SIDE, (.5 if held else -.4) + rng.uniform(-.1, .1)])
+        # The skin also holds along the rim of the top, measured on this plain block.
+        self.shell = (np.array([plane[0] for plane in planes[2:]]), np.array([plane[1] for plane in planes[2:]]), top, planes[0][1])
         block = Piece(self, planes)
-        for bearing, slope, lean, depth in shoulders:
-            normal = facing(math.radians(bearing + rng.uniform(-5, 5)), math.radians(slope + rng.uniform(-3, 3)))
-            block.planes.append([normal, (block.corners() @ normal).max() - depth, SIDE, lean])
+        for normal in rng.sample([plane[0] for plane in planes[2:]], 4 + round(4 * squat)):
+            bevel = facing(math.atan2(normal[1], normal[0]) + rng.uniform(-.2, .2), math.radians(rng.uniform(30, 48)))
+            block.planes.append([bevel, (block.corners() @ bevel).max() - rng.uniform(.02, .1) * (1 + 1.6 * squat) * size, SIDE, 0])
+        # One broad shoulder of ore lies a few degrees off the glint, never square to it: a
+        # flat face square to it clips to white in the game.
+        shoulder = facing(math.atan2(GLINT[1], GLINT[0]) + rng.uniform(-.35, .35), math.radians(30 + rng.choice((-1, 1)) * rng.uniform(7, 13)))
+        block.planes.append([shoulder, (block.corners() @ shoulder).max() - rng.uniform(.12, .25) * size, SIDE, -.6])
         pieces = [block]
+        bed = unit(UP + self.along * .2)
         for bearing, slope, across, along, level, panels in cracks:
             normal = facing(math.radians(bearing) + yaw + rng.uniform(-.1, .1), math.radians(slope + rng.uniform(-5, 5)))
             through = self.center + self.along * (along + rng.uniform(-.2, .2)) + self.across * across + UP * (level + rng.uniform(-.1, .1))
             pieces = self.split(pieces, normal, normal @ through, CRACK, panels)
-        pieces = [self.shifted(rng, piece, .09, .22) for piece in pieces]
+            if slope < 45:
+                bed = normal
+        # The joints the rock breaks along when it is mined, and the size of the blocks they bound.
+        self.joints = np.array((unit(self.along + UP * .15), unit(self.across + UP * .1), bed))
+        self.blocks = np.array((1.1, .9, .7)) * (.6 + .4 * min(1, height / 2.7))
+        # The top keeps its skin on one side of a crack and has lost it on the other: of
+        # the ways to share its panels out, one of the two that leave nearest to half of it
+        # covered. A top no crack divides is left to break up in patches.
+        tops = [piece for piece in pieces if piece.top_area() > .3]
+        areas = np.array([piece.top_area() for piece in tops])
+        covered = lambda held: abs(sum(areas[k] for k in range(len(tops)) if held >> k & 1) / areas.sum() - .5)
+        shares = sorted(range(1, 2 ** len(tops) - 1), key=covered)[:2]
+        held = rng.choice(shares) if shares else None
+        for index, piece in enumerate(tops):
+            skin = .12 if held is None else .45 if held >> index & 1 else -.12
+            piece.planes[0] = [top, planes[0][1], TOP, skin + rng.uniform(-.1, .1)]
+        pieces = [self.shifted(rng, piece, .07, .14) for piece in pieces]
         for _ in range(breaks):
             pieces = self.broken(rng, pieces)
         self.pieces = pieces
@@ -451,7 +486,7 @@ class Mass:
         result = []
         for piece in pieces:
             reach = piece.corners() @ normal
-            if not piece.path.startswith(panels) or reach.min() > offset - .2 or reach.max() < offset + .2:
+            if not piece.path.startswith(panels) or reach.min() > offset - .4 or reach.max() < offset + .4:
                 result.append(piece)
                 continue
             result += [Piece(self, piece.planes + [[normal, offset + OVERLAP, kind, 0]], piece.path + 'a'),
@@ -459,15 +494,16 @@ class Mass:
         return result
 
     def shifted(self, rng, piece, lean, setback):
-        """The panel with each outer face leaned a little and set back, so panels meet in steps."""
+        """The panel with each outer face leaned a little and set back, so panels meet in
+        steps and a top split by a crack lies in planes of different tilt."""
         middle = piece.corners().mean(0)
         planes = []
-        for normal, offset, kind, ore in piece.planes:
+        for normal, offset, kind, skin in piece.planes:
             if kind in (TOP, SIDE):
                 pivot = middle + normal * (offset - normal @ middle)
-                normal = tilt(normal, rng, lean * (.5 if kind == TOP else 1))
-                offset = normal @ pivot - rng.uniform(0, setback) * (.4 if kind == TOP else 1)
-            planes.append([normal, offset, kind, ore])
+                normal = tilt(normal, rng, lean)
+                offset = normal @ pivot - rng.uniform(0, setback)
+            planes.append([normal, offset, kind, skin])
         return Piece(self, planes, piece.path)
 
     def broken(self, rng, pieces):
@@ -484,8 +520,8 @@ class Mass:
         reach = (piece.corners() @ normal).max()
         size = min(self.height, 2.) / 2
         if rng.random() < .55:
-            lean = sum(plane[3] for plane in chosen) / len(chosen) - .15
-            piece.planes.append([normal, reach - rng.uniform(.1, .38) * size, SIDE, lean])
+            skin = sum(plane[3] for plane in chosen) / len(chosen) + .15
+            piece.planes.append([normal, reach - rng.uniform(.1, .38) * size, SIDE, skin])
             return pieces
         parts = self.split([piece], normal, reach - rng.uniform(.3, .7) * size, STEP)
         if len(parts) < 2:
@@ -501,9 +537,26 @@ def loose(rng, center, size):
     for axis, flat in zip(np.eye(3), (1, rng.uniform(.6, .9), rng.uniform(.4, .65))):
         for side in (-1, 1):
             normal = np.array(turn @ Vector(tilt(axis * side, rng, .3)))
-            planes.append([normal, normal @ center + size * flat * rng.uniform(.6, 1), SIDE, -2])
-    stone = SimpleNamespace(bite=0, grain=np.array((1., 0, 0)), height=size, center=center, along=UP, spine=0)
+            planes.append([normal, normal @ center + size * flat * rng.uniform(.6, 1), SIDE, 2])
+    stone = SimpleNamespace(bite=0, grain=np.array((1., 0, 0)), height=size, center=center, along=UP, spine=0, index=0, shell=None)
     return Piece(stone, planes)
+
+
+def jointed(points, joints, sizes, mass, seed):
+    """The blocks a mass's joints bound, laid in staggered courses along its bedding: each
+    point's block (as one number), a random value per block, and the distance in metres
+    to the block's nearest joint."""
+    across = np.einsum('nij,nj->ni', joints, points) / sizes
+    # Courses are not quite level: the bedding undulates.
+    across[:, 2] += .35 * fbm(points * .25, seed + 2, 2)
+    course = np.floor(across[:, 2]).astype(np.int64)
+    for k in (0, 1):
+        across[:, k] += hashed(course, mass, k, seed)
+    cell = np.floor(across).astype(np.int64)
+    part = across - cell
+    border = (np.minimum(part, 1 - part) * sizes).min(1)
+    block = ((cell + 4096) * (1, 8192, 8192 ** 2)).sum(1) + mass * 8192 ** 3
+    return block, hashed(cell[:, 0], cell[:, 1] + mass * 97, cell[:, 2], seed + 1), border
 
 
 class Outcrop:
@@ -514,33 +567,37 @@ class Outcrop:
     def __init__(self, rng, seed):
         self.seed = seed
         wobble = lambda spread=.07: rng.uniform(1 - spread, 1 + spread)
-        # The dominant mass lies across the view, its far end turned toward the camera, so its
-        # long front face looks toward the camera and the sun at once.
-        yaw = math.radians(rng.uniform(-21, -13))
-        half, height = (3.2 * wobble(.05), 1.9 * wobble()), 3.6 * wobble(.05)
-        dominant = Mass(rng, (0, 0), yaw, half, height,
-                        sides=[(-90, 74, .55, 0), (-35, 72, .1, .5 * wobble(.2)), (8, 79, -.4, 0), (55, 80, -.6, .4),
-                               (95, 82, -.6, 0), (172, 79, -.1, 0), (-138, 72, .4, .55 * wobble(.2))],
-                        shoulders=[(-120, 38, .3, .3 * wobble(.2))],
-                        cracks=[(rng.uniform(-10, 30), rng.uniform(12, 18), -half[1] + .9, 0, height * .46, ''),
-                                (rng.uniform(-8, 8), 80, 0, -.5 * wobble(.5), 0, 'b'),
-                                (rng.uniform(-8, 8), 82, 0, 1.3 * wobble(.3), 0, 'a')],
-                        bite=.42, breaks=13)
-        # The two smaller masses lean on its front, one toward each end. An even seed swaps their ends.
-        swap = -1 if seed % 2 == 0 else 1
+        # The dominant mass is long and low. It lies across the view, its far end turned
+        # toward the camera, so its long front face looks toward the camera and the sun at once.
+        yaw = math.radians(rng.uniform(-22, -12))
+        half, height = (rng.uniform(3.2, 3.6), rng.uniform(1.5, 1.7)), rng.uniform(3.15, 3.35)
+        # Its long crack dips along it, toward either end; steep cracks cross what lies over
+        # and under that one, so the top is in two or three planes.
+        side = rng.choice((-1, 1))
+        cracks = [(rng.choice((0, 180)) + rng.uniform(-25, 25), rng.uniform(12, 20), -half[1] + .9, rng.uniform(-.5, .5), height * rng.uniform(.42, .58), ''),
+                  (rng.uniform(-8, 8), 80, 0, rng.uniform(-.25, .25) * half[0], 0, 'b'),
+                  (rng.uniform(-8, 8), 82, 0, side * rng.uniform(.9, 1.7), 0, 'a')]
+        if rng.random() < .5:
+            cracks.append((rng.uniform(-8, 8), 80, 0, -side * rng.uniform(1.3, 1.9), 0, 'b'))
+        # Each mass draws its own numbers, so tuning one never moves the others.
+        dominant = Mass(random.Random(f'{seed} dominant'), (0, 0), yaw, half, height, 0, cracks, bite=.42, breaks=13)
+        # The two smaller masses lean on its front, one at each end and reaching past it.
+        end = rng.choice((-1, 1))
         masses = [dominant]
-        for scale, slide, tuck, tall, cracks, breaks in (
-                (.63, -.72 * swap, 1.25, 2.3, [(rng.uniform(-10, 10), 80, 0, rng.uniform(-.4, .2), 0, ''),
-                                              (rng.uniform(140, 220), rng.uniform(10, 16), 0, 0, 1.15, rng.choice('ab'))], 6),
-                (.44, .92 * swap, 1.1, 1.55, [(rng.uniform(-30, 30), rng.uniform(8, 14), 0, 0, .8, '')], 4)):
-            size = (half[0] * scale * wobble(), half[1] * scale * 1.1 * wobble())
-            center = (dominant.along * slide * half[0] * wobble() - dominant.across * (half[1] + size[1] - tuck * wobble()))[:2]
-            masses.append(Mass(rng, center, math.radians(rng.uniform(-30, -14)), size, tall * wobble(),
-                               sides=[(-90, 72, .55, 0), (-35, 68, .15, .45 * scale * 2), (10, 75, -.4, 0), (90, 80, -.6, 0),
-                                      (160, 74, -.4, .4 * scale * 2), (-148, 68, .35, .55 * scale * 2)],
-                               shoulders=[(-125, 37, .3, .22 * scale * 2 * wobble(.2))],
-                               cracks=cracks, bite=.2 + .2 * scale, breaks=breaks))
+        for scale, slide, tall, squat, cracks, breaks in (
+                (.56, end * rng.uniform(.7, .95), rng.uniform(1.85, 2.05), .6,
+                 [(rng.uniform(-12, 12), rng.uniform(72, 84), 0, rng.uniform(-.3, .3), 0, ''),
+                  (rng.uniform(140, 220), rng.uniform(10, 16), 0, 0, rng.uniform(.85, 1.1), rng.choice('ab'))], 6),
+                (.44, -end * rng.uniform(.75, 1.), rng.uniform(1.45, 1.65), 1,
+                 [(rng.uniform(-25, 25), rng.uniform(68, 82), 0, rng.uniform(-.3, .3), 0, '')], 4)):
+            size = (half[0] * scale * wobble(), half[1] * scale * 1.25 * wobble())
+            center = (dominant.along * slide * half[0] - dominant.across * (half[1] + size[1] - rng.uniform(.5, .8)))[:2]
+            masses.append(Mass(random.Random(f'{seed} {scale}'), center, yaw + math.radians(rng.uniform(-18, 22)), size, tall, squat, cracks,
+                               bite=.2 + .2 * scale, breaks=breaks))
         self.masses = masses
+        for index, mass in enumerate(masses):
+            mass.index = index
+        self.joints, self.blocks = np.array([mass.joints for mass in masses]), np.array([mass.blocks for mass in masses])
         self.pieces = [piece for mass in masses for piece in mass.pieces]
         for piece in self.pieces:
             piece.freeze()
@@ -570,16 +627,16 @@ class Outcrop:
         return np.min([(points @ piece.normals.T - piece.offsets).max(1) for piece in self.pieces], 0)
 
     def drifted(self):
-        """Sand height on a grid: banked against the feet, deepest in the corners between
-        masses. Past a bank's edge the surface drops below the ground at once, so on
-        sloping ground it shows as a short bank, not a flat apron."""
+        """Sand height on a grid: a low bank against the feet at the slope of loose sand. It
+        meets the ground within 0.25 m and goes on under it at the same slope, because
+        the ground under a deposit is never quite level: wherever it cuts the bank, it
+        cuts a bank and not the rim of a plate (rounds 5 and 6). Below that it dives."""
         x, y = np.meshgrid(*self.axes, indexing='ij')
-        flat = np.stack([x.ravel(), y.ravel(), np.full(x.size, .12)], 1)
-        rock = (self.solid(flat) < 0).reshape(x.shape).astype(float)
-        sand = .5 * (blur(rock, .42 / self.GRID_STEP) - .28)
-        sand = sand * (1 + .6 * fbm(flat * (.5, .5, 0), self.seed + 41, 2).reshape(x.shape)) + .02 * fbm(flat * (.9, .9, 0), self.seed + 40, 3).reshape(x.shape)
-        # A bank eases out of the ground at its rim; past the rim the surface dives under it.
-        return np.clip(np.where(sand < 0, sand * 4 - .5 * smoothstep(-sand, .06, .1), sand * sand / (sand + .05)), -1.3, None)
+        flat = np.stack([x.ravel(), y.ravel(), np.full(x.size, .15)], 1)
+        away = np.clip(self.solid(flat), 0, None)
+        tall = .03 + .12 * np.clip(.5 + fbm(flat * (.5, .5, 0), self.seed + 41, 2), 0, 1) + .06 * fbm(flat * (1.6, 1.6, 0), self.seed + 42, 2)
+        bank = np.maximum(tall - .8 * away, -.3) + np.minimum(tall + .3 - .8 * away, 0) * 6
+        return (np.clip(GROUND + bank + .012 * fbm(flat * (2.5, 2.5, 0), self.seed + 40, 2), -1.3, None)).reshape(x.shape)
 
     def sand(self, x, y):
         grid = self.drift
@@ -612,32 +669,42 @@ class Outcrop:
         return obj
 
     def survey(self, points):
-        """What each surface point lies on: its panel, how far the panel's planes lean it
-        toward ore, its distance to the nearest crack and nearest corner step, how far it
-        is under its block's top, its block's cleavage direction and hollow depth, and the
-        nearest point of the block's middle line."""
+        """What each surface point lies on: its panel and mass, how firmly the panel's
+        planes and the top over it hold their skin there, its distance to the rim of the top, to the
+        nearest crack and to the nearest corner step, how far it is under its block's top,
+        its block's cleavage direction and hollow depth, and the nearest point of the
+        block's middle line."""
         best, owner = np.full(len(points), .09), np.full(len(points), -1)
         for index, piece in enumerate(self.pieces):
             gap = (points @ piece.normals.T - piece.offsets).max(1)
             closer = gap < best
             best[closer], owner[closer] = gap[closer], index
-        lean, crack, step = np.full(len(points), -2.), np.full(len(points), 9.), np.full(len(points), 9.)
+        skin, rim, crack, step = np.full(len(points), 2.), np.zeros(len(points)), np.full(len(points), 9.), np.full(len(points), 9.)
         under, bite, grain = np.zeros(len(points)), np.zeros(len(points)), np.tile((1., 0, 0), (len(points), 1))
-        heart = points.copy()
+        heart, mass, top_skin = points.copy(), np.zeros(len(points), np.int64), np.zeros(len(points))
         for index, piece in enumerate(self.pieces):
             mine = np.nonzero(owner == index)[0]
             gaps = points[mine] @ piece.normals.T - piece.offsets
-            outer = piece.kinds <= SIDE
-            # A top keeps its skin except right at its edge, and lends it to the faces below.
-            weight = np.exp(np.clip(gaps[:, outer], None, 0) / .4) * np.where(piece.kinds[outer] == TOP, 1.6, 1)
-            lean[mine] = (weight * piece.leans[outer]).sum(1) / weight.sum(1)
+            outer = np.nonzero(piece.kinds <= SIDE)[0]
+            # A face's own skin counts; its neighbours' only close to the edge they share (at .4 m
+            # they outvoted a narrow top and left it bare, round 9).
+            weight = np.exp(np.clip(gaps[:, outer], None, 0) / .12)
+            skin[mine] = (weight * piece.skins[outer]).sum(1) / weight.sum(1)
+            body = piece.mass
+            if body.shell:
+                # The rim is where the block's top meets its nearest side; measured along the surface.
+                sides, reaches, top, level = body.shell
+                side = points[mine] @ sides.T - reaches
+                nearest = side.argmax(1)
+                bend = sides[nearest] @ top
+                rim[mine] = np.abs(side.max(1) - (points[mine] @ top - level)) / np.sqrt(1 - bend ** 2)
             for kind, target in ((CRACK, crack), (STEP, step)):
                 if (piece.kinds == kind).any():
                     target[mine] = np.abs(gaps[:, piece.kinds == kind] + OVERLAP).min(1)
-            under[mine], bite[mine], grain[mine] = -gaps[:, 0], piece.mass.bite, piece.mass.grain
-            mass = piece.mass
-            heart[mine] = mass.center + mass.along * np.clip((points[mine] - mass.center) @ mass.along, -mass.spine, mass.spine)[:, None]
-        return SimpleNamespace(owner=owner, lean=lean, crack=crack, step=step, under=under, bite=bite, grain=grain, heart=heart)
+            under[mine], bite[mine], grain[mine], mass[mine], top_skin[mine] = -gaps[:, 0], body.bite, body.grain, body.index, piece.skins[0]
+            heart[mine] = body.center + body.along * np.clip((points[mine] - body.center) @ body.along, -body.spine, body.spine)[:, None]
+        return SimpleNamespace(skin=skin, rim=rim, crack=crack, step=step, under=under, bite=bite, grain=grain,
+                               heart=heart, mass=mass, top_skin=top_skin)
 
     def weather(self, full):
         """Wear the fused rock, decide where its skin is broken away, and shape both states:
@@ -653,20 +720,27 @@ class Outcrop:
         rock = smoothstep(points[:, 2] - ground, .03, .25) * (at.bite > 0)
         normal = normals(mesh, points)
         wear = .55 + .45 * fbm(points * .6, seed + 1)
-        for repeat, share in ((8, .8), (40, .3)):
+        for repeat, share in ((8, .8), (30, .25)):
             bulge = ((points - relax(points, edge, repeat)) * normal).sum(1)
             points -= normal * (np.clip(bulge, 0, None) * wear * share * rock)[:, None]
         normal = normals(mesh, points)
         inward = relax(normal, edge, 40)
         inward /= np.linalg.norm(inward, axis=1)[:, None]
 
-        # Where the skin is gone. The skin breaks off in flat-sided flakes, so the border runs in straight pieces.
-        patchy = fbm(points * .42, seed + 3, 2)
-        field = (at.lean + .7 * patchy + chips(points * 1.2, seed + 4)[0] + .4 * chips(points * 3.4, seed + 2)[0]
-                 - 1.3 * (1 - smoothstep(points[:, 2] - np.clip(ground, 0, None), 0, .12 + .9 * np.clip(.5 + fbm(points * .45, seed + 19, 2), 0, 1) ** 2)))
-        # No ore at the very foot, no speck of crust or ore alone, and no thin tongue of either.
+        # Where the skin is gone. Each face of a mass mostly keeps it or has mostly lost it:
+        # it holds on part of the top, on corners, in a hem under the top it still covers
+        # and around the foot, so it frames the ore of the broad faces. It breaks off in
+        # flat-sided flakes, so the border runs in straight pieces.
         height = points[:, 2] - np.clip(ground, 0, None)
-        skin = tidy((field > 0) & (height > .1), at.bite > 0, edge, 700) & (at.bite > 0)
+        opened = fbm(points * .55, seed + 3, 2)
+        level = smoothstep(inward[:, 2], .6, .9)
+        width = .2 + .35 * np.clip(.5 - 1.2 * opened, 0, 1) ** 1.5
+        frame = (1 - smoothstep(at.rim, .5 * width, width)) * smoothstep(opened, .25, .05) * (1 - level) * smoothstep(at.top_skin, -.1, .1)
+        foot = 1 - smoothstep(height, 0, .08 + .35 * np.clip(.5 + fbm(points * .45, seed + 19, 2), 0, 1) ** 2)
+        field = ((.5 + .3 * level) * opened - at.skin + .9 * chips(points * 1.2, seed + 4)[0] + .4 * chips(points * 3.4, seed + 2)[0]
+                 - 1.5 * frame - 1.5 * foot)
+        # No ore at the very foot, and no speck of crust or ore alone.
+        skin = tidy((field > 0) & (height > .1), at.bite > 0, edge, 1200) & (at.bite > 0)
         ore = relax((relax(skin.astype(float), edge, 2) > .5).astype(float), edge, 1)
 
         # Crust: slow swell, blocky chipped relief, pits.
@@ -679,54 +753,74 @@ class Outcrop:
         small, small_roll, _, small_border = chips(drawn * 5, seed + 12)
         crease = np.maximum(1 - smoothstep(big_border / 1.8, 0, .05), .6 * (1 - smoothstep(small_border / 5, 0, .035)))
         # Toward the foot the ore comes flush with the crust, so no lip of crust rings the base like a tray.
-        metal = -CRUST_THICKNESS * (1 + .5 * patchy) * smoothstep(height, .15, .6) + big / 1.8 * .42 + small / 5 * .4
-        groove = .08 * np.exp(-(at.crack / .045) ** 2) + .025 * np.exp(-(at.step / .03) ** 2)
+        metal = -CRUST_THICKNESS * (1 + .5 * opened) * smoothstep(height, .15, .6) + big / 1.8 * .3 + small / 5 * .3
+        groove = .06 * np.exp(-(at.crack / .03) ** 2) + .025 * np.exp(-(at.step / .03) ** 2)
         full_points = points + normal * ((crust * (1 - ore) + metal * ore - groove) * rock)[:, None]
 
-        # Depleted: every ore point is drawn toward the middle line of its block, less near
-        # the top, so the hollow's floor is a ledge the camera sees and its back wall leans.
-        # Moving along the surface normal instead folded the surface at every corner of a
-        # block and showed as black slits (rounds 4 to 7). Ore on the tops sinks straight down;
-        # lower ledges do not, or they would leave a pit at the foot.
-        # The hollow's outline is the ore's with its thin tongues smoothed away, so no flake
-        # of crust is left standing over it. The broken relief is only baked.
-        hollow = smoothstep(relax(ore, edge, 60), .45, .6)
-        inside = smoothstep(relax(hollow, edge, 150), .5, .97)
+        # Depleted: the ore has been broken out along the rock's joints, block by block.
+        # Every block steps back by its own depth: a shallow first step all along the ore's
+        # outline, deeper steps only in blocks that were ore throughout, deepest high up,
+        # so the floor rises in benches toward the back and nothing is left hanging.
+        # Sides step back toward the middle line of their mass and tops straight down;
+        # moving along the surface normal instead folded the surface at every corner of a
+        # block and showed as black slits (round 3). The low-poly follows these steps
+        # loosely; their crisp edges are in the baked normal map.
+        block, roll, joint = jointed(points, self.joints[at.mass], self.blocks[at.mass], at.mass, seed + 30)
+        mined = at.bite > 0
+        _, member = np.unique(block[mined], return_inverse=True)
+        whole = np.ones(member.max() + 1)
+        np.minimum.at(whole, member, relax(skin.astype(float), edge, 20)[mined])
+        throughout = np.zeros(len(points))
+        throughout[mined] = whole[member] > .3
+        deep = .25 + .55 * roll + .4 * points[:, 2] / np.maximum(at.under + points[:, 2], .5)
+        steps = .3 + .7 * throughout * np.select([deep < .55, deep < .85], [.3, .65], 1)
         push = (at.heart - points) * (1, 1, 0)
         push = push / np.maximum(np.linalg.norm(push, axis=1), 1e-6)[:, None]
         sinks = smoothstep(inward[:, 2], .6, .9) * smoothstep(at.under, .6, .3)
         push = push * (1 - sinks)[:, None] - UP * sinks[:, None]
-        move = push * (np.minimum(at.bite * inside, .02 + .4 * at.under) * hollow)[:, None]
-        broken = (chips(points * 1.3, seed + 14)[0] / 1.3 * .18 + chips(points * 4, seed + 15)[0] / 4 * .12) * inside - CRUST_THICKNESS * smoothstep(height, .15, .6) * ore
-        hollow_points = points + move + normal * ((crust * (1 - ore) + broken - groove * (1 - hollow)) * rock)[:, None]
+        # Under a top that keeps its skin the wall leans back from the rim, so the skin is never a thin lip.
+        # At its foot it leans back from nothing, so no shelf rings the base like a plinth.
+        # A top sinks by one shallow step.
+        depth = np.minimum(at.bite * (steps + (.45 - steps) * sinks), np.maximum(.1 + .8 * at.under, at.bite * sinks)) * ore * np.maximum(smoothstep(height, .1, .7), sinks)
+        move = push * depth[:, None]
+        inside = smoothstep(relax(ore, edge, 30), .5, .9)
+        broken = ((chips(points * 1.3, seed + 14)[0] / 1.3 * .2 + chips(points * 4, seed + 15)[0] / 4 * .15) * inside
+                  - .03 * np.exp(-(joint / .025) ** 2) * throughout) * ore
+        hollow_points = points + move + normal * ((crust * (1 - ore) + broken - groove * (1 - ore)) * rock)[:, None]
         # Sand has drifted into the bottom of each hollow.
-        drifted = smoothstep(.5 + .3 * fbm(points * .8, seed + 16, 2) - (hollow_points[:, 2] - np.clip(ground, 0, None)), 0, .3) * inside
+        drifted = smoothstep(.35 + .3 * fbm(points * .8, seed + 16, 2) - (hollow_points[:, 2] - np.clip(ground, 0, None)), 0, .3) * inside
 
         depleted = duplicate(full, 'depleted / high-poly')
-        for obj, moved, ore_mask, hollow_mask, floor_sand in ((full, full_points, ore, ore * 0, ore * 0), (depleted, hollow_points, ore * 0, hollow, drifted)):
+        nothing = np.zeros(len(points))
+        # What each chip of ore should show in game, divided by most of the light its face
+        # gets there (measured in round 3: about .3 of the base color in shade, 1.35 facing
+        # the sun, less the share metalness takes), so shaded ore stays graphite, not black.
+        shown = .05 + .13 * big_roll ** 2 + .05 * small_roll
+        tone = np.clip(shown / ((.3 + 1.05 * np.clip(inward @ SUN, 0, 1)) * (1 - METALNESS)), .03, .6)
+        for obj, moved, ore_mask, hollow_mask, floor_sand, facets in (
+                (full, full_points, ore, nothing, nothing, None),
+                (depleted, hollow_points, nothing, ore, drifted, np.stack([roll, nothing, np.exp(-(joint / .02) ** 2) * throughout], 1))):
             normal = normals(obj.data, moved)
             if obj is full:
                 self.full_normals = normal
+                # A chip tilted toward the sun is painted brighter than its face: steep ore that the
+                # sun's highlight never reaches carries its sheen in the base color. A chip
+                # square to the glint would clip to white, so those stay duller.
+                sheen = tone * (1 + 1.5 * np.clip(normal @ SUN - inward @ SUN, 0, .3)) * (1 - .25 * level)
+                facets = np.stack([sheen, smoothstep(normal @ GLINT, .985, .998), crease], 1)
             bulge = ((moved - relax(moved, edge, 5)) * normal).sum(1)
-            sand = smoothstep(self.sand(moved[:, 0], moved[:, 1]) + .03 - moved[:, 2], 0, .035)
-            # Dust lies on low, flat, sheltered rock, and the lowest hand's breadth fades into the ground.
+            lifted = moved[:, 2] - self.sand(moved[:, 0], moved[:, 1])
+            sand = smoothstep(.03 - lifted, 0, .035)
+            # Dust lies on low, flat, sheltered rock, and the lowest hand's breadth fades into the sand.
             dust = (smoothstep(normal[:, 2], .7, .95) * np.clip(.25 - bulge * 25 + .5 * fbm(moved * .8, seed + 17), 0, 1)
                     * np.clip(1.2 - moved[:, 2] * .45, .15, 1)) * (1 - ore_mask)
-            foot = smoothstep(moved[:, 2], .12 + .35 * np.clip(.5 + fbm(moved * .7, seed + 21, 2), 0, 1), 0) * .9
+            foot = smoothstep(lifted, .02 + .2 * np.clip(.2 + fbm(moved * .7, seed + 21, 2), 0, 1), 0) * .9
             paint(obj.data, 'Masks', np.stack([np.maximum.reduce([sand, dust * .8, foot, floor_sand]), ore_mask,
                                                np.clip(.5 + bulge * 28, 0, 1), hollow_mask], 1))
-            # What each chip should show in game, divided by the light its face gets there
-            # (measured in round 1: about .3 of the base color in shade, 1.35 facing the sun,
-            # less the share metalness takes). Steep ore the sun misses gets a lighter base.
-            shown = .055 + .17 * big_roll ** 1.5 + .06 * small_roll
-            tone = shown / ((.3 + 1.05 * np.clip(inward @ SUN, 0, 1)) * (1 - METALNESS))
-            # Only chips that lie near the glint direction are bright enough to flash; one
-            # square to it would clip to white, so those stay a little duller.
-            polish = (.3 + .7 * small_roll) * smoothstep(normal @ GLINT, .84, .96) * (1 - .5 * smoothstep(normal @ GLINT, .985, .998))
-            paint(obj.data, 'Ore', np.stack([np.clip(tone, .04, .6), polish, crease], 1))
+            paint(obj.data, 'Facets', facets)
             paint(obj.data, 'Lines', np.stack([at.crack, at.step, self.veins(moved, at)], 1))
             paint(obj.data, 'Grain', at.grain)
-        self.ore, self.full_points, self.hollow_move = np.maximum(ore, hollow), full_points, move
+        self.ore, self.rock, self.full_points, self.hollow_move = ore, rock, full_points, move
         for obj in (full, depleted):
             keep_faces(obj, coords(obj.data)[:, 2] < -.6)
         log(f'weathered: ore on {ore[rock > .5].mean():.0%} of the rock')
@@ -739,12 +833,11 @@ class Outcrop:
         nearest = np.full(len(points), 9.)
         wander = fbm(points * .9, self.seed + 18, 2) * .12
         for index, mass in enumerate(self.masses):
-            mine = np.isin(at.owner, [k for k, piece in enumerate(self.pieces) if piece.mass is mass])
             for _ in range(2 if index == 0 else 1):
                 normal = unit(np.cross(mass.grain, tilt(mass.across, rng, .5)))
                 through = mass.center + mass.along * rng.uniform(-.6, .6) * mass.height + UP * mass.height * .5
                 gap = np.abs((points - through) @ normal + wander)
-                nearest[mine] = np.minimum(nearest, gap)[mine]
+                nearest[at.mass == index] = np.minimum(nearest, gap)[at.mass == index]
         return nearest
 
 
@@ -881,6 +974,12 @@ class Graph:
         self.links.new(node.outputs['Vector'], parts.inputs[0])
         return (*parts.outputs, node.outputs['Alpha'])
 
+    def up(self):
+        """How far the surface itself, not its painted relief, faces the sky."""
+        parts = self.nodes.new('ShaderNodeSeparateXYZ')
+        self.links.new(self.nodes.new('ShaderNodeNewGeometry').outputs['True Normal'], parts.inputs[0])
+        return parts.outputs['Z']
+
     def sand(self):
         return self.mix(1, self.image(GROUND_COLOR, 30), GROUND_TINT, 'MULTIPLY')
 
@@ -919,7 +1018,9 @@ def rock_material():
     """Crust, ore, hollow and sand in one material, chosen by the painted masks."""
     graph = Graph('Three knuckles / crust, ore and sand')
     sand, ore, wear, hollow = graph.attribute('Masks')
-    tone, polish, crease, _ = graph.attribute('Ore')
+    # On ore: each chip's tone, whether it lies square to the glint, and its creases.
+    # In a hollow: each block's tone, nothing, and its joints.
+    tone, square, crease, _ = graph.attribute('Facets')
     crack, step, vein, _ = graph.attribute('Lines')
     grain = graph.attribute('Grain', split=False)
 
@@ -939,49 +1040,56 @@ def rock_material():
     joint = graph.math('MAXIMUM', graph.line(crack, .022), graph.times(graph.line(step, .014), .7))
     crust = graph.mix(graph.math('MAXIMUM', graph.times(hairline, .75), graph.times(joint, .8)), crust, (.035, .02, .012))
 
-    # Ore. Streaks run along each mass's cleavage; every chip has its own tone and polish.
+    # Ore: dark graphite. Every chip has its own tone and polish.
     across = graph.vector('SUBTRACT', graph.position, graph.vector('SCALE', grain, scale=graph.times(
         graph.vector('DOT_PRODUCT', graph.position, grain), .96)))
     streak = graph.noise(30, 3, across)
-    fine, fine_roll, fine_border = graph.chips(13, across)
-    value = graph.times(tone, graph.add(1, graph.times(graph.math('SUBTRACT', streak, .5), .22), graph.times(graph.math('SUBTRACT', fine_roll, .5), .4),
-                                        graph.times(graph.math('SUBTRACT', graph.noise(1.1, 3), .5), .25)))
-    # Chip edges are bruised bright, the way broken metal ore catches light on every arris.
+    fine, fine_roll, _ = graph.chips(13, across)
+    value = graph.times(tone, graph.add(1, graph.times(graph.math('SUBTRACT', fine_roll, .5), .6),
+                                        graph.times(graph.math('SUBTRACT', graph.noise(1.1, 3), .5), .3)))
     grit = graph.add(.62, graph.times(graph.luma(graph.image(CLIFF_GRAIN, 1.3)), 1.6))
-    metal = graph.mix(1, ORE_TINT, graph.times(value, grit, graph.add(1, graph.times(graph.remap(wear, .74, .98), 1.4)),
-                                               graph.add(1, graph.times(crease, -.35))), 'MULTIPLY')
-    lode = graph.times(graph.line(vein, graph.add(.008, graph.times(graph.noise(1.7, 2), .03))), graph.remap(graph.noise(1.2, 3), .34, .5))
+    # Silver where the metal is bruised: on the arris of every chip, and in thin streaks along the cleavage.
+    arris = graph.remap(wear, .68, .93)
+    thin = graph.times(graph.remap(streak, .66, .76), graph.remap(graph.noise(2.2, 2), .42, .6))
+    metal = graph.mix(1, ORE_TINT, graph.times(value, grit, graph.add(1, graph.times(arris, 2.2), graph.times(thin, 1.4)),
+                                               graph.add(1, graph.times(crease, -.4))), 'MULTIPLY')
+    # Veins of bright metal run along the main cracks for metres, and a few cross the faces.
+    lode = graph.math('MAXIMUM',
+                      graph.times(graph.line(vein, graph.add(.012, graph.times(graph.noise(1.7, 2), .035))), graph.remap(graph.noise(1.2, 3), .3, .45)),
+                      graph.times(graph.line(crack, .05), graph.remap(graph.noise(1.5, 3), .33, .5)))
     metal = graph.mix(lode, metal, ORE_VEIN)
-    # Sand has packed into the cracks and into pits on the faces.
-    packed = graph.math('MAXIMUM', graph.times(graph.line(crack, .035), graph.remap(graph.noise(4, 3), .45, .6)),
-                        graph.times(graph.remap(graph.noise(55, 2), .7, .76), graph.remap(graph.noise(2.5, 2), .45, .65)))
-    packed = graph.times(packed, graph.invert(lode))
+    # Sand has packed into pits on the faces, and dust lies on them in patches.
+    packed = graph.times(graph.remap(graph.noise(55, 2), .7, .76), graph.remap(graph.noise(2.5, 2), .45, .65), graph.invert(lode))
     dusty = graph.mix(1, tint, (.85, .8, .75), 'MULTIPLY')
-    metal = graph.mix(graph.times(graph.remap(graph.noise(.9, 4), .42, .8), .4), metal, dusty)
+    metal = graph.mix(graph.times(graph.remap(graph.noise(.9, 4), .45, .8), .25), metal, dusty)
     metal = graph.mix(graph.times(packed, .85), metal, dusty)
-    # A crack through ore is a dark line with a bruised, bright lip.
-    metal = graph.mix(graph.times(graph.line(crack, .06), graph.remap(graph.noise(3, 3), .3, .6), .6), metal, ORE_VEIN)
-    metal = graph.mix(graph.line(crack, .02), metal, (.01, .01, .01))
+    metal = graph.mix(graph.line(crack, .014), metal, (.01, .01, .01))
 
-    # The mined-out hollow: broken stone under dust, a shade darker and greyer than the crust.
+    # The mined-out hollow: broken stone under dust, a shade darker and greyer than the
+    # crust, each block its own tone, with dark joints between them.
     stone = graph.mix(1, graph.mix(graph.remap(graph.noise(1.6, 3), .35, .7), HOLLOW, graph.mix(.5, HOLLOW, tint)),
-                      graph.times(shade, graph.add(.5, graph.times(wear, .75))), 'MULTIPLY')
+                      graph.times(shade, graph.add(.42, graph.times(wear, .6), graph.times(tone, .3))), 'MULTIPLY')
+    stone = graph.mix(graph.times(graph.math('MAXIMUM', crease, graph.times(hairline, .6)), .7), stone, (.035, .02, .012))
 
     shows_ore = graph.remap(graph.jitter(ore, 11, .05), .42, .58)
     shows_hollow = graph.remap(graph.jitter(hollow, 11, .05), .42, .58)
-    drift = graph.remap(graph.jitter(sand, 3.5, .4), .38, .62)
+    # Sand lies on the ground, in the bottom of each hollow and on every ledge in it.
+    ledge = graph.times(graph.remap(graph.up(), .5, .8), shows_hollow, graph.remap(graph.noise(2.5, 3), .3, .5))
+    drift = graph.math('MAXIMUM', graph.remap(graph.jitter(sand, 3.5, .4), .38, .62), ledge)
     color = graph.mix(drift, graph.mix(shows_hollow, graph.mix(shows_ore, crust, metal), stone), graph.sand())
 
+    # Polish differs from chip to chip, so the sun breaks into many small graded highlights.
     gleam = graph.times(shows_ore, graph.invert(packed), graph.invert(drift))
-    ore_rough = graph.add(.62, graph.times(polish, -.34), graph.times(graph.math('SUBTRACT', streak, .5), .12), graph.times(lode, -.15))
-    roughness = graph.mix(gleam, .92, ore_rough)
-    stone_relief = graph.add(graph.times(graph.luma(graph.image(CLIFF_GRAIN, 2.4)), .03), graph.times(flake, .12), graph.times(hairline, -.012), graph.times(joint, -.02))
+    ore_rough = graph.add(.2, graph.times(fine_roll, .35), graph.times(graph.math('SUBTRACT', streak, .5), .08), graph.times(square, .2))
+    roughness = graph.mix(gleam, .92, graph.mix(lode, ore_rough, .28))
+    stone_relief = graph.add(graph.times(graph.luma(graph.image(CLIFF_GRAIN, 2.4)), .03), graph.times(flake, .12), graph.times(hairline, -.012),
+                             graph.times(joint, -.02), graph.times(crease, shows_hollow, -.02))
     # Fine cleavage: small flat chips and parallel steps along the grain.
     steps = graph.math('FRACT', graph.times(graph.add(graph.vector('DOT_PRODUCT', across, (.577, .577, .577)), graph.times(graph.noise(3, 2), .08)), 9))
     ore_relief = graph.add(graph.times(fine, 1 / 13, .35), graph.times(steps, .003), graph.times(crease, -.008), graph.times(grit, .006),
                            graph.times(graph.line(crack, .03), -.02), graph.times(packed, .004))
     relief = graph.mix(drift, graph.mix(gleam, stone_relief, ore_relief), graph.times(graph.luma(graph.image(GROUND_COLOR, 30)), .01))
-    return graph.finish(color, roughness, graph.times(gleam, METALNESS), relief)
+    return graph.finish(color, roughness, graph.times(gleam, graph.add(METALNESS, graph.times(lode, .15))), relief)
 
 
 # --- Runtime mesh and bake -------------------------------------------------------
@@ -991,7 +1099,7 @@ def runtime(outcrop, source, triangles):
     marked FULL and copied as DEPLETED, moved to where the hollow is, so the two states
     share every other face and meet along the same edges."""
     obj = duplicate(source, 'runtime')
-    for name in ('Masks', 'Ore', 'Lines', 'Grain'):
+    for name in ('Masks', 'Facets', 'Lines', 'Grain'):
         obj.data.attributes.remove(obj.data.attributes[name])
     obj.data.materials.clear()
     obj.data.calc_loop_triangles()
@@ -1008,6 +1116,7 @@ def runtime(outcrop, source, triangles):
     for index, point in enumerate(outcrop.full_points):
         near.insert(point, index)
     near.balance()
+    outcrop.on_camera = on_camera(tree, near, outcrop)
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bm.faces.ensure_lookup_table()
@@ -1022,13 +1131,32 @@ def runtime(outcrop, source, triangles):
         if isinstance(item, bmesh.types.BMFace):
             item[state] = DEPLETED
         elif isinstance(item, bmesh.types.BMVert) and not item.is_boundary:
-            # The nearest source point that faces the same way: in a crevice the nearest of all may lie on the other wall.
-            alike = max(near.find_n(item.co, 8), key=lambda found: item.normal.dot(Vector(outcrop.full_normals[found[1]])) - found[2] * 4)
-            item.co += Vector(outcrop.hollow_move[alike[1]])
+            # The smallest move among the source points around it that face the same way
+            # (in a crevice the nearest may lie on the other wall). Beside a step or a
+            # flake of skin the copy so stays on the outside: under them the bake's rays,
+            # which start just outside it, would miss the hollow and leave bare texels (rounds 4 to 6).
+            alike = [index for _, index, _ in near.find_range(item.co, .12) if item.normal.dot(Vector(outcrop.full_normals[index])) > .3]
+            if alike:
+                item.co += Vector(min(outcrop.hollow_move[alike], key=np.linalg.norm))
     bm.to_mesh(obj.data)
     bm.free()
     log(f'runtime mesh: {len(obj.data.polygons)} triangles, {len(marked)} of them show ore')
     return obj
+
+
+def on_camera(tree, near, outcrop):
+    """The share of the rock the game's camera sees that is ore, from a grid of its rays."""
+    toward, right = Vector(VIEW), Vector((1, 0, 0))
+    rise = toward.cross(right)
+    rock = ore = 0
+    for across in np.arange(-8, 8, .08):
+        for up in np.arange(-8, 8, .08):
+            hit = tree.ray_cast(right * across + rise * up + toward * 40, -toward)[0]
+            index = near.find(hit)[1] if hit else None
+            if hit and outcrop.rock[index] > .5:
+                rock += 1
+                ore += outcrop.ore[index] > .5
+    return ore / rock
 
 
 def unwrap(obj):
@@ -1124,7 +1252,7 @@ def unwrap(obj):
     log(f'atlas: {len(members)} charts, {len(squeezed)} of them laid out flat')
 
 
-def spread(pixels, filled, steps=10):
+def spread(pixels, filled, steps=48):
     """Grow baked texels into the empty ones around them, so seams and mip levels never sample unbaked texels."""
     for _ in range(steps):
         total, count = np.zeros_like(pixels), np.zeros(filled.shape)
@@ -1148,7 +1276,7 @@ def bake(low, sources, output, name):
     # Occlusion looks only a short way, so a hollow is shaded in its corners, not blackened throughout.
     scene.world = bpy.data.worlds.new('Bake')
     scene.world.light_settings.distance = .7
-    settings = dict(use_selected_to_active=True, cage_extrusion=.08, max_ray_distance=.25, margin=0, use_clear=True,
+    settings = dict(use_selected_to_active=True, cage_extrusion=.1, max_ray_distance=.55, margin=0, use_clear=True,
                     uv_layer='RuntimeUV', normal_space='TANGENT')
     # The first pass marks the texels whose ray found the source; the rest take their neighbours' values.
     passes = dict(found=('EMIT', 1, 'white'), color=('EMIT', 6, 'color'), normal=('NORMAL', 8, 'shaded'),
@@ -1173,6 +1301,7 @@ def bake(low, sources, output, name):
         high.select_set(True)
         target.select_set(True)
         bpy.context.view_layer.objects.active = target
+        baked = {}
         for key, (kind, samples, shows) in passes.items():
             image = bpy.data.images.new(f'{key} {states}', ATLAS, ATLAS, alpha=True, float_buffer=True)
             image.colorspace_settings.name = 'Linear Rec.709' if key == 'color' else 'Non-Color'
@@ -1182,13 +1311,17 @@ def bake(low, sources, output, name):
             bpy.ops.object.bake(type=kind, **settings)
             pixels = np.empty(ATLAS * ATLAS * 4, np.float32)
             image.pixels.foreach_get(pixels)
-            pixels = pixels.reshape(ATLAS, ATLAS, 4)
-            if key == 'found':
-                hit = pixels[..., 0] > .5
-                covered |= hit
-                log(f'states {states}: {hit.mean():.1%} of the atlas')
-            layers[key][hit] = pixels[hit]
+            baked[key] = pixels.reshape(ATLAS, ATLAS, 4)
             bpy.data.images.remove(image)
+        # A ray that started under the source, where the low-poly cuts a corner, found the
+        # back of some other surface: its normal points into the low-poly and would shade
+        # black in the game (rounds 4 to 7). Such texels take their neighbours' values too.
+        found = baked['found'][..., 0] > .5
+        hit = found & (baked['normal'][..., 2] > .6)
+        covered |= hit
+        log(f'states {states}: {found.mean():.1%} of the atlas, {(found & ~hit).mean():.2%} of it dropped')
+        for key in passes:
+            layers[key][hit] = baked[key][hit]
         bpy.data.objects.remove(target)
     show('shaded')
     for high in highs:
@@ -1305,7 +1438,7 @@ def draft(output, sources):
         log(f'draft of {name}')
 
 
-def author(seed, suffix):
+def author(seed):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     SHOWS.clear()
     output = OUT / f'seed-{seed}'
@@ -1331,14 +1464,14 @@ def author(seed, suffix):
     points = coords(low.data)
     low.data.transform(Matrix.Scale(FOOTPRINT_RADIUS / float(np.hypot(points[:, 0], points[:, 1]).max()), 4))
     entries = []
+    shares = dict(ore_on_rock=float(outcrop.ore[outcrop.rock > .5].mean()), ore_on_camera=float(outcrop.on_camera))
     for name, states in (('full', (BOTH, FULL)), ('depleted', (BOTH, DEPLETED))):
-        entries.append(dict(seed=seed, state=name, **export(low, states, OUT / f'{name}{suffix}.glb')))
+        entries.append(dict(seed=seed, state=name, **export(low, states, output / f'{name}.glb'), **shares))
         print('KNUCKLES_EXPORT', json.dumps(entries[-1]), flush=True)
     return entries
 
 
-exports = [entry for index, seed in enumerate(args.seed)
-           for entry in author(seed, '-' + chr(ord('a') + index) if index else '')]
+exports = [entry for seed in args.seed for entry in author(seed)]
 if exports:
     (OUT / 'export.json').write_text(json.dumps(dict(
         generator='tools/assets/build_titanium_three_knuckles.py',
