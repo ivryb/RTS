@@ -57,6 +57,8 @@ export interface OreModel {
 
 export type OreModelLoader = () => Promise<readonly OreModel[]>;
 
+const NOTHING_SELECTED: ReadonlySet<string> = new Set();
+
 /** The strip of rock face that a beam from one spot can sweep, as points from bottom to top. */
 export class Workface {
   count = 0;
@@ -187,13 +189,12 @@ export class OrePresentation {
       this.root.add(root);
       root.updateMatrixWorld(true);
       placeGroundGeometry(ring.geometry, 0);
-      const presentation: OreDeposit = {
+      this.deposits.set(deposit.id, {
         root, visual, ring, meshes: [], radius, full: source.full.clone(true), depleted: source.depleted.clone(true),
-      };
-      this.show(presentation, deposit.amount > 0 ? presentation.full : presentation.depleted);
-      this.deposits.set(deposit.id, presentation);
+      });
       this.selectables.push(root);
     });
+    this.update(deposits, NOTHING_SELECTED);
   }
 
   update(deposits: readonly TitaniumDepositState[], selected: ReadonlySet<string>) {
