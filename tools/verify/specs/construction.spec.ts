@@ -103,6 +103,24 @@ const resume = async (page: Page, site: BuildingSnapshot) => {
 const frameSize = (kind: Kind, zoom: "default" | "close"): [number, number] =>
   zoom === "default" ? (kind === "turret" ? [280, 210] : [460, 340]) : kind === "turret" ? [520, 400] : [900, 600];
 
+/**
+ * Waits until a site the drone has just left has gone dark. The weld cools over 0.8 s of game
+ * time, and the game steps at most 50 ms a frame, so a machine that draws two frames a second
+ * needs twenty frames for it, not 1.5 s.
+ */
+const waitForColdWeld = async (page: Page) => {
+  await page.waitForTimeout(1_500);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    let frames = 0;
+    const next = () => {
+      frames += 1;
+      if (frames < 20) requestAnimationFrame(next);
+      else resolve();
+    };
+    requestAnimationFrame(next);
+  }));
+};
+
 const progressOf = async (page: Page, id: string) => (await siteState(page, id)).site?.constructionProgress ?? 0;
 
 /** Captures frames until the site is complete, then through the half second its scaffold takes to drop. */
@@ -171,7 +189,7 @@ const build = async (page: Page, kind: Kind) => {
   const paused = await progressOf(page, site.id);
   expect(paused).toBeGreaterThan(0);
   expect(paused).toBeLessThan(1);
-  await page.waitForTimeout(1_500);
+  await waitForColdWeld(page);
   await shoot(page, site, `${kind}-paused-default`, frames, frameSize(kind, "default"));
   await look(page, site.x, site.z, CLOSEST);
   await shoot(page, site, `${kind}-paused-close`, frames, frameSize(kind, "close"));

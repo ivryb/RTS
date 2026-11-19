@@ -176,14 +176,17 @@ const lossState = (seconds: number): SiteState => {
 };
 const LOSS_SECONDS = 4.5;
 
-/** The drone leaves for 2 s, long enough for the weld to go cold, and then for only 0.4 s, which catches it half cooled. */
-const PAUSES = [[1.5, 3.5], [5, 5.4]] as const;
+/**
+ * The drone leaves for 2 s, long enough for the weld to go cold, then for 0.4 s, which catches
+ * the glow half cooled, then for 0.1 s, which catches the arcs half out.
+ */
+const PAUSES = [[1.5, 3.5], [5, 5.4], [6.4, 6.5]] as const;
 /** A build at the Command Center's pace that the drone leaves twice. */
 const pauseState = (seconds: number): SiteState => {
   const idle = PAUSES.reduce((sum, [from, to]) => sum + THREE.MathUtils.clamp(seconds - from, 0, to - from), 0);
   return constructing(0.4 + (seconds - idle) / 60, !PAUSES.some(([from, to]) => seconds >= from && seconds < to));
 };
-const PAUSE_SECONDS = 6.5;
+const PAUSE_SECONDS = 7.5;
 
 const params = new URLSearchParams(location.search);
 const shot = params.get("shot") ?? "gameplay";
@@ -286,7 +289,7 @@ const applyState = (site: Site, state: SiteState, seconds: number) => {
   positions.needsUpdate = true;
 };
 
-/** For a still: the site as it looks once it has been in `state` for a while, not caught mid-fade. */
+/** For a strip, whose panels share their sites: the site once it has been in `state` for a while, not caught mid-fade. */
 const applySettled = (site: Site, state: SiteState, seconds: number) => {
   site.handle.update(state, seconds - SETTLE_SECONDS);
   applyState(site, state, seconds);
@@ -448,7 +451,7 @@ if (shot in stripShots) {
   const target = row(2);
   const camera = cameraFor({ x: target.x + 3, z: target.z + 3 }, 40, innerWidth / innerHeight);
   aimSun(target);
-  sites.forEach((site, index) => applySettled(site, constructing(0.45, index % 4 < 2), time));
+  sites.forEach((site, index) => applyState(site, constructing(0.45, index % 4 < 2), time));
   construction.flush(time);
   renderer.render(scene, camera);
   sceneName.textContent = `Construction · buildings turned ${turns.join(", ")} degrees, standing side by side`;
@@ -491,8 +494,8 @@ if (shot in stripShots) {
     : shot.startsWith("film-pause")
       ? [pauseState, PAUSE_SECONDS]
       : shot === "film-opening-command-center"
-      ? [openingState, OPENING_SECONDS]
-      : shot === "film-command-center" ? [excerptState, EXCERPT_SECONDS] : [filmState, FILM_SECONDS];
+        ? [openingState, OPENING_SECONDS]
+        : shot === "film-command-center" ? [excerptState, EXCERPT_SECONDS] : [filmState, FILM_SECONDS];
   window.__constructionFrameCount = Math.round(length * FILM_FPS);
   window.__constructionFrame = (index) => {
     const seconds = index / FILM_FPS;
@@ -545,8 +548,6 @@ if (shot in stripShots) {
   const programsAtRest = renderer.info.programs?.length ?? 0;
   const atRest = measureFrame(camera);
   const building = (index: number) => constructing(0.08 + index * 0.095, index % 3 !== 2);
-  // Two frames a second apart, so the working sites' welds are fully lit when they are counted.
-  frame(building, 0);
   frame(building, 1);
   renderer.render(scene, camera);
   const underConstruction = measureFrame(camera);

@@ -6,13 +6,13 @@ The two looks that lost the study, a layer-by-layer print with a cyan blueprint 
 
 ## The look
 
-A physical scaffold stands around the site from the moment it is placed. The real building rises inside it from the ground up, and the scaffold drops away when the building is complete. Everything is driven by four values: construction progress from 0 to 1, whether a drone is working, the site's health, and the time since the site completed or was destroyed. A site carries one thing from frame to frame, the heat of its weld, so the glow can fade when the drone starts and stops.
+A physical scaffold stands around the site from the moment it is placed. The real building rises inside it from the ground up, and the scaffold drops away when the building is complete. Everything is driven by four values: construction progress from 0 to 1, whether a drone is working, the site's health, and the time since the site completed or was destroyed. A site carries one thing from frame to frame, its weld (how strongly the arcs burn and how hot the steel is), so both can fade when the drone starts and stops.
 
 | State | What the player sees |
 | --- | --- |
 | Just placed, 0%, no drone yet | The scaffold at full size on a dusty plate pad with striped kerbs. No sparks, no building. |
 | Drone working | The finished model is shown up to a horizontal cut at `progress × height`. The newest band under the cut is bare steel. A dark ribbed deck closes the cut, glowing only near its rim, which carries a hot seam, and weld arcs with falling sparks hop around the hull at that height. The drone's beam ends at the cut. In the first 0.9 s of work the first layer spreads out from under the beam as a growing disc. |
-| Paused, no drone working | The arcs die in 0.2 s, and the seam and the deck's glow cool to dark steel in 0.8 s. When the drone comes back the arcs strike in 0.2 s and the glow returns in 0.4 s. A drone that stops and resumes sooner than that turns each fade round from where it is, so nothing jumps. Nothing moves on a paused site. |
+| Paused, no drone working | The arcs die in 0.2 s, and the seam and the deck's glow cool to dark steel in 0.8 s. When the drone comes back the arcs strike in 0.2 s and the glow returns in 0.4 s. A drone that stops and resumes sooner than that turns each fade round from where it is, so nothing jumps. Nothing moves on a paused site unless it is damaged and smoking. |
 | Damaged before completion | Rails and braces hang or go missing in proportion to lost health, and dark smoke rises where they broke, from more places as health falls. Posts, feet and the pad always stand. The game's health bar still carries the exact value. |
 | Destroyed before completion | The scaffold drops into the ground in 0.24 s with a skirt of dust. The building stays cut at the height it had reached, with its deck, and sinks into pale dust over 1 s, leaving a heap of rubble: [destruction and death effects](death_effects.md) stage that. |
 | Completion | The building is the untouched model from the first frame. The scaffold's walls and feet drop into the pad, the pad and its kerbs sink after them, all within 0.5 s, and the dust is gone 1 s after completion, when nothing of the site is left. |
@@ -45,7 +45,7 @@ The site is picked through what is visible. Each site has a pick object under it
 
 ## Cost
 
-Measured in the construction preview with 5 Command Centers and 5 Turrets under construction at once, with 7 working drones and their beams, shadow pass included. Draw calls and triangles are exact counts from `renderer.info`. The CPU times are single runs on Boat, which renders in software; they are far below a 16.7 ms frame, so their spread does not change the picture.
+Measured in the construction preview with 5 Command Centers and 5 Turrets under construction at once, with 7 working drones and their beams, shadow pass included. Draw calls and triangles are exact counts from `renderer.info`. The CPU times are from Boat, which renders in software; they are far below a 16.7 ms frame, so their spread does not change the picture. The scaffold's per-frame time is the range of six runs. The weld's fade (D77-12) did not move it: in alternating runs the code before it took 0.026 to 0.038 ms and the code after it 0.029 to 0.043 ms. The other times are single runs.
 
 | | Stretch (before) | Scaffold |
 | --- | --- | --- |
@@ -53,8 +53,8 @@ Measured in the construction preview with 5 Command Centers and 5 Turrets under 
 | Triangles, 10 finished buildings | 5,942,803 | 5,942,803 |
 | Draw calls, 10 sites | 196 | 200 |
 | Draw calls, 10 sites, in a browser without `WEBGL_multi_draw` | 196 | 238 |
-| Triangles, 10 sites | 5,978,671 | 6,035,351 |
-| CPU per frame for 10 sites | 0.0017 ms | 0.023 ms |
+| Triangles, 10 sites | 5,978,671 | 6,035,303 |
+| CPU per frame for 10 sites | 0.0017 ms | 0.029 to 0.043 ms |
 | Preparing a site | 0 ms | up to 1.3 ms (Command Center), 0.4 ms (Turret) |
 | Measuring a building kind, once | none | 15 to 21 ms |
 
@@ -86,7 +86,7 @@ box pull art/workbench/renders/previews/construction/
 - `first-layer`, `first-layer-turret`, `cuts-turret`, `cuts-command-center`, `shoulders`, `barrels`: the cut at the heights where it once looked wrong.
 - `fit`, `slope`: buildings turned 0, 30, 45, 77 and 180 degrees side by side, and a Command Center on the steepest slope placement allows.
 - `film`, `film-turret`, `film-command-center`, `film-opening-command-center`, `film-loss`, `film-loss-turret`: a build at real Turret speed with the drone leaving for 1.5 s, 12 s of a Command Center build at its real pace, the first 3 s of one, and a site shot at and destroyed.
-- `film-pause`, `film-pause-turret`, `film-pause-command-center`: the drone leaves for 2 s, long enough for the weld to go cold, comes back, and then leaves for only 0.4 s, which catches the weld half cooled.
+- `film-pause`, `film-pause-turret`: the drone leaves for 2 s, long enough for the weld to go cold, then for 0.4 s, which catches the glow half cooled, then for 0.1 s, which catches the arcs half out. `?shot=film-pause-command-center` shows the same close on the Command Center.
 - `perf`: the cost table above, written to `perf.json`.
 
 A new building needs no work here, but look at it in `gameplay` and `fit` once: the outline assumes one main hull around the model's vertical axis.
