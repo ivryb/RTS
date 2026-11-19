@@ -289,8 +289,9 @@ export class ConstructionSites {
         weldedAt = time;
         arcing = clamp(arcing + elapsed / (welding ? ARC_SECONDS : -ARC_SECONDS), 0, 1);
         heat = clamp(heat + elapsed / (welding ? HEAT_SECONDS : -COOL_SECONDS), 0, 1);
-        // A destroyed site goes dark at once.
-        const glow = constructing ? smoothstep(heat, 0, 1) : 0;
+        // Squared, because the seam is far brighter than white: an even fade would hold it white
+        // for half its time and then drop. A destroyed site goes dark at once.
+        const glow = constructing ? heat * heat : 0;
         // The last courses have no bare band left, so completion does not repaint the roof.
         const band = fullBand * (1 - smoothstep(progress, 0.86, 1));
         const flicker = 0.82 + 0.18 * Math.sin(time * 23 + seed * 40) * Math.sin(time * 17.3);
