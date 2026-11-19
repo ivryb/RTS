@@ -71,6 +71,176 @@
         "ScaffoldCurb",
         "ScaffoldBeacon"
       ]
+    },
+    {
+      "slug": "scout-drone-wreck",
+      "design": "crashed and burnt Scout Drone, laid where it lands",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_units.py",
+      "runtime_file": "assets/models/wrecks/scout-drone-wreck.glb",
+      "size_bytes": 81796,
+      "sha256": "0cfa790fcb8094d7358456fc896d6f5bb450503561c7dd30d4192f907f720f7d",
+      "triangles": 900,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 256,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "ScoutDroneWreck"
+      ]
+    },
+    {
+      "slug": "hornet-wreck",
+      "design": "crashed and burnt Hornet, laid where it lands",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_units.py",
+      "runtime_file": "assets/models/wrecks/hornet-wreck.glb",
+      "size_bytes": 178208,
+      "sha256": "3c6f81745b4905d3a5232c949dedf20965080b77e3ee41bddfe4cd3ca961bc1e",
+      "triangles": 1700,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 512,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "HornetWreck"
+      ]
+    },
+    {
+      "slug": "behemoth-wreck",
+      "design": "burnt-out Behemoth hull, in the frame of the live model",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_units.py",
+      "runtime_file": "assets/models/wrecks/behemoth-wreck.glb",
+      "size_bytes": 219216,
+      "sha256": "9b232a2ea8aa30e4e082b50baac1825b45d2f1078b12924a81d7f56e6e4afdc7",
+      "triangles": 2600,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 512,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "BehemothWreck"
+      ]
+    },
+    {
+      "slug": "ghostrunner-wreck",
+      "design": "charred Ghostrunner husk in the last pose of its Dead clip",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_units.py",
+      "runtime_file": "assets/models/wrecks/ghostrunner-wreck.glb",
+      "size_bytes": 132532,
+      "sha256": "a60b270df55feb112b046241284528b2c7af0dc4cb6de6bd00bd411ea52b66af",
+      "triangles": 1500,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 256,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "GhostrunnerWreck"
+      ]
+    },
+    {
+      "slug": "command-center-ruin",
+      "design": "burnt-out Command Center: wall stubs around fallen roof plates in an ash apron",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_ruins.py",
+      "runtime_file": "assets/models/wrecks/command-center-ruin.glb",
+      "size_bytes": 701172,
+      "sha256": "93957ed26ea16074cc3ed004680889c3907cdd5d752d5071b9245afddab93183",
+      "triangles": 6643,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 1024,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "CommandCenterRuin"
+      ]
+    },
+    {
+      "slug": "turret-ruin",
+      "design": "burnt-out Turret: cracked feet, bearing and the fallen gun in an ash apron",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_ruins.py",
+      "runtime_file": "assets/models/wrecks/turret-ruin.glb",
+      "size_bytes": 188640,
+      "sha256": "6d3a0c286643e58ffc6578c44b45cb9c2e54bd6b558ece58343ee8559c7d0465",
+      "triangles": 2506,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 512,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "TurretRuin"
+      ]
+    },
+    {
+      "slug": "site-rubble",
+      "design": "unburnt heap of a half-built Command Center: fallen scaffold, wall slabs and bare steel",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_ruins.py",
+      "runtime_file": "assets/models/wrecks/site-rubble.glb",
+      "size_bytes": 572812,
+      "sha256": "6aff3a2770b3a4068a12bfd0bb88a583b109a1de8bf7b092584c2626998a601d",
+      "triangles": 3051,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 1024,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "SiteRubble"
+      ]
+    },
+    {
+      "slug": "site-rubble-small",
+      "design": "unburnt heap of a half-built Turret, built at its size from the same parts",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_ruins.py",
+      "runtime_file": "assets/models/wrecks/site-rubble-small.glb",
+      "size_bytes": 171948,
+      "sha256": "21dd15b2970357a178bd7499d1e7a9197cc34e6b7685c412ace3b8488c9c1b79",
+      "triangles": 1214,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 512,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "SiteRubbleSmall"
+      ]
+    },
+    {
+      "slug": "scrap-plate",
+      "design": "charred plate thrown by blasts, about a metre long before the game scales it",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_ruins.py",
+      "runtime_file": "assets/models/wrecks/scrap-plate.glb",
+      "size_bytes": 15840,
+      "sha256": "0426ce73ac894db055c7992cf69ef10125b58eb8f860337797bc2d666ee4d13a",
+      "triangles": 36,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 256,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "ScrapPlate"
+      ]
+    },
+    {
+      "slug": "scrap-beam",
+      "design": "pale beam thrown when a construction site falls",
+      "accepted_at": "2026-11-19",
+      "generator": "tools/assets/build_death_wreck_ruins.py",
+      "runtime_file": "assets/models/wrecks/scrap-beam.glb",
+      "size_bytes": 40380,
+      "sha256": "e9dc140e5790b06f2938f846bcdba241050b6d25be6f67adb75ac0163eab9c3d",
+      "triangles": 484,
+      "meshes": 1,
+      "materials": 1,
+      "atlas_size": 256,
+      "texture_format": "WebP quality 85",
+      "nodes": [
+        "ScrapBeam"
+      ]
     }
   ]
 }
