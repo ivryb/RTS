@@ -54,17 +54,20 @@ Write one-off feature drives as a new spec file there (they double as
 regression proofs and are cheap to keep). The helpers encode everything that
 broke the first time — use them instead of raw Playwright calls:
 
-- `openGame(page, seed?, { render? })` — opens `/?seed=N&verify=1`, waits for
-  sim frames **and** model GLB fetches (`networkidle`). Skipping the model wait
-  makes raycast picking silently miss buildings. It opens the light render mode
-  unless the spec passes `{ render: "full" }`; see "Render modes" below.
+- `openGame(page, seed?, { render?, titanium? })` — opens `/?seed=N&verify=1`,
+  waits for sim frames **and** model GLB fetches (`networkidle`). Skipping the
+  model wait makes raycast picking silently miss buildings. It opens the light
+  render mode unless the spec passes `{ render: "full" }`; see "Render modes"
+  below. `titanium: N` starts every Titanium Deposit at N instead of 16,000 or
+  more, so a Scout can mine one out; the game honours it only with `verify=1`.
 - `snapshot(page)` / `waitForSnapshot(page, predicate, timeout?)` — read-only
   match state from the `?verify=1` hook: `tick`, `outcome`, `units[]`
   (`id, kind, ownerId, x, z, health, order, moving, attacking, cargoTitanium,
   harvest, miningLaser`),
   `buildings[]` (`id, kind, ownerId, lifecycle, constructionProgress, health,
   productionQueue`),
-  `titaniumDeposits[]` (`id, x, z, radius, amount`),
+  `titaniumDeposits[]` (`id, x, z, radius, amount, shown` — `shown` is the
+  model drawn, `"full"` or `"depleted"`),
   `selected.unitIds/buildingIds`. Poll, never sleep.
 - `clickEntity(page, id)` — selects an entity by left-clicking its projected
   position through the real canvas raycast path. Click height varies per model,
