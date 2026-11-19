@@ -33,7 +33,7 @@ const WHOLE_HULL = 1e6;
 const ARC_SECONDS = 0.2;
 /** Seconds the steel takes to glow behind the arcs. */
 const HEAT_SECONDS = 0.4;
-/** Seconds it takes to cool once the arcs are out: hot steel goes dark more slowly than it lights. */
+/** Seconds it takes to cool once the drone stops: hot steel goes dark more slowly than it lights. */
 const COOL_SECONDS = 0.8;
 
 /** Everything the presentation knows about one site on one frame. */
@@ -55,7 +55,8 @@ export interface ConstructionSite {
   /**
    * Sets every visual from `state` and `time`. Only the weld is carried over from the last
    * call: its arcs and glow come up and die down over the time that passed since then, so
-   * call this with a later `time` each frame. Returns false once the building is complete
+   * call this with a later `time` each frame. The first call shows the weld settled, and an
+   * earlier `time` counts as no time passed. Returns false once the building is complete
    * and nothing of its construction is left to show, so the site can be disposed.
    */
   update(state: SiteState, time: number): boolean;
@@ -256,10 +257,10 @@ export class ConstructionSites {
     let beamTargetY = ground;
     let sunk = 0;
     // The weld, from 0 (out, cold) to 1: how strongly its arcs burn and how hot its steel is,
-    // and when both were last moved. No time has passed before the first update.
+    // and when both were last moved. The first update finds it settled, lit or cold.
     let arcing = 0;
     let heat = 0;
-    let weldedAt = Infinity;
+    let weldedAt = -Infinity;
     return {
       get beamTargetY() {
         return beamTargetY;
