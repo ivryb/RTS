@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { DECK_STRIDE, DIRECTIONS, SLICES } from "./outline";
 import { structureGlsl } from "./reveal";
 
-/** Floats per deck: ground position and turn; height, table row, work and reach; then opacity. */
-const STRIDE = 12;
+/** Floats per deck: ground position and turn; then height, table row, work and reach. */
+const STRIDE = 8;
 /** Metres of hot seam around a deck's rim while it is being welded. */
 const SEAM = 0.09;
 /** Metres in from the rim over which a welded deck cools down to cold steel. */
@@ -17,8 +17,6 @@ export interface Deck {
    * `reach` metres from the building's axis, which is how the first layer spreads out.
    */
   set(progress: number, height: number, work: number, reach: number): void;
-  /** Fades the deck out, from 1 (opaque) to 0. */
-  setOpacity(opacity: number): void;
   hide(): void;
 }
 
@@ -27,14 +25,12 @@ export interface Deck {
 const vertexShader = /* glsl */ `
 attribute vec4 aSite;
 attribute vec4 aCut;
-attribute vec4 aLook;
 uniform sampler2D uHulls;
 varying vec2 vLocal;
 varying float vRim;
 varying float vReach;
 varying float vWork;
 varying float vRow;
-varying float vOpacity;
 
 void main() {
   float angle = position.x / ${DIRECTIONS}.0 * 6.283185307 - 3.141592654;
@@ -45,7 +41,6 @@ void main() {
   vReach = reach;
   vWork = aCut.z;
   vRow = aCut.y;
-  vOpacity = aLook.x;
   vec3 world = vec3(
     aSite.x + aSite.z * vLocal.x + aSite.w * vLocal.y,
     aCut.x,
@@ -64,7 +59,6 @@ varying float vRim;
 varying float vReach;
 varying float vWork;
 varying float vRow;
-varying float vOpacity;
 ${structureGlsl}
 
 void main() {
@@ -76,7 +70,7 @@ void main() {
   float seam = 1.0 - smoothstep(${(SEAM * 0.4).toFixed(3)}, ${SEAM.toFixed(3)}, inward);
   // Only the edge being welded is hot; the middle of a wide deck has cooled to dark steel.
   float heat = vWork * (1.0 - smoothstep(0.0, ${HEAT_REACH.toFixed(1)}, inward));
-  gl_FragColor = vec4(siteDeck(vLocal, heat) + vWork * seam * SITE_HOT_SEAM, vOpacity);
+  gl_FragColor = vec4(siteDeck(vLocal, heat) + vWork * seam * SITE_HOT_SEAM, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -109,19 +103,18 @@ export class Decks {
     }
     const geometry = new THREE.InstancedBufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(corners, 3));
-    // Blended, so a deck can fade with its building; it still writes depth and draws ahead
-    // of every other blended thing, exactly as an opaque surface would.
     this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
       name: "Construction deck",
       uniforms: { uHulls: { value: this.hulls } },
       vertexShader,
       fragmentShader,
       side: THREE.DoubleSide,
-      transparent: true,
     }));
     this.mesh.name = "Construction decks";
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = -1;
+    // Drawn after the buildings, as it was while it could fade: where the rim meets a wall at
+    // equal depth, the later of the two wins the pixel.
+    this.mesh.renderOrder = 1;
     this.mesh.visible = false;
     this.bind();
     parent.add(this.mesh);
@@ -132,7 +125,6 @@ export class Decks {
     const { geometry } = this.mesh;
     geometry.setAttribute("aSite", new THREE.InterleavedBufferAttribute(this.buffer, 4, 0));
     geometry.setAttribute("aCut", new THREE.InterleavedBufferAttribute(this.buffer, 4, 4));
-    geometry.setAttribute("aLook", new THREE.InterleavedBufferAttribute(this.buffer, 4, 8));
   }
 
   /** Stores one building kind's `Outline.decks` and returns its table number for `createDeck`. */
@@ -152,7 +144,6 @@ export class Decks {
     data[1] = root.position.z;
     data[2] = Math.cos(root.rotation.y);
     data[3] = Math.sin(root.rotation.y);
-    data[8] = 1;
     const rows = SLICES * this.kinds;
     return {
       set: (progress, height, work, reach) => {
@@ -163,9 +154,6 @@ export class Decks {
         data[6] = work;
         data[7] = reach;
         this.shown.add(data);
-      },
-      setOpacity: (opacity) => {
-        data[8] = opacity;
       },
       hide: () => this.shown.delete(data),
     };
