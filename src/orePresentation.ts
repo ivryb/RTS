@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { hashId } from "./behemothAttack";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import { sampleHeight } from "./map";
 import type { TerrainSurface } from "./terrainWalkability";
@@ -387,8 +388,7 @@ const SWEEP_SECONDS = 1.9;
 
 /** A stable random number from 0 to 1 per unit. */
 const unitSeed = (id: string) => {
-  let hash = 2166136261;
-  for (let index = 0; index < id.length; index += 1) hash = Math.imul(hash ^ id.charCodeAt(index), 16777619);
+  let hash = hashId(id);
   // Ids that differ only in their last digit hash next to each other until the bits are mixed.
   hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
   hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);

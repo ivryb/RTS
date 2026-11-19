@@ -8,13 +8,16 @@ export const seededRandom = (seed: number, offset: number) => {
   return value - Math.floor(value);
 };
 
-export const behemothVolleySeed = (attackerId: string, tick: number) => {
-  let seed = tick;
-  for (let index = 0; index < attackerId.length; index += 1) {
-    seed = Math.imul(seed ^ attackerId.charCodeAt(index), 16_777_619);
+/** A stable whole number for an id (FNV-1a), started from `seed`. */
+export const hashId = (id: string, seed = 2_166_136_261) => {
+  let hash = seed;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = Math.imul(hash ^ id.charCodeAt(index), 16_777_619);
   }
-  return seed >>> 0;
+  return hash >>> 0;
 };
+
+export const behemothVolleySeed = (attackerId: string, tick: number) => hashId(attackerId, tick);
 
 export const behemothFirstImpactSeconds = (distance: number, seed: number) =>
   Math.max(BEHEMOTH_MIN_FLIGHT_SECONDS, distance / BEHEMOTH_ROCKET_SPEED)

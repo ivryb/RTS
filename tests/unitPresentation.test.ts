@@ -13,6 +13,7 @@ import {
 import { pickSurface, selectableEntityId } from "../src/unitInput";
 import { UnitSystem, createHealthBar, updateHealthBar, type UnitPresentationOptions, type UnitSpawn } from "../src/unitSystem";
 import type { OreModelLoader } from "../src/orePresentation";
+import { WRECK_MODEL_NAMES, type WreckKit } from "../src/death/wreckKit";
 
 const map = {
   size: 100,
@@ -93,6 +94,37 @@ const scaffoldKit = async () => {
   return kit;
 };
 
+/** A stand-in for the wreck kit: every wreck, ruin and piece of scrap is a one-metre box on the ground. */
+const wreckKit = async () => Object.fromEntries(WRECK_MODEL_NAMES.map((name) => {
+  const geometry = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  geometry.computeBoundingBox();
+  return [name, { geometry, material: new THREE.MeshStandardMaterial() }];
+})) as unknown as WreckKit;
+
+/** Loads the kits and warms the effects up as the game does while it loads, with nothing to draw on. */
+const prepareEffects = (system: UnitSystem) => system.prepareRendering(
+  { compile() {}, render() {} } as unknown as THREE.WebGLRenderer,
+  new THREE.Scene(),
+  new THREE.Camera(),
+);
+
+/** Where the wrecks, ruins or heaps of one model lie in the world. */
+const leftovers = (world: THREE.Object3D, name: string) => {
+  const pool = world.getObjectByName(name) as THREE.InstancedMesh;
+  const matrix = new THREE.Matrix4();
+  const places: THREE.Vector3[] = [];
+  for (let index = 0; pool.visible && index < pool.count; index += 1) {
+    pool.getMatrixAt(index, matrix);
+    // A free slot is kept at zero scale.
+    if (matrix.elements[0] !== 0 || matrix.elements[5] !== 0) places.push(new THREE.Vector3().setFromMatrixPosition(matrix));
+  }
+  return places;
+};
+
+/** Runs the presentation for `seconds` in rendered frames of a tenth of a second. */
+const play = (system: UnitSystem, seconds: number) => {
+  for (let elapsed = 0; elapsed < seconds - 1e-6; elapsed += 0.1) system.update(0.1);
+};
 /** Resolves once a site placed in this turn has been given its scaffold. */
 const kitLoaded = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -730,7 +762,7 @@ describe("unit presentation timing", () => {
     expect(world.getObjectByName("Turret attack range")?.visible).toBe(true);
   });
 
-  test("drops the scaffold and fades a half-built site destroyed before completion", async () => {
+  test("drops the scaffold and sinks a half-built site destroyed before completion into a heap of rubble", async () => {
     const ghostrunner = unit("ghostrunner");
     const session = new TestSession(frame(1, ghostrunner, []));
     const world = new THREE.Group();
@@ -756,7 +788,9 @@ describe("unit presentation timing", () => {
       undefined,
       undefined,
       scaffoldKit,
+      wreckKit,
     );
+    await prepareEffects(system);
     const site = activeBuilding("turret-site", "turret", {
       lifecycle: "constructing",
       constructionProgress: 0.4,
@@ -780,19 +814,27 @@ describe("unit presentation timing", () => {
     system.update(0);
     expect(clickedFromAbove(system, world, 11.08, 2.4)).toBeUndefined();
 
-    system.update(0.4);
-    // The stump stands as it was cut, without the collapse a finished building gets, and fades.
+    play(system, 0.8);
+    // The stump keeps its cut while it goes down, with no fire: nothing in it was finished.
     expect(world.getObjectByName("site model")).toBe(root);
-    expect(root.getObjectByName("Building visual")?.scale.y).toBe(1);
     expect(model.material).not.toBe(finished);
-    expect((model.material as THREE.Material).opacity).toBeCloseTo(0.5);
+    expect(root.position.y).toBeLessThan(0);
+    expect(root.rotation.x).toBeCloseTo(0);
+    expect(root.rotation.z).toBeCloseTo(0);
+    expect(leftovers(world, "site-rubble-small")).toHaveLength(1);
+    expect(leftovers(world, "turret-ruin")).toHaveLength(0);
 
-    system.update(0.5);
+    play(system, 1);
     expect(world.getObjectByName("site model")).toBeUndefined();
     // The model belongs to its factory and may be shared: it gets its own material back, untouched.
     expect(model.material).toBe(finished);
     expect(finished.opacity).toBe(1);
     expect(finishedDisposed).toBe(false);
+    // The heap lies for most of a minute, then sinks into the sand.
+    play(system, 40);
+    expect(leftovers(world, "site-rubble-small")).toHaveLength(1);
+    play(system, 15);
+    expect(leftovers(world, "site-rubble-small")).toHaveLength(0);
   });
 
   test("keeps placement active until a queued build is authoritatively accepted", () => {
@@ -975,7 +1017,7 @@ describe("unit presentation timing", () => {
     expect(buildingHealth.visible).toBe(true);
   });
 
-  test("a destroyed building fades on its own materials and leaves the model it shares untouched", async () => {
+  test("a destroyed building collapses into a ruin and leaves the model it shares untouched", async () => {
     const ghostrunner = unit("ghostrunner");
     const doomed = activeBuilding("turret-doomed");
     const survivor = activeBuilding("turret-survivor", "turret", {
@@ -998,7 +1040,11 @@ describe("unit presentation timing", () => {
       const root = new THREE.Group();
       root.add(source.clone());
       return root;
-    });
+    }, undefined, undefined, scaffoldKit, wreckKit);
+    system.attachGhostrunner(ghostrunner.id, new THREE.Group(), [new THREE.AnimationClip("Idle", 1, [])], options);
+    await prepareEffects(system);
+    // Warming the effects up leaves nothing in the world.
+    expect(leftovers(world, "turret-ruin")).toHaveLength(0);
 
     session.frames.push(frame(2, ghostrunner, [doomed, survivor]));
     system.update(0);
@@ -1009,13 +1055,13 @@ describe("unit presentation timing", () => {
       THREE.BufferGeometry, THREE.MeshStandardMaterial>;
     const doomedRoot = rootOf(doomed.id);
     const survivorRoot = rootOf(survivor.id);
-    expect(meshOf(doomedRoot).geometry).toBe(meshOf(survivorRoot).geometry);
-    expect(meshOf(doomedRoot).material.map).toBe(meshOf(survivorRoot).material.map);
     const selectionRing = doomedRoot.getObjectByName("Selection ring") as THREE.Mesh;
     let selectionRingDisposed = false;
     selectionRing.geometry.addEventListener("dispose", () => {
       selectionRingDisposed = true;
     });
+    // A selected unit must not keep a destroyed building standing.
+    system.select([ghostrunner.id]);
 
     session.frames.push(frame(3, ghostrunner, [survivor], [{
       type: "building-died",
@@ -1027,60 +1073,35 @@ describe("unit presentation timing", () => {
     expect(system.attackables).not.toContain(doomedRoot);
     expect(selectionRingDisposed).toBe(true);
 
-    system.update(0.4);
-    const fading = meshOf(doomedRoot).material;
-    let fadingDisposed = false;
-    fading.addEventListener("dispose", () => {
-      fadingDisposed = true;
-    });
-    expect(doomedRoot.getObjectByName("Building visual")?.scale.y).toBeLessThan(1);
-    expect(fading).not.toBe(source.material);
-    expect(fading.map).toBe(texture);
-    expect(fading.opacity).toBeLessThan(1);
-    system.update(0.5);
+    // It burns where it stands for a beat, then goes down while its ruin rises in its place.
+    play(system, 0.3);
+    expect(doomedRoot.parent).toBe(world);
+    expect(doomedRoot.position.y).toBeCloseTo(0, 1);
+    expect(leftovers(world, "turret-ruin")).toHaveLength(0);
+    play(system, 0.9);
+    expect(doomedRoot.position.y).toBeLessThan(-0.2);
+    expect(leftovers(world, "turret-ruin")).toHaveLength(1);
+    play(system, 1);
     expect(doomedRoot.parent).toBeNull();
-    expect(fadingDisposed).toBe(true);
+    const [ruin] = leftovers(world, "turret-ruin");
+    expect(ruin!.x).toBeCloseTo(10);
+    expect(ruin!.z).toBeCloseTo(2);
 
     const survivorMesh = meshOf(survivorRoot);
     expect(survivorRoot.parent).toBe(world);
     expect(survivorRoot.visible).toBe(true);
+    expect(survivorMesh.material).toBe(meshOf(doomedRoot).material);
     expect(survivorMesh.material.opacity).toBe(1);
     expect(survivorMesh.material.transparent).toBe(false);
-    expect(survivorMesh.material.depthWrite).toBe(true);
     expect(disposed.size).toBe(0);
+
+    // The ruin smokes, goes cold, and has sunk into the sand a minute later.
+    play(system, 50);
+    expect(leftovers(world, "turret-ruin")).toHaveLength(1);
+    play(system, 15);
+    expect(leftovers(world, "turret-ruin")).toHaveLength(0);
     system.dispose();
   });
-
-  test("a destroyed building sinks and leaves while the player has a unit selected", async () => {
-    const ghostrunner = unit("ghostrunner");
-    const building = activeBuilding("turret-target");
-    const session = new TestSession(frame(1, ghostrunner, building));
-    const world = new THREE.Group();
-    const system = new UnitSystem(world, map, [spawn(ghostrunner)], [], session, () => {
-      const root = new THREE.Group();
-      root.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial()));
-      return root;
-    });
-    system.attachGhostrunner(ghostrunner.id, new THREE.Group(), [new THREE.AnimationClip("Idle", 1, [])], options);
-    system.update(0);
-    system.select([ghostrunner.id]);
-    const root = system.attackables.find((candidate) => candidate.userData.buildingId === building.id)!;
-
-    session.frames.push(frame(2, ghostrunner, [], [{
-      type: "building-died",
-      tick: 1,
-      id: building.id,
-      attackerId: ghostrunner.id,
-    }]));
-    system.update(0);
-    expect(system.attackables).not.toContain(root);
-    system.update(0.4);
-    expect(root.getObjectByName("Building visual")?.scale.y).toBeLessThan(1);
-    system.update(0.5);
-    expect(root.parent).toBeNull();
-    system.dispose();
-  });
-
   test("shows its range, aims, then fires a synchronized heavy Turret projectile", async () => {
     const intruder = unit("ghostrunner");
     const turret = activeBuilding("enemy-turret", "turret", {
@@ -1269,7 +1290,7 @@ describe("unit presentation timing", () => {
     system.dispose();
   });
 
-  test("does not replay an expired Turret shot after firing and impact frames coalesce", () => {
+  test("does not replay an expired Turret shot after firing and impact frames coalesce", async () => {
     const intruder = unit("ghostrunner");
     const turret = activeBuilding("enemy-turret", "turret", {
       position: toSimPoint(0, 0),
@@ -1277,7 +1298,9 @@ describe("unit presentation timing", () => {
     });
     const session = new TestSession(frame(1, intruder, turret));
     const world = new THREE.Group();
-    const system = new UnitSystem(world, map, [spawn(intruder)], [], session);
+    const system = new UnitSystem(
+      world, map, [spawn(intruder)], [], session, undefined, undefined, undefined, scaffoldKit, wreckKit,
+    );
     const intruderRoot = new THREE.Group();
     system.attachGhostrunner(intruder.id, intruderRoot, [
       new THREE.AnimationClip("Idle", 1, []),
@@ -1289,6 +1312,7 @@ describe("unit presentation timing", () => {
     const head = createTurretHead();
     turretRoot.add(head);
     system.attachBuilding(turret.id, turretRoot);
+    await prepareEffects(system);
     const dead = { ...structuredClone(intruder), health: 0 };
 
     session.frames.push(frame(5, dead, turret, [
@@ -1467,26 +1491,28 @@ describe("unit presentation timing", () => {
     expect(presentation.actions.attack.time).toBeGreaterThan(firstFrameTime);
   });
 
-  test("plays, holds, and fades the Ghostrunner death presentation", () => {
+  test("a Ghostrunner falls where it was killed and leaves a husk that later sinks", async () => {
     const ghostrunner = unit("ghostrunner");
     const building = activeBuilding("building-1", "turret", {
       position: ghostrunner.target,
     });
     const session = new TestSession(frame(1, ghostrunner, building));
-    const system = new UnitSystem(new THREE.Group(), map, [spawn(ghostrunner)], [], session);
-    const root = new THREE.Group();
-    const corpse = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshStandardMaterial(),
+    const world = new THREE.Group();
+    const system = new UnitSystem(
+      world, map, [spawn(ghostrunner)], [], session, undefined, undefined, undefined, scaffoldKit, wreckKit,
     );
+    const root = new THREE.Group();
+    const body = new THREE.MeshStandardMaterial();
+    const corpse = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), body);
     root.add(corpse);
     const clips = [
       new THREE.AnimationClip("Idle", 1, []),
       new THREE.AnimationClip("Female_Throwing_Stance_Charge_inplace", 1, []),
       new THREE.AnimationClip("Attack", 1, []),
-      new THREE.AnimationClip("Dead", 1, []),
+      new THREE.AnimationClip("Dead", 3, []),
     ];
     system.attachGhostrunner(ghostrunner.id, root, clips, options);
+    await prepareEffects(system);
 
     system.select([ghostrunner.id]);
     expect(root.getObjectByName("Selection ring")?.visible).toBe(true);
@@ -1513,19 +1539,82 @@ describe("unit presentation timing", () => {
     expect(system.select([ghostrunner.id])).toBe(0);
     expect(presentation.state).toBe("death");
     expect(presentation.actions.death.isRunning()).toBe(true);
-    expect(presentation.actions.death.getEffectiveTimeScale()).toBe(1.3);
-    expect((corpse.material as THREE.Material).transparent).toBe(true);
-    expect((corpse.material as THREE.Material).opacity).toBeCloseTo(0.95);
+    expect(leftovers(world, "ghostrunner-wreck")).toHaveLength(0);
 
     session.frames.push(frame(3, dead, building));
-    system.update(0.1);
+    // The clip runs on while the body, once down, darkens on materials of its own.
+    play(system, 1.5);
     expect(root.visible).toBe(true);
-    system.update(1 / 1.3 + 4 - 0.1);
-    expect(root.visible).toBe(true);
-    system.update(1);
-    expect((corpse.material as THREE.Material).opacity).toBeCloseTo(0.475);
-    system.update(1.01);
+    expect(presentation.actions.death.time).toBeGreaterThan(2);
+    expect(corpse.material).not.toBe(body);
+    expect((corpse.material as THREE.MeshStandardMaterial).color.r).toBeLessThan(1);
+    expect(body.color.r).toBe(1);
+
+    // Then a husk takes the body's place, and sinks into the sand half a minute later.
+    play(system, 0.6);
     expect(root.visible).toBe(false);
+    expect(leftovers(world, "ghostrunner-wreck")).toHaveLength(1);
+    play(system, 20);
+    expect(leftovers(world, "ghostrunner-wreck")).toHaveLength(1);
+    play(system, 8);
+    expect(leftovers(world, "ghostrunner-wreck")).toHaveLength(0);
+    system.dispose();
+  });
+
+  test("a Hornet killed on the move falls along its path and its wreck lies ahead of where it died", async () => {
+    const hornet = unit("hornet");
+    hornet.order = "move";
+    hornet.attacking = false;
+    hornet.attackTargetId = undefined;
+    hornet.moving = true;
+    const session = new TestSession(frame(1, hornet, []));
+    const world = new THREE.Group();
+    const system = new UnitSystem(
+      world, map, [spawn(hornet)], [], session, undefined, undefined, undefined, scaffoldKit, wreckKit,
+    );
+    const root = new THREE.Group();
+    const visual = new THREE.Group();
+    root.add(visual);
+    system.attachHornet(hornet.id, root, visual, options);
+    await prepareEffects(system);
+    // It flies towards +x at 5 m/s.
+    play(system, 0.3);
+    const dead = structuredClone(hornet);
+    dead.health = 0;
+    dead.moving = false;
+    session.frames.push(frame(2, dead, [], [{ type: "unit-died", tick: 1, id: dead.id, attackerId: "turret-1" }]));
+
+    system.update(0);
+    expect(root.visible).toBe(true);
+    play(system, 0.3);
+    // Still in the air, already past the spot.
+    expect(root.visible).toBe(true);
+    expect(root.position.x).toBeGreaterThan(0.5);
+    expect(root.position.y).toBeGreaterThan(0.5);
+    play(system, 1.2);
+    expect(root.visible).toBe(false);
+    const [wreck] = leftovers(world, "hornet-wreck");
+    expect(wreck!.x).toBeGreaterThan(1);
+    expect(wreck!.y).toBeCloseTo(0);
+    expect(Math.abs(wreck!.z)).toBeLessThan(0.2);
+    system.dispose();
+  });
+
+  test("a unit that dies before the wreck kit has loaded vanishes at once", () => {
+    const hornet = unit("hornet");
+    const session = new TestSession(frame(1, hornet, []));
+    const system = new UnitSystem(new THREE.Group(), map, [spawn(hornet)], [], session);
+    const root = new THREE.Group();
+    const visual = new THREE.Group();
+    root.add(visual);
+    system.attachHornet(hornet.id, root, visual, options);
+    const dead = structuredClone(hornet);
+    dead.health = 0;
+    session.frames.push(frame(2, dead, [], [{ type: "unit-died", tick: 1, id: dead.id, attackerId: "turret-1" }]));
+    system.update(0);
+    expect(root.visible).toBe(false);
+    expect(system.select([hornet.id])).toBe(0);
+    system.dispose();
   });
 
   test("waits for the visual Behemoth impact before presenting an early death frame", () => {
