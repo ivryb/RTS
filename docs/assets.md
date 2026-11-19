@@ -28,7 +28,7 @@ Every new unit, building, prop, and resource is a Blender Python generator in `t
 4. Change the generator to fix what reads wrong, such as scale, silhouette, palette, or detail density, and repeat from step 2 until the model sits naturally beside them.
 5. Copy the accepted GLB to `assets/models/` and record its generator, size, hash, and triangle count in the matching manifest.
 
-Boat syncs only files git sees, so generators that read ignored inputs from `art/workbench/`, such as the Poly Haven scans behind the terrain and titanium preparation scripts, still run only where those folders exist.
+Boat syncs only files git sees, so generators that read ignored inputs from `art/workbench/`, such as the Poly Haven scans behind the terrain preparation scripts, still run only where those folders exist.
 
 Terrain models and vegetation follow the same rule from a different start: CC0 Poly Haven scans reshaped by repeatable scripts, recorded in the [terrain manifest](../assets/models/terrain/manifest.json).
 
@@ -48,9 +48,9 @@ Generated PBR maps, editable Blender assemblies, and the appendable material lib
 
 ## Titanium outcrops
 
-The main game uses three locally authored compositions: **three knuckles**, **split lens**, and **eroded window**. `tools/assets/build_titanium_ore.py` builds their fractured shapes and bakes one PBR material per asset. The source Cliff Side color, normal, and roughness maps and CC0 provenance live under `assets/source/polyhaven/titanium/`; exported model details are recorded in `assets/models/titanium-manifest.json`. Workbench renders compare source and reimported GLBs, while the main game verifies their scale beside Scout Drones and Command Centers.
+Every Titanium Deposit is one of three variants of the **Three knuckles** outcrop: seeds 5, 1 and 3 of `tools/assets/build_titanium_three_knuckles.py`. A variant is one file, `assets/models/titanium-deposit-<seed>.glb`, holding the meshes `full` and `depleted` on one material and one atlas; the game shows `depleted` once the deposit's amount reaches zero. `assets/models/titanium-manifest.json` records the three files. The generator reads the terrain's cliff, scree and sand textures and the Cliff Side color scan under `assets/source/polyhaven/titanium/`, whose CC0 provenance is recorded there.
 
-An approved redesign, not yet in the game, replaces all three with seeds of one Three knuckles generator and adds a depleted state: see [Titanium Deposit](titanium_deposit.md).
+[Titanium Deposit](titanium_deposit.md) describes the look, the budget, and how to rebuild a variant and check it in the game.
 
 ## Terrain textures
 

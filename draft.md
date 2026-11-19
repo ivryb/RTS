@@ -75,7 +75,7 @@ Select a Scout and right-click a Titanium Deposit. The Scout travels to an acces
 
 A new Command Center near ore shortens later hauling trips. Unfinished and enemy buildings cannot accept deliveries. A worker without an available drop-off waits with its cargo. Move, stop, or build orders interrupt harvesting without deleting carried ore; a later gather order resumes the work. A destroyed worker loses its cargo. Depletion stops extraction while retaining the rock footprint.
 
-Starting bases and expansions have deposits with nearby clear ground for Command Centers. The approved ore family has three compositions: three knuckles, split lens, and eroded window. All use warm sandstone shoulders with dark exposed mineral faces. There is no separate mine building.
+Starting bases and expansions have deposits with nearby clear ground for Command Centers. Every deposit is a Three knuckles outcrop in one of three variants: three rock masses that touch, with a tan sandstone crust and dark, silver-veined ore faces. A depleted deposit keeps its shape and turns all tan ([Titanium Deposit](docs/titanium_deposit.md)). There is no separate mine building.
 
 ### Current controls and presentation
 

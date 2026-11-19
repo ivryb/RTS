@@ -1,8 +1,8 @@
 # Titanium Deposit
 
-How a Titanium Deposit looks. Ivan approved this design for D77-7 on 2026-11-19 ("agree, let's finish with three knuckles", then "go with 8 MiB, approve the rest"). The game does not use it yet: it still shows the three models from `tools/assets/build_titanium_ore.py`. [What the build has to do](#what-the-build-has-to-do) lists the steps that put it in.
+How a Titanium Deposit looks, and how the game shows it. Ivan approved this design for D77-7 on 2026-11-19 ("agree, let's finish with three knuckles", then "go with 8 MiB, approve the rest").
 
-The design answers two complaints about the shipped models: they did not fit the terrain, and the better of them read as an ordinary stone, not as a resource to mine. Six invented designs lost the study (Seam, Blades, Lode, Pod, Cluster and Split lens). Their generators are in the repository's history, removed by the commit "Remove the six rejected Titanium Deposit sketches".
+The design answers two complaints about the three models it replaced, which `tools/assets/build_titanium_ore.py` built: they did not fit the terrain, and the better of them read as an ordinary stone, not as a resource to mine. That generator and six invented designs that lost the study (Seam, Blades, Lode, Pod, Cluster and Split lens) are in the repository's history.
 
 ## The look
 
@@ -35,37 +35,54 @@ Accepted at approval, and worth another pass if the look is tuned later: the mas
 box 'blender --background --threads 8 --python-exit-code 1 --python tools/assets/build_titanium_three_knuckles.py -- --out art/workbench/titanium-three-knuckles'
 ```
 
-Without `--seed` it builds `VARIANTS`, seeds 5, 1 and 3, and writes `seed-<n>/full.glb` and `seed-<n>/depleted.glb` for each, in about two minutes a seed on Boat. The build is deterministic: the same seed gives the same bytes.
+Without `--seed` it builds `VARIANTS`, seeds 5, 1 and 3, and writes `seed-<n>/deposit.glb` for each, in about two minutes a seed on Boat. The file holds the meshes `full` and `depleted` on one material, so the atlas is stored and uploaded once. The build is deterministic: the same seed gives the same bytes.
 
 A seed draws each mass's place, size, lean, cracks and corner cuts from hand-set ranges, and which planes keep their crust. Seed 5 has the concept's layout, seed 1 swaps the two small masses, and seed 3 moves the dominant mass's crust to its other end. Pick a new seed by looking at it in the game: in drafts, seeds 6 to 8 came out with ore on 67 to 73% of the rock, which is more than the design wants.
 
-The model is made as a high-poly source of about a million triangles, cut down to the triangle budget, and baked with Cycles into one atlas per seed that both states share. Faces that show ore exist twice, once for each state; every other face is shared.
+The model is made as a high-poly source of about a million triangles, cut down to the triangle budget, and baked with Cycles into one atlas per seed that both states share. Faces that show ore are baked twice, once for each state; every other face has the same texels in both.
 
 Two facts about the game shaped the ore, and hold for any metal in it. The camera and the sun never turn, so the sun's highlight can only fall on surfaces that face one fixed direction (`GLINT` in the generator), about 30 degrees off vertical; ore on tops and shoulders lies near it, and steeper ore carries its sheen in the base color. And there is no environment map, so metal has only the sun to reflect: metalness near 0.45 with a dark base color reads as metal, while pale grey reads as ice or concrete.
 
 ## Budget
 
-Measured from the exported files.
+Measured from the shipped files, `assets/models/titanium-deposit-<seed>.glb`.
 
-| Seed | Triangles, each state | File size, full / depleted | Height | Ore on camera | Mining directions that reach ore first |
+| Seed | Triangles, each state | File size, both states | Height | Ore on camera | Mining directions that reach ore first |
 | --- | --- | --- | --- | --- | --- |
-| 5 | 8,598 | 0.48 / 0.50 MB | 3.03 m | 55% | 90% |
-| 1 | 8,600 | 0.47 / 0.48 MB | 2.93 m | 53% | 88% |
-| 3 | 8,599 | 0.48 / 0.49 MB | 3.09 m | 60% | 75% |
+| 5 | 8,598 | 0.79 MB | 3.03 m | 55% | 90% |
+| 1 | 8,600 | 0.76 MB | 2.93 m | 53% | 88% |
+| 3 | 8,599 | 0.78 MB | 3.09 m | 60% | 75% |
 
-- One mesh, one material and one draw call per deposit.
-- Texture memory is 8 MiB per variant and 24 MiB for the three, however many deposits a map holds: one 1024 px and two 512 px maps, uncompressed with mipmaps. The shipped models take 16 MiB each, 48 MiB together, at 8,892 to 10,044 triangles.
+- A deposit is one mesh with one material: one draw call, and one more in the sun's shadow pass. Only the state it shows is in the scene.
+- Texture memory is 8 MiB per variant and 24 MiB for the three, however many deposits a map holds: one 1024 px and two 512 px maps, uncompressed with mipmaps, shared by both states.
 - The mining figures come from the generator's own survey: rays from 72 directions, cast by the game's contact rule from 0.7 m outside the footprint. From every direction the ray reaches the model.
 - Frame rate was never measured, because Boat has no GPU.
 
-## What the build has to do
+Against the three models this design replaced:
 
-Nothing in the simulation changes: the blocked footprint and the mining positions stay as they are, and the model is still scaled so its widest reach equals the deposit's radius, unrotated.
+| | Replaced models | This design |
+| --- | --- | --- |
+| Draw calls per deposit | 1, and 1 in the shadow pass | the same |
+| Triangles per deposit | 8,892, 9,030 or 10,044 | 8,598 to 8,600 |
+| Texture memory, three variants | 48 MiB | 24 MiB |
+| Download, three variants | 2.59 MB | 2.33 MB, with the depleted state included |
 
-1. Load a variant's two states with one atlas. As exported, `full.glb` and `depleted.glb` each embed their own copy of the same textures, which doubles the download and, loaded as two files, the texture memory. Export both states into one GLB per variant, or share the textures at load.
-2. In `src/orePresentation.ts`, show a deposit's depleted mesh once its amount reaches zero.
-3. Copy the accepted GLBs to `assets/models/`, replace `titanium-manifest.json`, and retire `build_titanium_ore.py` with the three old models and their source maps under `assets/source/polyhaven/titanium/`.
-4. Update the "Titanium outcrops" section of [assets](assets.md).
-5. Check it in the game with `bun tools/verify/capture-ore.mjs --out <dir> --mine 0`, which captures deposits on sand, among scree rocks and in dry grass at gameplay and close zoom, and a Scout mining.
+Measured in the mining preview scene (`/tools/preview/?scene=mining&mining=0&deposit=N`) on deposits 0, 1 and 2, one of each variant: a frame draws the same 21, 26 and 18 calls as with the replaced models, and 294, 430 and 1,445 fewer triangles, which is exactly the difference between the models.
 
-Captures of the approved look in the game, beside the concept and the shipped models, are kept locally in `art/workbench/verify/d77-7/sheets/` (git-ignored).
+## In the game
+
+`src/orePresentation.ts` loads the three files once a match. Every deposit shows a clone that shares its variant's geometry, material and textures, so the three variants exist once on the GPU however many deposits a map holds. A deposit's variant is its index modulo three, in the order seeds 5, 1, 3.
+
+The model is scaled so the full mesh's widest reach equals the deposit's radius, set 0.05 m into the ground and never rotated. Nothing in the simulation reads it: the blocked footprint and the mining positions come from the deposit's radius alone.
+
+When a deposit's amount reaches zero, its `full` mesh is taken out of the scene and its `depleted` mesh put in its place, at the same scale. The swap costs one comparison per deposit on each simulation frame and allocates nothing.
+
+## Rebuilding a variant
+
+1. Run the generator on Boat and pull `art/workbench/titanium-three-knuckles/` back.
+2. Look at the candidate in the game before installing it: `bun tools/verify/capture-ore.mjs --model <seed-n/deposit.glb> --out <dir> --mine 0` serves it in place of all three variants and captures deposits on sand, among scree rocks and in dry grass at gameplay and close zoom, and a Scout mining. Add `--titanium 0` for the depleted state.
+3. Copy it to `assets/models/titanium-deposit-<seed>.glb` and copy its entry from the generator's `export.json` into `assets/models/titanium-manifest.json`.
+
+`tools/verify/specs/deposit-depletion.spec.ts` mines a deposit out in a live match and checks the swap.
+
+Captures of the approved look in the game, beside the concept and the replaced models, are kept locally in `art/workbench/verify/d77-7/sheets/` (git-ignored).

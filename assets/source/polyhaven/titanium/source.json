@@ -8,7 +8,7 @@
     "Jenelle van Heerden": "Processing"
   },
   "sourceWidthMeters": 1.8,
-  "processing": "Original 2K JPG source maps preserved byte-for-byte. Titanium generator projects and bakes these onto newly authored solids; geometry does not come from a scan.",
+  "processing": "Original 2K JPG source maps preserved byte-for-byte. The Titanium Deposit generator bakes the color map into the crust of newly authored solids, and the terrain's oxide cliff maps are made from all three; geometry does not come from a scan.",
   "files": [
     {
       "role": "color",
