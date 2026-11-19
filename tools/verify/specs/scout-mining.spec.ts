@@ -8,7 +8,8 @@ const scoutIn = (snap: MatchSnapshot) => snap.units.find((unit) => unit.id === s
 
 test("a mining Scout Drone fires a laser at the rock, and stops it to haul or on a new order", async ({ page }) => {
   mkdirSync(evidenceDir, { recursive: true });
-  await openGame(page, 77);
+  // Full render: the screenshots are the evidence of how the laser looks on the rock.
+  await openGame(page, 77, { render: "full" });
   const opening = await snapshot(page);
   const home = scoutIn(opening);
   const deposit = [...opening.titaniumDeposits].sort((a, b) =>
@@ -36,7 +37,7 @@ test("a mining Scout Drone fires a laser at the rock, and stops it to haul or on
   await page.evaluate(([x, z]) => window.__dune77!.view(x, z, 0.6), [deposit.x, deposit.z] as const);
   await page.screenshot({ path: `${evidenceDir}/game-mining-farthest-zoom.png`, timeout: 120_000 });
 
-  // Hauling: a full Scout leaves for the Command Center with its cargo bin and no beam.
+  // Hauling: a full Scout leaves for the Command Center with no beam.
   const hauling = scoutIn(await waitForSnapshot(page, (snap) => scoutIn(snap).harvest?.phase === "to-dropoff", 60_000));
   expect(hauling.cargoTitanium).toBeGreaterThan(0);
   expect(scoutIn(await waitForSnapshot(page, (snap) => !scoutIn(snap).miningLaser)).miningLaser).toBeUndefined();
