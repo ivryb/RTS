@@ -10,9 +10,9 @@ sand is banked against it; the broad faces between are the ore itself. Mined out
 is broken out block by block along the rock's joints, leaving stepped, dusty hollows with
 sand on their ledges inside the same skin.
 
-Each `--seed` composes a sibling outcrop and exports `seed-<n>/full.glb` and
-`seed-<n>/depleted.glb` under `--out` (default art/workbench/titanium-three-knuckles),
-with one atlas per seed shared by the two (color at 1024 px, normal and surface at 512 px).
+Each `--seed` composes a sibling outcrop and exports `seed-<n>/deposit.glb` under `--out`
+(default art/workbench/titanium-three-knuckles): the meshes `full` and `depleted`, which
+share one material and one atlas (color at 1024 px, normal and surface at 512 px).
 Without `--seed` it builds VARIANTS, the three seeds the game's three variants are made
 from. `--draft` stops before the bake and renders
 `seed-<n>/draft-full.png` and `draft-depleted.png` from the game's camera, in about a
@@ -33,7 +33,8 @@ How a build goes:
    joints, the skin untouched.
 4. Runtime. The source is decimated to the triangle budget. Faces that show ore are copied
    and moved toward the hollow, so the two states share every other face. One atlas is baked
-   from the two high-poly sources with Cycles, and each state is exported as a face subset.
+   from the two high-poly sources with Cycles, and each state is exported as a face subset,
+   the two as meshes of one file.
 
 The game never turns the model, the camera or the sun, so the half-vector between sun and
 camera is one fixed direction (GLINT). Ore on the tops and on each mass's broad shoulder
@@ -1395,20 +1396,29 @@ def mining_contact(obj):
     return dict(bearings_hit=hits / 72, bearings_ore_first=ore / 72)
 
 
-def export(baked, states, path):
-    """Export the faces one state shows; the copy keeps the baked atlas and material."""
-    obj = duplicate(baked, path.stem)
-    keep_states(obj, states)
-    activate(obj)
+def export(baked, path):
+    """Export both states as the meshes `full` and `depleted` of one GLB. They share the baked
+    material, so the file holds the atlas once and the game uploads it once."""
+    objects = {}
+    for name, states in (('full', (BOTH, FULL)), ('depleted', (BOTH, DEPLETED))):
+        objects[name] = duplicate(baked, name)
+        keep_states(objects[name], states)
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in objects.values():
+        obj.select_set(True)
     bpy.ops.export_scene.gltf(filepath=str(path), export_format='GLB', use_selection=True, export_apply=True,
                               export_yup=True, export_image_format='WEBP', export_image_quality=72,
                               export_vertex_color='NONE')
-    obj.data.calc_loop_triangles()
-    points = coords(obj.data)
+
+    def measured(obj):
+        obj.data.calc_loop_triangles()
+        points = coords(obj.data)
+        return dict(triangles=len(obj.data.loop_triangles), radius=float(np.hypot(points[:, 0], points[:, 1]).max()),
+                    height=float(points[:, 2].max()), **mining_contact(obj))
+
     return dict(path=str(path.relative_to(OUT)), bytes=path.stat().st_size,
-                sha256=hashlib.sha256(path.read_bytes()).hexdigest(), triangles=len(obj.data.loop_triangles),
-                radius=float(np.hypot(points[:, 0], points[:, 1]).max()), height=float(points[:, 2].max()),
-                **mining_contact(obj))
+                sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                states={name: measured(obj) for name, obj in objects.items()})
 
 
 def draft(output, sources):
@@ -1471,18 +1481,16 @@ def author(seed):
     low.data.transform(Matrix.Translation((-middle[0], -middle[1], 0)))
     points = coords(low.data)
     low.data.transform(Matrix.Scale(FOOTPRINT_RADIUS / float(np.hypot(points[:, 0], points[:, 1]).max()), 4))
-    entries = []
-    shares = dict(ore_on_rock=float(outcrop.ore[outcrop.rock > .5].mean()), ore_on_camera=float(outcrop.on_camera))
-    for name, states in (('full', (BOTH, FULL)), ('depleted', (BOTH, DEPLETED))):
-        entries.append(dict(seed=seed, state=name, **export(low, states, output / f'{name}.glb'), **shares))
-        print('KNUCKLES_EXPORT', json.dumps(entries[-1]), flush=True)
-    return entries
+    entry = dict(seed=seed, **export(low, output / 'deposit.glb'),
+                 ore_on_rock=float(outcrop.ore[outcrop.rock > .5].mean()), ore_on_camera=float(outcrop.on_camera))
+    print('KNUCKLES_EXPORT', json.dumps(entry), flush=True)
+    return [entry]
 
 
 exports = [entry for seed in args.seed for entry in author(seed)]
 if exports:
     (OUT / 'export.json').write_text(json.dumps(dict(
         generator='tools/assets/build_titanium_three_knuckles.py',
-        format='1 mesh, 1 standard PBR material, WebP atlas per seed shared by both states: 1024px color, 512px normal and roughness-metallic',
+        format='meshes `full` and `depleted` sharing 1 standard PBR material and 1 WebP atlas: 1024px color, 512px normal and roughness-metallic',
         coordinates='Y-up, centered X/Z, ground pivot Y=0', assets=exports), indent=2) + '\n')
 log('done')
