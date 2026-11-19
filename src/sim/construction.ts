@@ -47,6 +47,12 @@ export const constructionTicks = (kind: BuildingKind) => Math.round(
   BUILDING_DEFINITIONS[kind].constructionSeconds / SIMULATION_TICK_SECONDS,
 );
 
+/** A Scout Drone works on a site once it has arrived; one still flying in does not count yet. */
+export const isWorkingOn = (
+  unit: Pick<UnitState, "order" | "moving" | "constructionTargetId">,
+  siteId: string,
+) => unit.order === "build" && !unit.moving && unit.constructionTargetId === siteId;
+
 const distance = (first: SimPoint, second: SimPoint) => Math.hypot(
   first.x - second.x,
   first.z - second.z,

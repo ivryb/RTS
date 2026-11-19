@@ -233,7 +233,7 @@ export class UnitInput {
       building.friendly,
       building.lifecycle,
       building.constructionProgress,
-      building.builderId,
+      building.working,
       building.health,
       building.maxHealth,
       building.productionQueue,
@@ -316,7 +316,7 @@ export class UnitInput {
         if (building.lifecycle === "constructing") {
           const progress = document.createElement("span");
           progress.textContent = `Construction ${Math.round(building.constructionProgress * 100)}% · ${
-            building.builderId ? "working" : "paused"
+            building.working ? "working" : "paused"
           }`;
           details.append(progress);
         }

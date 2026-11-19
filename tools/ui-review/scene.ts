@@ -35,13 +35,16 @@ const units: UnitState[] = kinds.map((kind, index) => {
   position: { x: index * 4000, z: 0 }, target: { x: index * 4000, z: 0 }, path: [], order: "idle", moving: false, attacking: false,
 };
 });
+// "construction" shows a site its Scout Drone is working on; "construction-paused" has none.
+if (state === "construction") {
+  Object.assign(units.find((unit) => unit.kind === "scout-drone")!, { order: "build", constructionTargetId: "command-center" });
+}
 if (state === "group") {
   for (let index = 0; index < 5; index++) units.push({ ...units[0]!, id: `group-${index}` });
 }
 const buildings: BuildingState[] = ["command-center", "turret"].map((kind, index) => ({
   id: kind, kind: kind === "turret" ? "turret" : "command-center", lifecycle: state.startsWith("construction") ? "constructing" : "active",
   constructionProgress: state.startsWith("construction") ? .42 : 1,
-  builderId: state === "construction" ? "scout-drone" : undefined,
   ownerId: state === "enemy-building" ? "enemy-player" : "local-player",
   position: { x: index * 10000, z: 10000 }, rotation: 0, radius: 2000, health: kind === "turret" ? 900 : 2500, maxHealth: kind === "turret" ? 900 : 2500,
   productionQueue: kind === "command-center" ? Array.from({ length: state === "queue-full" ? 5 : state === "training" ? 2 : 0 }, (_, i) => ({ id: `queue-${i}`, kind: "ghostrunner", progressTicks: i === 0 ? 42 : 0, totalTicks: 100 })) : undefined,

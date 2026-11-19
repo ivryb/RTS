@@ -5,6 +5,7 @@ import {
   behemothImpactDelayTicks,
   behemothVolleySeed,
 } from "../src/behemothAttack";
+import { constructionTicks, isWorkingOn } from "../src/sim/construction";
 import { initializeNavigation } from "../src/sim/navigation";
 import {
   ATTACK_SEPARATION_GAP,
@@ -444,7 +445,6 @@ describe("unit simulation", () => {
       lifecycle: "constructing",
       constructionProgress: 0,
       ownerId: "player-1",
-      builderId: scout.id,
       health: 1,
     })]);
     expect(simulation.snapshot()[0]).toMatchObject({
@@ -457,7 +457,6 @@ describe("unit simulation", () => {
     expect(simulation.buildingSnapshot()).toEqual([expect.objectContaining({
       lifecycle: "active",
       constructionProgress: 1,
-      builderId: undefined,
       health: 900,
       maxHealth: 900,
     })]);
@@ -487,23 +486,24 @@ describe("unit simulation", () => {
     }).accepted).toBe(true);
     const pausedProgress = simulation.buildingSnapshot()[0]!.constructionProgress;
     for (let tick = 0; tick < 10; tick += 1) simulation.step();
-    expect(simulation.buildingSnapshot()[0]).toMatchObject({
-      builderId: undefined,
-      constructionProgress: pausedProgress,
-    });
+    expect(simulation.buildingSnapshot()[0]!.constructionProgress).toBe(pausedProgress);
 
     expect(simulation.dispatch("player-1", {
       type: "resume-construction",
       unitIds: [secondScout.id],
       buildingId: site.id,
     }).accepted).toBe(true);
-    expect(simulation.buildingSnapshot()[0]!.builderId).toBe(secondScout.id);
+    expect(simulation.snapshot().find(({ id }) => id === secondScout.id)).toMatchObject({
+      order: "build",
+      constructionTargetId: site.id,
+    });
     expect(simulation.dispatch("player-1", {
       type: "move",
       unitIds: [secondScout.id],
       target: toSimPoint(-5, 5),
     }).accepted).toBe(true);
-    expect(simulation.buildingSnapshot()[0]!.builderId).toBeUndefined();
+    expect(simulation.snapshot().find(({ id }) => id === secondScout.id)?.constructionTargetId)
+      .toBeUndefined();
     expect(simulation.dispatch("player-1", {
       type: "resume-construction",
       unitIds: [firstScout.id],
@@ -513,7 +513,6 @@ describe("unit simulation", () => {
     expect(simulation.buildingSnapshot()[0]).toMatchObject({
       lifecycle: "active",
       constructionProgress: 1,
-      builderId: undefined,
     });
   });
 
@@ -643,7 +642,6 @@ describe("unit simulation", () => {
       id: site.id,
       lifecycle: "constructing",
       constructionProgress: 0,
-      builderId: undefined,
     });
   });
 
@@ -2295,4 +2293,178 @@ describe("unit simulation", () => {
     expect(byId.get(target.id)?.health).toBe(0);
   });
 
+});
+
+describe("shared construction", () => {
+  const T = constructionTicks("turret");
+  const SITE_ID = "turret-site";
+
+  // A Turret site at the origin with a Scout Drone at each given point, none assigned yet.
+  const siteWith = (...points: readonly (readonly [number, number])[]) => {
+    const simulation = new LocalUnitSimulation(
+      points.map(([x, z], index) => unitAt(`scout-${index + 1}`, x, z)),
+    );
+    simulation.createBuilding({
+      id: SITE_ID,
+      kind: "turret",
+      lifecycle: "constructing",
+      constructionProgress: 0,
+      ownerId: "player-1",
+      position: toSimPoint(0, 0),
+      rotation: 0,
+      radius: 1.8 * POSITION_SCALE,
+      attackRadius: 1.5 * POSITION_SCALE,
+      health: 1,
+      maxHealth: 900,
+    });
+    return simulation;
+  };
+  // Four points around the site, each already within a Scout Drone's reach.
+  const AROUND_SITE = [[2.7, 0], [-2.7, 0], [0, 2.7], [0, -2.7]] as const;
+
+  const assign = (simulation: LocalUnitSimulation, ...unitIds: string[]) => {
+    for (const unitId of unitIds) {
+      expect(simulation.dispatch("player-1", {
+        type: "resume-construction",
+        unitIds: [unitId],
+        buildingId: SITE_ID,
+      }).accepted).toBe(true);
+    }
+  };
+  const progress = (simulation: LocalUnitSimulation) =>
+    simulation.buildingSnapshot()[0]!.constructionProgress;
+  const unit = (simulation: LocalUnitSimulation, id: string) =>
+    simulation.snapshot().find((candidate) => candidate.id === id)!;
+  const progressOverTicks = (simulation: LocalUnitSimulation, ticks: number) => {
+    const before = progress(simulation);
+    for (let tick = 0; tick < ticks; tick += 1) simulation.step();
+    return progress(simulation) - before;
+  };
+
+  test("a second drone joining keeps the first one working", () => {
+    const simulation = siteWith(AROUND_SITE[0], [-12, 0]);
+    assign(simulation, "scout-1");
+    for (let tick = 0; tick < 5; tick += 1) simulation.step();
+
+    assign(simulation, "scout-2");
+
+    expect(unit(simulation, "scout-1")).toMatchObject({ order: "build", constructionTargetId: SITE_ID });
+    expect(progressOverTicks(simulation, 1)).toBeCloseTo(1 / T, 12);
+  });
+
+  test.each([
+    [1, 1],
+    [2, 0.75],
+    [3, 0.6],
+    [4, 0.5],
+  ])("%i working drones build in 3T / (n + 2), %p of one drone's time", (count, share) => {
+    const simulation = siteWith(...AROUND_SITE.slice(0, count));
+    assign(simulation, ...AROUND_SITE.slice(0, count).map((_, index) => `scout-${index + 1}`));
+
+    let ticks = 0;
+    while (simulation.buildingSnapshot()[0]!.lifecycle === "constructing" && ticks < 2 * T) {
+      simulation.step();
+      ticks += 1;
+    }
+
+    expect(ticks).toBe(T * share);
+    expect(simulation.buildingSnapshot()[0]).toMatchObject({ health: 900, constructionProgress: 1 });
+    for (let index = 1; index <= count; index += 1) {
+      expect(unit(simulation, `scout-${index}`)).toMatchObject({ order: "idle", constructionTargetId: undefined });
+    }
+  });
+
+  test("a drone flying in counts only once it arrives", () => {
+    const simulation = siteWith(AROUND_SITE[0], [-12, 0]);
+    assign(simulation, "scout-1", "scout-2");
+
+    let flyingTicks = 0;
+    while (unit(simulation, "scout-2").moving) {
+      const built = progressOverTicks(simulation, 1);
+      if (!unit(simulation, "scout-2").moving) break;
+      expect(built).toBeCloseTo(1 / T, 12);
+      flyingTicks += 1;
+    }
+
+    expect(flyingTicks).toBeGreaterThan(5);
+    expect(unit(simulation, "scout-2")).toMatchObject({ order: "build", constructionTargetId: SITE_ID });
+    expect(progressOverTicks(simulation, 3)).toBeCloseTo(3 * 4 / (3 * T), 12);
+  });
+
+  test("a builder that leaves leaves the others working, and the site pauses when none is left", () => {
+    const simulation = siteWith(AROUND_SITE[0], AROUND_SITE[1]);
+    assign(simulation, "scout-1", "scout-2");
+    expect(progressOverTicks(simulation, 3)).toBeCloseTo(3 * 4 / (3 * T), 12);
+
+    simulation.dispatch("player-1", { type: "stop", unitIds: ["scout-1"] });
+
+    expect(unit(simulation, "scout-2")).toMatchObject({ order: "build", constructionTargetId: SITE_ID });
+    expect(progressOverTicks(simulation, 3)).toBeCloseTo(3 / T, 12);
+
+    simulation.dispatch("player-1", { type: "move", unitIds: ["scout-2"], target: toSimPoint(-6, 0) });
+
+    expect(progressOverTicks(simulation, 10)).toBe(0);
+    expect(simulation.buildingSnapshot()[0]!.lifecycle).toBe("constructing");
+  });
+
+  test("a builder that is destroyed leaves the others working", () => {
+    const simulation = siteWith(AROUND_SITE[0], AROUND_SITE[1]);
+    const enemy = unitAt("enemy-1", 4.15, 0);
+    enemy.ownerId = "player-2";
+    enemy.attackDamage = 200;
+    enemy.attackIntervalTicks = 1;
+    const withEnemy = new LocalUnitSimulation([...simulation.snapshot(), enemy], simulation.buildingSnapshot());
+    assign(withEnemy, "scout-1", "scout-2");
+    expect(progressOverTicks(withEnemy, 1)).toBeCloseTo(4 / (3 * T), 12);
+    withEnemy.dispatch("player-2", { type: "attack", unitIds: [enemy.id], targetId: "scout-1" });
+
+    withEnemy.step();
+
+    expect(unit(withEnemy, "scout-1").health).toBe(0);
+    expect(unit(withEnemy, "scout-2")).toMatchObject({ order: "build", constructionTargetId: SITE_ID });
+    expect(progressOverTicks(withEnemy, 3)).toBeCloseTo(3 / T, 12);
+  });
+
+  test("drones sent together from afar spread around the site and all keep working", () => {
+    const simulation = siteWith([-15, -2], [-13.8, -2], [-12.6, -2], [-11.4, -2]);
+    const ids = ["scout-1", "scout-2", "scout-3", "scout-4"];
+    simulation.dispatch("player-1", { type: "resume-construction", unitIds: ids, buildingId: SITE_ID });
+
+    let ticks = 0;
+    while (!ids.every((id) => isWorkingOn(unit(simulation, id), SITE_ID)) && ticks < 40) {
+      simulation.step();
+      ticks += 1;
+    }
+
+    expect(ticks).toBeLessThan(40);
+    expect(progressOverTicks(simulation, 10)).toBeCloseTo(10 * 6 / (3 * T), 12);
+    expect(ids.every((id) => isWorkingOn(unit(simulation, id), SITE_ID))).toBe(true);
+  });
+
+  test("one command sends every selected drone to the site", () => {
+    const simulation = siteWith(AROUND_SITE[0], AROUND_SITE[1], [-12, 0]);
+
+    expect(simulation.dispatch("player-1", {
+      type: "resume-construction",
+      unitIds: ["scout-1", "scout-2", "scout-3"],
+      buildingId: SITE_ID,
+    }).accepted).toBe(true);
+
+    for (const id of ["scout-1", "scout-2", "scout-3"]) {
+      expect(unit(simulation, id)).toMatchObject({ order: "build", constructionTargetId: SITE_ID });
+    }
+
+    const placing = new LocalUnitSimulation([unitAt("scout-1", 0, 0), unitAt("scout-2", -3, 0)]);
+    expect(placing.dispatch("player-1", {
+      type: "build",
+      unitIds: ["scout-1", "scout-2"],
+      kind: "turret",
+      target: toSimPoint(2.7, 0),
+      rotation: 0,
+    }).accepted).toBe(true);
+    const siteId = placing.buildingSnapshot()[0]!.id;
+    for (const id of ["scout-1", "scout-2"]) {
+      expect(unit(placing, id)).toMatchObject({ order: "build", constructionTargetId: siteId });
+    }
+  });
 });

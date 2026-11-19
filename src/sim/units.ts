@@ -23,6 +23,7 @@ import {
   BUILDING_DEFINITIONS,
   constructionPlacementIsValid,
   constructionTicks,
+  isWorkingOn,
   type ConstructionTerrain,
 } from "./construction";
 
@@ -66,7 +67,6 @@ export interface BuildingState {
   attackRadius?: number;
   health: number;
   maxHealth: number;
-  builderId?: string;
   weapon?: BuildingWeaponState;
   productionQueue?: TrainingQueueItem[];
   rallyPoint?: SimPoint;
@@ -900,7 +900,6 @@ export class LocalUnitSimulation implements GameSimulation {
       || building.constructionProgress < 0
       || building.constructionProgress > 1
       || (building.lifecycle === "active" && building.constructionProgress !== 1)
-      || (building.lifecycle === "active" && building.builderId !== undefined)
       || (building.lifecycle === "constructing" && building.constructionProgress === 1)) {
       return false;
     }
@@ -935,13 +934,8 @@ export class LocalUnitSimulation implements GameSimulation {
   }
 
   private startConstruction(playerId: string, command: BuildCommand) {
-    const builder = command.unitIds.flatMap((id) => {
-      const unit = this.units.get(id);
-      return unit?.ownerId === playerId && unit.health > 0 && unit.kind === "scout-drone"
-        ? [unit]
-        : [];
-    })[0];
-    if (!builder || !Number.isFinite(command.rotation) || !constructionPlacementIsValid(
+    const builders = this.commandedBuilders(playerId, command.unitIds);
+    if (!builders.length || !Number.isFinite(command.rotation) || !constructionPlacementIsValid(
       this.terrain,
       command.kind,
       command.target,
@@ -968,32 +962,29 @@ export class LocalUnitSimulation implements GameSimulation {
       maxHealth: definition.maxHealth,
     };
     if (!this.createBuilding(site)) return false;
-    const authoritativeSite = this.buildings.get(id)!;
-    const path = this.planConstructionPath(builder, authoritativeSite);
-    if (!path) {
+    if (!this.assignConstruction(builders, this.buildings.get(id)!)) {
       this.buildings.delete(id);
       this.setNavigationObstacles(this.pathingBuildings());
       return false;
     }
     this.buildingSequence = sequence;
-    this.assignConstruction(builder, authoritativeSite, path);
     return true;
   }
 
   private resumeConstruction(playerId: string, command: ResumeConstructionCommand) {
     const site = this.buildings.get(command.buildingId);
-    const builder = command.unitIds.flatMap((id) => {
+    if (!site || site.ownerId !== playerId || site.health <= 0
+      || site.lifecycle !== "constructing") return false;
+    return this.assignConstruction(this.commandedBuilders(playerId, command.unitIds), site);
+  }
+
+  private commandedBuilders(playerId: string, unitIds: readonly string[]) {
+    return unitIds.flatMap((id) => {
       const unit = this.units.get(id);
       return unit?.ownerId === playerId && unit.health > 0 && unit.kind === "scout-drone"
         ? [unit]
         : [];
-    })[0];
-    if (!builder || !site || site.ownerId !== playerId || site.health <= 0
-      || site.lifecycle !== "constructing") return false;
-    const path = this.planConstructionPath(builder, site);
-    if (!path) return false;
-    this.assignConstruction(builder, site, path);
-    return true;
+    });
   }
 
   private queueTraining(playerId: string, command: TrainCommand) {
@@ -1039,12 +1030,20 @@ export class LocalUnitSimulation implements GameSimulation {
     return true;
   }
 
-  private assignConstruction(builder: UnitState, site: BuildingState, path: SimPoint[]) {
-    const previousBuilder = site.builderId && this.units.get(site.builderId);
-    if (previousBuilder && previousBuilder.id !== builder.id) this.stop(previousBuilder);
-    this.releaseConstruction(builder);
+  /** Sends each drone that can reach the site to build it; false when none can. */
+  private assignConstruction(builders: readonly UnitState[], site: BuildingState) {
+    let assigned = false;
+    for (const builder of builders) {
+      const path = this.planConstructionPath(builder, site);
+      if (!path) continue;
+      this.sendToBuild(builder, site, path);
+      assigned = true;
+    }
+    return assigned;
+  }
+
+  private sendToBuild(builder: UnitState, site: BuildingState, path: SimPoint[]) {
     builder.harvest = undefined;
-    site.builderId = builder.id;
     builder.path = path;
     builder.order = "build";
     builder.attackTargetId = undefined;
@@ -1058,11 +1057,18 @@ export class LocalUnitSimulation implements GameSimulation {
 
   private planConstructionPath(builder: UnitState, site: BuildingState) {
     if (distance(builder.position, site.position) <= directMaximumRange(builder, site)) return [];
+    // Each drone keeps its spot on the site's edge, so drones sent together spread around it
+    // instead of the last one pushing against the others forever.
+    const reservations = [...this.units.values()].flatMap((other) =>
+      other.id !== builder.id && other.health > 0 && other.order === "build"
+        && other.constructionTargetId === site.id
+        ? [{ position: reservedPosition(other), radius: other.radius + UNIT_SEPARATION_GAP - ATTACK_SEPARATION_GAP }]
+        : []);
     return planApproachRing(
       builder,
       site.position,
       directApproachRadius(builder, site),
-      [],
+      reservations,
       this.createPathPlanner(builder),
       // Recast can project a requested edge point outside construction reach.
       // Reject that endpoint instead of repeatedly walking to the same unusable spot.
@@ -1307,7 +1313,6 @@ export class LocalUnitSimulation implements GameSimulation {
       ? rangedFormationFor(units.filter((unit) => unit.attackRange), attackTarget!.position)
       : undefined;
     for (const unit of units) {
-      this.releaseConstruction(unit);
       unit.harvest = undefined;
       this.attackStalls.delete(unit.id);
       this.attackWaitingUntil.delete(unit.id);
@@ -1439,6 +1444,7 @@ export class LocalUnitSimulation implements GameSimulation {
       this.stepDirectAttack(unit);
       this.stepAttackGround(unit);
     }
+    this.stepConstructionSites();
     this.resolveUnitCollisions();
     this.updateAttackStalls();
     this.resolveCommandCenterElimination();
@@ -2122,8 +2128,9 @@ export class LocalUnitSimulation implements GameSimulation {
       health,
     });
     if (health > 0) return;
-    const builder = target.builderId && this.units.get(target.builderId);
-    if (builder) this.stop(builder);
+    for (const unit of this.units.values()) {
+      if (unit.constructionTargetId === target.id) this.stop(unit);
+    }
     this.events.push({
       type: "building-died",
       tick: this.tick,
@@ -2135,7 +2142,6 @@ export class LocalUnitSimulation implements GameSimulation {
   }
 
   private stop(unit: UnitState) {
-    this.releaseConstruction(unit);
     unit.harvest = undefined;
     this.attackStalls.delete(unit.id);
     this.attackWaitingUntil.delete(unit.id);
@@ -2150,21 +2156,12 @@ export class LocalUnitSimulation implements GameSimulation {
     unit.target = { ...unit.position };
   }
 
-  private releaseConstruction(unit: UnitState) {
-    const site = unit.constructionTargetId
-      ? this.buildings.get(unit.constructionTargetId)
-      : undefined;
-    if (site?.builderId === unit.id) site.builderId = undefined;
-    unit.constructionTargetId = undefined;
-  }
-
   private stepConstruction(builder: UnitState) {
     if (builder.order !== "build") return;
     const site = builder.constructionTargetId
       ? this.buildings.get(builder.constructionTargetId)
       : undefined;
-    if (!site || site.lifecycle !== "constructing" || site.builderId !== builder.id
-      || site.ownerId !== builder.ownerId) {
+    if (!site || site.lifecycle !== "constructing" || site.ownerId !== builder.ownerId) {
       this.stop(builder);
       return;
     }
@@ -2180,24 +2177,35 @@ export class LocalUnitSimulation implements GameSimulation {
       builder.target = { ...path[0]! };
       builder.moving = true;
       builder.formationPosition = { ...path.at(-1)! };
-      return;
     }
+  }
 
-    const totalTicks = constructionTicks(site.kind);
-    const completedTicks = Math.round(site.constructionProgress * totalTicks);
-    const nextTicks = Math.min(totalTicks, completedTicks + 1);
-    const healthBuiltDuringConstruction = site.maxHealth - 1;
-    const previousBuiltHealth = Math.floor(
-      completedTicks / totalTicks * healthBuiltDuringConstruction,
-    );
-    const nextBuiltHealth = Math.floor(nextTicks / totalTicks * healthBuiltDuringConstruction);
-    site.constructionProgress = nextTicks / totalTicks;
-    site.health = Math.min(site.maxHealth, site.health + nextBuiltHealth - previousBuiltHealth);
-    if (nextTicks < totalTicks) return;
-    site.lifecycle = "active";
-    site.constructionProgress = 1;
-    site.builderId = undefined;
-    this.stop(builder);
+  // Age of Empires II's rule: n working drones finish a site that takes one drone T ticks in
+  // 3T / (n + 2), so each added drone helps less than the one before. Work is counted in thirds
+  // of a tick so every rate stays a whole number.
+  private stepConstructionSites() {
+    const builders = new Map<string, UnitState[]>();
+    for (const unit of this.units.values()) {
+      const siteId = unit.constructionTargetId;
+      if (siteId && isWorkingOn(unit, siteId)) builders.set(siteId, [...builders.get(siteId) ?? [], unit]);
+    }
+    for (const [siteId, siteBuilders] of builders) {
+      const site = this.buildings.get(siteId)!;
+      const totalWork = 3 * constructionTicks(site.kind);
+      const completedWork = Math.round(site.constructionProgress * totalWork);
+      const nextWork = Math.min(totalWork, completedWork + siteBuilders.length + 2);
+      const healthBuiltDuringConstruction = site.maxHealth - 1;
+      const previousBuiltHealth = Math.floor(
+        completedWork / totalWork * healthBuiltDuringConstruction,
+      );
+      const nextBuiltHealth = Math.floor(nextWork / totalWork * healthBuiltDuringConstruction);
+      site.constructionProgress = nextWork / totalWork;
+      site.health = Math.min(site.maxHealth, site.health + nextBuiltHealth - previousBuiltHealth);
+      if (nextWork < totalWork) continue;
+      site.lifecycle = "active";
+      site.constructionProgress = 1;
+      for (const builder of siteBuilders) this.stop(builder);
+    }
   }
 
   private createPathPlanner(unit: UnitState, extraObstacles: readonly CircularObstacle[] = []) {
