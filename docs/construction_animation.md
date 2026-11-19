@@ -6,13 +6,13 @@ The two looks that lost the study, a layer-by-layer print with a cyan blueprint 
 
 ## The look
 
-A physical scaffold stands around the site from the moment it is placed. The real building rises inside it from the ground up, and the scaffold drops away when the building is complete. Everything is driven by four values: construction progress from 0 to 1, whether a drone is working, the site's health, and the time since the site completed or was destroyed.
+A physical scaffold stands around the site from the moment it is placed. The real building rises inside it from the ground up, and the scaffold drops away when the building is complete. Everything is driven by four values: construction progress from 0 to 1, whether a drone is working, the site's health, and the time since the site completed or was destroyed. A site carries one thing from frame to frame, the heat of its weld, so the glow can fade when the drone starts and stops.
 
 | State | What the player sees |
 | --- | --- |
 | Just placed, 0%, no drone yet | The scaffold at full size on a dusty plate pad with striped kerbs. No sparks, no building. |
 | Drone working | The finished model is shown up to a horizontal cut at `progress × height`. The newest band under the cut is bare steel. A dark ribbed deck closes the cut, glowing only near its rim, which carries a hot seam, and weld arcs with falling sparks hop around the hull at that height. The drone's beam ends at the cut. In the first 0.9 s of work the first layer spreads out from under the beam as a growing disc. |
-| Paused, no drone working | Arcs, seam and glow go out and the deck turns dark steel. Nothing moves on a paused site. |
+| Paused, no drone working | The arcs die in 0.2 s, and the seam and the deck's glow cool to dark steel in 0.8 s. When the drone comes back the arcs strike in 0.2 s and the glow returns in 0.4 s. A drone that stops and resumes sooner than that turns each fade round from where it is, so nothing jumps. Nothing moves on a paused site. |
 | Damaged before completion | Rails and braces hang or go missing in proportion to lost health, and dark smoke rises where they broke, from more places as health falls. Posts, feet and the pad always stand. The game's health bar still carries the exact value. |
 | Destroyed before completion | The scaffold drops into the ground in 0.24 s with a skirt of dust. The building stays cut at the height it had reached, with its deck, and sinks into pale dust over 1 s, leaving a heap of rubble: [destruction and death effects](death_effects.md) stage that. |
 | Completion | The building is the untouched model from the first frame. The scaffold's walls and feet drop into the pad, the pad and its kerbs sink after them, all within 0.5 s, and the dust is gone 1 s after completion, when nothing of the site is left. |
@@ -86,6 +86,7 @@ box pull art/workbench/renders/previews/construction/
 - `first-layer`, `first-layer-turret`, `cuts-turret`, `cuts-command-center`, `shoulders`, `barrels`: the cut at the heights where it once looked wrong.
 - `fit`, `slope`: buildings turned 0, 30, 45, 77 and 180 degrees side by side, and a Command Center on the steepest slope placement allows.
 - `film`, `film-turret`, `film-command-center`, `film-opening-command-center`, `film-loss`, `film-loss-turret`: a build at real Turret speed with the drone leaving for 1.5 s, 12 s of a Command Center build at its real pace, the first 3 s of one, and a site shot at and destroyed.
+- `film-pause`, `film-pause-turret`, `film-pause-command-center`: the drone leaves for 2 s, long enough for the weld to go cold, comes back, and then leaves for only 0.4 s, which catches the weld half cooled.
 - `perf`: the cost table above, written to `perf.json`.
 
 A new building needs no work here, but look at it in `gameplay` and `fit` once: the outline assumes one main hull around the model's vertical axis.

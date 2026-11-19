@@ -56,7 +56,10 @@ for (const [shot, width] of Object.entries(stills)) {
   });
 }
 
-const films = ["film", "film-turret", "film-command-center", "film-opening-command-center", "film-loss", "film-loss-turret"];
+const films = [
+  "film", "film-turret", "film-command-center", "film-opening-command-center", "film-loss", "film-loss-turret",
+  "film-pause", "film-pause-turret", "film-pause-command-center",
+];
 for (const shot of films) {
   if (only && !only.includes(shot)) continue;
   test(`construction ${shot}`, async ({ page }) => {
