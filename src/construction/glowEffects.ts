@@ -2,20 +2,16 @@ import * as THREE from "three";
 
 /** Floats per glow: position and size, velocity and seed, then kind, strength and age. */
 const STRIDE = 12;
-/** A lamp's glow never draws smaller than this many pixels across, so it reads at any zoom. */
-const LAMP_PIXELS = 24;
 
 export const Glow = {
   /** A welding arc: a flickering hot point. */
   Flare: 0,
   /** A falling spark thrown from an arc; it loops on its own from the clock. */
   Spark: 1,
-  /** A slow cyan blink on a scaffold lamp: the site is waiting for a drone. */
-  Lamp: 2,
   /** A puff of sand kicked up as something drops; `age` runs it from 0 to 1. */
-  Dust: 3,
+  Dust: 2,
   /** Dark smoke rising from a broken part; it loops on its own from the clock. */
-  Smoke: 4,
+  Smoke: 3,
 } as const;
 
 /** One owner's glows for the current frame. Refill it from scratch on every update. */
@@ -38,7 +34,6 @@ attribute vec4 aPlace;
 attribute vec4 aMotion;
 attribute vec4 aState;
 uniform float uTime;
-uniform float uViewportHeight;
 varying vec2 vCorner;
 varying float vKind;
 varying float vStrength;
@@ -65,11 +60,6 @@ void main() {
     vStrength *= (1.0 - age) * smoothstep(0.0, 0.1, age);
     lift = 0.2;
   } else if (vKind < 2.5) {
-    // A lamp never goes fully dark, so a waiting site reads as waiting in any single frame.
-    vStrength *= 0.3 + 0.7 * pow(0.5 + 0.5 * sin(uTime * 4.2 + seed), 5.0);
-    // The game's camera is orthographic, so one pixel is the same size everywhere on screen.
-    extent = max(extent, vec2(${(LAMP_PIXELS / 2).toFixed(1)} * 2.0 / (projectionMatrix[1][1] * uViewportHeight)));
-  } else if (vKind < 3.5) {
     float age = aState.z;
     center += aMotion.xyz * (1.0 - (1.0 - age) * (1.0 - age));
     extent *= 0.55 + 1.1 * age;
@@ -112,26 +102,21 @@ void main() {
     float body = (1.0 - abs(vCorner.x)) * (1.0 - vCorner.y * vCorner.y);
     light = mix(vec3(1.3, 0.55, 0.14), vec3(3.0, 2.5, 1.8), body) * body;
   } else if (vKind < 2.5) {
-    light = vec3(0.55, 2.3, 2.5) * exp(-reach * reach * 22.0)
-      + vec3(0.12, 0.6, 0.68) * exp(-reach * reach * 4.0) * 0.55;
-  } else if (vKind < 3.5) {
     cover = exp(-reach * reach * 3.0) * edge * 0.68 * vStrength;
     light = vec3(0.6, 0.41, 0.26);
   } else {
     cover = exp(-reach * reach * 2.2) * edge * 0.78 * vStrength;
     light = vec3(0.05, 0.043, 0.038);
   }
-  gl_FragColor = vec4(vKind < 2.5 ? light * edge * vStrength : light, 1.0);
+  gl_FragColor = vec4(vKind < 1.5 ? light * edge * vStrength : light, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
-  gl_FragColor = vKind < 2.5 ? vec4(gl_FragColor.rgb, 0.0) : vec4(gl_FragColor.rgb * cover, cover);
+  gl_FragColor = vKind < 1.5 ? vec4(gl_FragColor.rgb, 0.0) : vec4(gl_FragColor.rgb * cover, cover);
 }
 `;
 
-const viewport = new THREE.Vector4();
-
 /**
- * Sparks, arcs, lamp blinks, dust and smoke for the whole world, drawn as one instanced set of
+ * Sparks, arcs, dust and smoke for the whole world, drawn as one instanced set of
  * quads in one draw call. Each owner fills its own `GlowList` every frame; `flush` gathers
  * them once all owners have updated.
  */
@@ -146,7 +131,7 @@ export class GlowEffects {
     geometry.setIndex([0, 1, 2, 0, 2, 3]);
     this.mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
       name: "Construction glow",
-      uniforms: { uTime: { value: 0 }, uViewportHeight: { value: 900 } },
+      uniforms: { uTime: { value: 0 } },
       vertexShader,
       fragmentShader,
       transparent: true,
@@ -159,9 +144,6 @@ export class GlowEffects {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
     this.mesh.visible = false;
-    this.mesh.onBeforeRender = (renderer) => {
-      this.mesh.material.uniforms.uViewportHeight!.value = renderer.getCurrentViewport(viewport).w;
-    };
     this.bind();
     parent.add(this.mesh);
   }

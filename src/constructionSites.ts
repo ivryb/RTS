@@ -106,7 +106,7 @@ const hugHull = (root: THREE.Object3D, outline: Outline, ground: number) => {
  * Every site shares four draw calls: the scaffolds, their shadow, the decks and the glows.
  */
 export class ConstructionSites {
-  /** Sparks, lamps, dust and smoke. Other world effects may add their own lists to it. */
+  /** Arcs, sparks, dust and smoke. Other world effects may add their own lists to it. */
   readonly effects: GlowEffects;
   private readonly decks: Decks;
   private readonly hulls = new Map<BuildingKind, { outline: Outline; table: number }>();
@@ -190,9 +190,7 @@ export class ConstructionSites {
     const center = corners.reduce((sum, corner) => sum.add(corner), new THREE.Vector3()).divideScalar(corners.length);
     const arcs = clamp(Math.round(perimeter / 9), 2, 5);
     const puffs = clamp(Math.round(perimeter / 1.3), 12, 56);
-    const glows = this.effects.createList(
-      Math.max(arcs * (1 + SPARKS_PER_ARC), puffs, corners.length) + MOST_BREAKS * SMOKE_WISPS,
-    );
+    const glows = this.effects.createList(Math.max(arcs * (1 + SPARKS_PER_ARC), puffs) + MOST_BREAKS * SMOKE_WISPS);
     const seed = chance(root.position.x * 0.731 + root.position.z * 1.137);
     const fullBand = clamp(height * 0.06, 0.14, 0.32);
     const firstLayer = FIRST_LAYER_SECONDS / BUILDING_DEFINITIONS[kind].constructionSeconds;
@@ -285,7 +283,6 @@ export class ConstructionSites {
           return true;
         }
         if (welding && spread) addArcs(progress, reach, time);
-        else for (const lamp of cage?.lamps ?? []) glows.add(Glow.Lamp, lamp, 0.34, 0.85, seed * 6.28);
         addSmoke();
         return true;
       },
