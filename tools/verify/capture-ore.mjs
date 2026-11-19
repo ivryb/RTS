@@ -68,6 +68,10 @@ try {
       await page.waitForTimeout(600);
       if ((await inspect()).units.find(unit => unit.id === scout.id)?.harvest) break;
     }
+    // An empty deposit takes no gather order, and the wait for a fresh load below would never end.
+    if (!(await inspect()).units.find(unit => unit.id === scout.id)?.harvest) {
+      throw new Error(`The Scout took no gather order for deposit ${values.mine}; --mine needs Titanium left in it.`);
+    }
     // A Scout fills up in a few seconds and leaves, so each shot waits for the start of a fresh load,
     // then for Boat's slow frames to catch up with the simulation.
     const loading = limit => page.evaluate(([id, limit]) => {

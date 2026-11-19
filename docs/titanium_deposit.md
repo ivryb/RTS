@@ -80,8 +80,8 @@ When a deposit's amount reaches zero, its `full` mesh is taken out of the scene 
 ## Rebuilding a variant
 
 1. Run the generator on Boat and pull `art/workbench/titanium-three-knuckles/` back.
-2. Look at the candidate in the game before installing it: `bun tools/verify/capture-ore.mjs --model <seed-n/deposit.glb> --out <dir> --mine 0` serves it in place of all three variants and captures deposits on sand, among scree rocks and in dry grass at gameplay and close zoom, and a Scout mining. Add `--titanium 0` for the depleted state.
-3. Copy it to `assets/models/titanium-deposit-<seed>.glb` and copy its entry from the generator's `export.json` into `assets/models/titanium-manifest.json`.
+2. Look at the candidate in the game before installing it: `bun tools/verify/capture-ore.mjs --model <seed-n/deposit.glb> --out <dir> --mine 0` serves it in place of all three variants and captures deposits on sand, among scree rocks and in dry grass at gameplay and close zoom, and a Scout mining. For the depleted state, run it again with `--titanium 0` and without `--mine`: an empty deposit takes no gather order.
+3. Copy it to `assets/models/titanium-deposit-<seed>.glb` and copy its entry from the generator's `export.json` into `assets/models/titanium-manifest.json`, with `path` set to the installed file.
 
 `tools/verify/specs/deposit-depletion.spec.ts` mines a deposit out in a live match and checks the swap.
 

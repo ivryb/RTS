@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import * as THREE from "three";
 import { sampleHeight } from "../src/map";
 import { OrePresentation, Workface, type OreModelLoader } from "../src/orePresentation";
-import { selectableEntityId } from "../src/unitInput";
+import { pickSurface, selectableEntityId } from "../src/unitInput";
 
 const map = { size: 100, segments: 1, heights: new Float32Array(4) };
 const deposit = { id: "ore-1", position: { x: 0, z: 0 }, radius: 3000, amount: 40, initialAmount: 40 };
@@ -15,29 +15,32 @@ const loadRocks = (...rocks: THREE.Mesh[]): OreModelLoader => async () =>
 const faceHeights = (face: Workface) =>
   Array.from({ length: face.count }, (_, index) => face.points[index * 3 + 1]!);
 
+/** What a click straight down on the point `x` metres along +x from the deposit's centre selects. */
+const pickedFromAbove = (world: THREE.Group, ore: OrePresentation, x: number) => {
+  world.updateMatrixWorld(true);
+  const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10, 0), new THREE.Vector3(0, -1, 0));
+  return selectableEntityId(pickSurface(raycaster.intersectObjects(ore.selectables, true))?.object);
+};
+
 test("a deposit that runs out shows its depleted rock in place of the full one, and stays selectable", async () => {
   const world = new THREE.Group();
   const ore = new OrePresentation(world, map, [deposit], loadRocks(rock(10)));
   await ore.ready;
-  const root = ore.selectables[0]!;
-  const visual = root.children[0]!;
-  const scale = visual.scale.clone();
-  const full = visual.children[0]!;
+  // Scaled into the 3 m footprint, the full rock reaches 2.12 m along x and the depleted one 1.06 m.
   expect(ore.shownState(deposit.id)).toBe("full");
-  expect(visual.children).toHaveLength(1);
+  expect(pickedFromAbove(world, ore, 1.5)).toBe(deposit.id);
 
   ore.update([{ ...deposit, amount: 2 }], new Set());
-  expect(visual.children[0]).toBe(full);
+  expect(ore.shownState(deposit.id)).toBe("full");
+  expect(pickedFromAbove(world, ore, 1.5)).toBe(deposit.id);
 
   ore.update([{ ...deposit, amount: 0 }], new Set([deposit.id]));
   expect(ore.shownState(deposit.id)).toBe("depleted");
-  // Only the depleted rock is left to draw and to pick, at the scale the full one had.
-  expect(visual.children).toHaveLength(1);
-  expect(visual.children[0]).not.toBe(full);
-  expect(visual.scale.equals(scale)).toBe(true);
-  expect(selectableEntityId(visual.children[0]!.children[0])).toBe(deposit.id);
-  expect(root.children.find(child => child.userData.selectionOverlay)?.visible).toBe(true);
-  // The mined-out rock is half as wide: a beam from where the full face stood now travels on to it.
+  // The full rock is gone from the scene: a click where only it stood selects nothing.
+  expect(pickedFromAbove(world, ore, 1.5)).toBeUndefined();
+  expect(pickedFromAbove(world, ore, 0.5)).toBe(deposit.id);
+  expect(ore.selectables[0]!.children.find(child => child.userData.selectionOverlay)?.visible).toBe(true);
+  // A beam now travels on to the smaller rock, which stands at the scale the full one had.
   const face = new Workface();
   expect(ore.traceWorkface(deposit.id, new THREE.Vector3(4, 0.95, 0), face)).toBe(true);
   expect(face.points[0]!).toBeCloseTo(1.5 / Math.SQRT2, 4);
