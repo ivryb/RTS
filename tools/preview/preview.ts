@@ -14,6 +14,7 @@ import { createEnvironmentProps } from "../../src/environmentProps";
 import type { MatchFrame, MatchSession } from "../../src/matchSession";
 import { createTrainedUnitState } from "../../src/sim/production";
 import { POSITION_SCALE } from "../../src/sim/simulationConstants";
+import { HARVEST_APPROACH } from "../../src/sim/units";
 import { UnitSystem } from "../../src/unitSystem";
 import "./preview.css";
 
@@ -167,7 +168,6 @@ if (previewScene === "units" && requestedEffect === "behemoth-barrage") {
 // Scout Drones parked around one Titanium Deposit, drawn by the production UnitSystem from a
 // scripted frame. ?drones=N sets the crowd, ?mining=0 leaves them idle as the cost baseline, and
 // ?deposit=N uses the map's Nth deposit instead of the nearest; 0, 1 and 2 show the three rock models.
-// ?approach=M stands the drones M metres outside the deposit's footprint instead of the simulation's 1.
 let miningSystem: UnitSystem | undefined;
 if (previewScene === "mining") {
   const deposit = params.has("deposit")
@@ -185,7 +185,7 @@ if (previewScene === "mining") {
       id: `scout-drone-${index + 1}`, kind: "scout-drone", ownerId: "local-player",
       position: deposit.position, facing: 0,
     });
-    const distance = deposit.radius + scout.radius + (Number(params.get("approach") ?? 1)) * POSITION_SCALE;
+    const distance = deposit.radius + scout.radius + HARVEST_APPROACH;
     const position = {
       x: Math.round(deposit.position.x + Math.sin(angle) * distance),
       z: Math.round(deposit.position.z + Math.cos(angle) * distance),

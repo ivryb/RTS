@@ -2,7 +2,8 @@
 
 Scout Drones harvest Titanium Deposits and carry the ore to a friendly Command
 Center. While a Scout extracts, it fires a laser from its nose whose contact
-point sweeps up and down the rock; while it hauls, it carries a cargo bin.
+point sweeps up and down the rock. A hauling Scout looks like an empty one; the
+selection panel shows what it carries.
 
 ## Sub-features
 

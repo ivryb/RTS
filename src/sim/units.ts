@@ -259,7 +259,11 @@ export const toSimPoint = (x: number, z: number): SimPoint => ({
 });
 
 const HARVEST_REACH = 1.5 * POSITION_SCALE;
-const HARVEST_APPROACH = 1 * POSITION_SCALE;
+/**
+ * How far outside a deposit's or Command Center's footprint a Scout stands to work. Close enough
+ * that its mining laser is a short beam, and still clear of the path planner's obstacle margin.
+ */
+export const HARVEST_APPROACH = 0.3 * POSITION_SCALE;
 const PATH_CLEARANCE = 0.15 * POSITION_SCALE;
 const MELEE_REACH = 0.55 * POSITION_SCALE;
 const PATH_SAMPLES = 16;

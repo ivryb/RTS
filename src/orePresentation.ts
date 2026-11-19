@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import { sampleHeight } from "./map";
 import type { TerrainSurface } from "./terrainWalkability";
@@ -396,9 +395,8 @@ const unitSeed = (id: string) => {
   return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
 };
 
-/** A Scout's two work phases made visible: a cutting laser while it extracts, a cargo bin while it hauls. */
+/** A Scout's extraction made visible: a cutting laser from its nozzle onto the rock face. */
 export class ScoutHarvestPresentation {
-  readonly cargo = new THREE.Group();
   /** Whether the laser was drawn in the latest update. */
   firing = false;
   /** Where the beam leaves the drone and where it meets the rock; current while `firing`. */
@@ -412,22 +410,11 @@ export class ScoutHarvestPresentation {
 
   /** `nozzle` sits on the drone's model where the beam leaves it. */
   constructor(
-    root: THREE.Group,
     private readonly nozzle: THREE.Object3D,
     private readonly ore: OrePresentation,
     private readonly lasers: MiningLasers,
     unitId: string,
   ) {
-    const ivory = new THREE.MeshStandardMaterial({ color: 0xc9baa0, roughness: 0.72, metalness: 0.08 });
-    const graphite = new THREE.MeshStandardMaterial({ color: 0x323a3c, roughness: 0.7, metalness: 0.2 });
-    const bin = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.24, 0.36, 2, 0.045), ivory);
-    const contents = new THREE.Mesh(new RoundedBoxGeometry(0.4, 0.13, 0.27, 2, 0.025), graphite);
-    contents.position.y = 0.15;
-    this.cargo.add(bin, contents);
-    this.cargo.position.set(0, 0.75, -0.57);
-    this.cargo.visible = false;
-    this.cargo.name = "Titanium cargo";
-    root.add(this.cargo);
     // Drones on one deposit must not sweep in step, so each gets its own phase, tempo and wander.
     // The three come from different bits of the seed: two drones whose phases happen to match
     // still drift apart.
@@ -437,11 +424,10 @@ export class ScoutHarvestPresentation {
   }
 
   /**
-   * Shows `amount` of carried ore, and fires the laser at `depositId` for this frame when one is
-   * given. Call it after the drone's model has been posed for the frame.
+   * Fires the laser at `depositId` for this frame when one is given. Call it after the drone's
+   * model has been posed for the frame.
    */
-  update(amount: number, depositId: string | undefined) {
-    this.cargo.visible = amount > 0;
+  update(depositId: string | undefined) {
     this.firing = false;
     if (depositId === undefined) return;
     // Read from the model, not worked out from the drone's position: the nozzle bobs and sways
@@ -470,16 +456,5 @@ export class ScoutHarvestPresentation {
   /** For a Scout that is no longer drawn, and so no longer updated. */
   hide() {
     this.firing = false;
-  }
-
-  dispose() {
-    this.cargo.removeFromParent();
-    const materials = new Set<THREE.Material>();
-    this.cargo.traverse(object => {
-      if (!(object instanceof THREE.Mesh)) return;
-      object.geometry.dispose();
-      for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
-    });
-    for (const material of materials) material.dispose();
   }
 }
