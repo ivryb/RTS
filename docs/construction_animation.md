@@ -45,7 +45,7 @@ The site is picked through what is visible. Each site has a pick object under it
 
 ## Cost
 
-Measured in the construction preview with 5 Command Centers and 5 Turrets under construction at once, with 7 working drones and their beams, shadow pass included. Draw calls and triangles are exact counts from `renderer.info`. The CPU times are from Boat, which renders in software; they are far below a 16.7 ms frame, so their spread does not change the picture. The scaffold's per-frame time is the range of six runs. The weld's fade (D77-12) did not move it: in alternating runs the code before it took 0.026 to 0.038 ms and the code after it 0.029 to 0.043 ms. The other times are single runs.
+Measured in the construction preview with 5 Command Centers and 5 Turrets under construction at once, with 7 working drones and their beams, shadow pass included. Draw calls and triangles are exact counts from `renderer.info`. The CPU times are from Boat, which renders in software; they are far below a 16.7 ms frame, so their spread does not change the picture. The scaffold's per-frame time is the range of twelve runs. The weld's fade (D77-12) did not move it by more than the runs differ among themselves: the code before it took 0.026 to 0.038 ms over six runs. The other times are single runs.
 
 | | Stretch (before) | Scaffold |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ Measured in the construction preview with 5 Command Centers and 5 Turrets under 
 | Draw calls, 10 sites | 196 | 200 |
 | Draw calls, 10 sites, in a browser without `WEBGL_multi_draw` | 196 | 238 |
 | Triangles, 10 sites | 5,978,671 | 6,035,303 |
-| CPU per frame for 10 sites | 0.0017 ms | 0.029 to 0.043 ms |
+| CPU per frame for 10 sites | 0.0017 ms | 0.029 to 0.048 ms |
 | Preparing a site | 0 ms | up to 1.3 ms (Command Center), 0.4 ms (Turret) |
 | Measuring a building kind, once | none | 15 to 21 ms |
 
