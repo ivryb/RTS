@@ -29,6 +29,12 @@ const FIRST_LAYER_SECONDS = 0.9;
 const DECK_FLOOR = 0.07;
 /** A reach that cuts nothing off: the first layer has spread out to the hull. */
 const WHOLE_HULL = 1e6;
+/** Seconds the welding arcs take to strike once a drone starts work, and to die once it stops. */
+const ARC_SECONDS = 0.2;
+/** Seconds the steel takes to glow behind the arcs. */
+const HEAT_SECONDS = 0.4;
+/** Seconds it takes to cool once the arcs are out: hot steel goes dark more slowly than it lights. */
+const COOL_SECONDS = 0.8;
 
 /** Everything the presentation knows about one site on one frame. */
 export interface SiteState {
@@ -47,9 +53,10 @@ export interface ConstructionSite {
   /** World height at which the building is being built: where a Scout Drone's beam ends. */
   readonly beamTargetY: number;
   /**
-   * Sets every visual from `state` and `time` alone, with nothing carried over from the last
-   * call. Returns false once the building is complete and nothing of its construction is
-   * left to show, so the site can be disposed.
+   * Sets every visual from `state` and `time`. Only the weld is carried over from the last
+   * call: its arcs and glow come up and die down over the time that passed since then, so
+   * call this with a later `time` each frame. Returns false once the building is complete
+   * and nothing of its construction is left to show, so the site can be disposed.
    */
   update(state: SiteState, time: number): boolean;
   /**
@@ -198,13 +205,13 @@ export class ConstructionSites {
     // A plume sized for a Turret is lost against a Command Center.
     const smokeScale = clamp(perimeter / 14, 1, 2);
 
-    /** Welding arcs hop between points of the deck's rim, no farther out than `reach`. */
-    const addArcs = (progress: number, reach: number, time: number) => {
+    /** Welding arcs hop between points of the deck's rim, no farther out than `reach`, at `power` (0 to 1). */
+    const addArcs = (progress: number, reach: number, time: number, power: number) => {
       for (let arc = 0; arc < arcs; arc += 1) {
         const turn = time / (0.85 + 0.22 * arc) + arc * 0.37 + seed;
         const spot = Math.floor(turn);
         // Each arc fades out before it hops, so it never jumps while lit.
-        const strength = Math.sin(Math.PI * (turn - spot)) ** 0.6;
+        const strength = power * Math.sin(Math.PI * (turn - spot)) ** 0.6;
         outline.surface(progress, chance(spot * 7.3 + arc * 31.7 + seed * 100) * Math.PI * 2, point);
         point.y = 0;
         outward.copy(point).normalize().transformDirection(root.matrixWorld);
@@ -248,6 +255,11 @@ export class ConstructionSites {
 
     let beamTargetY = ground;
     let sunk = 0;
+    // The weld, from 0 (out, cold) to 1: how strongly its arcs burn and how hot its steel is,
+    // and when both were last moved. No time has passed before the first update.
+    let arcing = 0;
+    let heat = 0;
+    let weldedAt = Infinity;
     return {
       get beamTargetY() {
         return beamTargetY;
@@ -268,21 +280,31 @@ export class ConstructionSites {
         }
         const constructing = lifecycle === "constructing";
         const welding = constructing && working;
+        // The weld comes up and dies down instead of switching: the arcs follow the drone
+        // quickly, and the steel's glow follows the arcs. Both move at a steady rate, so a
+        // drone that stops and resumes in quick succession turns each fade round from where
+        // it is, and nothing pops.
+        const elapsed = Math.max(0, time - weldedAt);
+        weldedAt = time;
+        arcing = clamp(arcing + elapsed / (welding ? ARC_SECONDS : -ARC_SECONDS), 0, 1);
+        heat = clamp(heat + elapsed / (welding ? HEAT_SECONDS : -COOL_SECONDS), 0, 1);
+        // A destroyed site goes dark at once.
+        const glow = constructing ? smoothstep(heat, 0, 1) : 0;
         // The last courses have no bare band left, so completion does not repaint the roof.
         const band = fullBand * (1 - smoothstep(progress, 0.86, 1));
         const flicker = 0.82 + 0.18 * Math.sin(time * 23 + seed * 40) * Math.sin(time * 17.3);
         // Nothing is welded at 0%. The first layer then spreads out from under the beam.
         const spread = 1 - (1 - Math.min(1, progress / firstLayer)) ** 2;
         const reach = spread < 1 ? widest * spread : WHOLE_HULL;
-        reveal.set(cut - sunk, band, welding ? flicker : 0, reach);
-        if (spread) deck.set(progress, Math.max(cut, ground + DECK_FLOOR) - sunk, welding ? flicker : 0, reach);
+        reveal.set(cut - sunk, band, glow * flicker, reach);
+        if (spread) deck.set(progress, Math.max(cut, ground + DECK_FLOOR) - sunk, glow * flicker, reach);
         else deck.hide();
         cage?.set(constructing ? 0 : Math.min(1, since / COLLAPSE_SECONDS) ** 2, health);
         if (!constructing) {
           addDust(since, 0);
           return true;
         }
-        if (welding && spread) addArcs(progress, reach, time);
+        if (arcing && spread) addArcs(progress, reach, time, smoothstep(arcing, 0, 1));
         addSmoke();
         return true;
       },
