@@ -1065,7 +1065,7 @@ export class UnitSystem {
       },
       attack: "none",
       constructionBeam,
-      harvesting: new ScoutHarvestPresentation(root, nozzle, this.ore, this.miningLasers, id),
+      harvesting: new ScoutHarvestPresentation(nozzle, this.ore, this.miningLasers, id),
     });
   }
 
@@ -1785,7 +1785,6 @@ export class UnitSystem {
     this.miningLasers.dispose();
     for (const presentation of this.presentations.values()) {
       presentation.mixer?.stopAllAction();
-      presentation.harvesting?.dispose();
       disposeEntityOverlays(presentation);
       presentation.selectionHitbox.geometry.dispose();
       (presentation.selectionHitbox.material as THREE.Material).dispose();
@@ -2691,12 +2690,8 @@ export class UnitSystem {
         deltaSeconds,
       );
     }
-    // The cargo bin shows only on the way home: beside the laser it reads as a stray box. The
-    // laser waits for the drone to face the rock, so it never leaves the nozzle sideways.
-    presentation.harvesting?.update(
-      current.health > 0 && !miningDeposit ? current.cargoTitanium : 0,
-      current.health > 0 && facingTarget ? miningDeposit?.id : undefined,
-    );
+    // The laser waits for the drone to face the rock, so it never leaves the nozzle sideways.
+    presentation.harvesting?.update(current.health > 0 && facingTarget ? miningDeposit?.id : undefined);
     if (presentation.tracks) {
       const tracks = presentation.tracks;
       if (current.moving && tracks.lastX !== undefined && tracks.lastZ !== undefined) {

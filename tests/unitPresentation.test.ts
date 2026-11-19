@@ -337,7 +337,7 @@ describe("the mining laser stops when", () => {
   }
 });
 
-test("authoritative mining and hauling show different physical work states and delivered stock", () => {
+test("authoritative mining and hauling report the carried and delivered Titanium", () => {
   const scout = unit("scout-drone");
   scout.attacking = false;
   scout.order = "gather";
@@ -354,21 +354,19 @@ test("authoritative mining and hauling show different physical work states and d
   system.update(0.1);
   expect(system.selectedUnits()[0]?.harvest?.phase).toBe("extracting");
   expect(world.getObjectByName("Construction beam")?.visible).toBe(false);
-  // The bin is for the way home: a drone at the rock shows its laser, not its load.
-  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(false);
   expect(system.selectedGroups()[0]?.cargoTitanium).toBe(2);
   scout.cargoTitanium = 20;
   scout.moving = true;
   scout.harvest = { depositId: deposit.id, phase: "to-dropoff", dropoffId: "home", workPosition: toSimPoint(-8, 0) };
   session.frames.push({ ...frame(2, scout, []), titaniumDeposits: [deposit] });
   system.update(0.1);
-  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(true);
+  expect(system.selectedGroups()[0]?.cargoTitanium).toBe(20);
   expect(system.selectedUnits()[0]?.harvest?.phase).toBe("to-dropoff");
   scout.cargoTitanium = 0;
   scout.harvest = { depositId: deposit.id, phase: "to-deposit", workPosition: toSimPoint(0, 0) };
   session.frames.push({ ...frame(3, scout, []), playerTitanium: { "local-player": 20 } });
   system.update(0.1);
-  expect(root.getObjectByName("Titanium cargo")?.visible).toBe(false);
+  expect(system.selectedGroups()[0]?.cargoTitanium).toBe(0);
   expect(system.titanium).toBe(20);
   system.dispose();
 });
