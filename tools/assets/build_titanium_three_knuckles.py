@@ -12,8 +12,9 @@ sand on their ledges inside the same skin.
 
 Each `--seed` composes a sibling outcrop and exports `seed-<n>/full.glb` and
 `seed-<n>/depleted.glb` under `--out` (default art/workbench/titanium-three-knuckles),
-with one atlas per seed shared by the two. Without `--seed` it builds VARIANTS, the three
-seeds the game's three variants are made from. `--draft` stops before the bake and renders
+with one atlas per seed shared by the two (color at 1024 px, normal and surface at 512 px).
+Without `--seed` it builds VARIANTS, the three seeds the game's three variants are made
+from. `--draft` stops before the bake and renders
 `seed-<n>/draft-full.png` and `draft-depleted.png` from the game's camera, in about a
 minute a seed against two for a build. Nothing is written to assets/models; review with
 `bun tools/verify/capture-ore.mjs --model <glb> --out <dir>`.
@@ -68,6 +69,9 @@ FOOTPRINT_RADIUS = 5.35
 # The game sets the model this far into the ground, so the sand around it is authored this high.
 GROUND = .05
 ATLAS = 1024
+# Normal and surface maps hold up at half the color map's size, which halves the model's
+# texture memory to 8 MiB; they are baked at ATLAS and averaged down.
+DETAIL_ATLAS = 512
 TRIANGLES = 8600
 # The seeds the game's three variants are built from.
 VARIANTS = (5, 1, 3)
@@ -1333,11 +1337,15 @@ def bake(low, sources, output, name):
     layers['surface'][..., 0] = 1
     layers['normal'][~covered] = (.5, .5, 1, 1)
     images = {}
-    for key in ('color', 'normal', 'surface'):
-        image = bpy.data.images.new(f'{name} {key}', ATLAS, ATLAS, alpha=False, float_buffer=True)
+    for key, size in dict(color=ATLAS, normal=DETAIL_ATLAS, surface=DETAIL_ATLAS).items():
+        image = bpy.data.images.new(f'{name} {key}', size, size, alpha=False, float_buffer=True)
         if key != 'color':
             image.colorspace_settings.name = 'Non-Color'
-        pixels = spread(layers[key], covered.copy())
+        step = ATLAS // size
+        pixels = spread(layers[key], covered.copy()).reshape(size, step, size, step, 4).mean((1, 3))
+        if key == 'normal':
+            vectors = pixels[..., :3] * 2 - 1
+            pixels[..., :3] = vectors / np.linalg.norm(vectors, axis=-1, keepdims=True) * .5 + .5
         pixels[..., 3] = 1
         image.pixels.foreach_set(pixels.ravel())
         image.filepath_raw = str(output / f'runtime-{key}.png')
@@ -1475,6 +1483,6 @@ exports = [entry for seed in args.seed for entry in author(seed)]
 if exports:
     (OUT / 'export.json').write_text(json.dumps(dict(
         generator='tools/assets/build_titanium_three_knuckles.py',
-        format='1 mesh, 1 standard PBR material, 1024px WebP color/normal/roughness-metallic per seed, shared by both states',
+        format='1 mesh, 1 standard PBR material, WebP atlas per seed shared by both states: 1024px color, 512px normal and roughness-metallic',
         coordinates='Y-up, centered X/Z, ground pivot Y=0', assets=exports), indent=2) + '\n')
 log('done')
