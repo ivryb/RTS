@@ -68,6 +68,9 @@ const verifyEnabled = params.has("verify");
 // Behavioral verify specs add render=light: Boat has no GPU, and shadows, rocks, vegetation
 // and antialiasing are most of each software-drawn frame. Players never reach it.
 const lightRender = verifyEnabled && params.get("render") === "light";
+// A deposit holds 16,000 Titanium or more, hours of mining. Verify specs add titanium=N to start
+// every deposit at N, so a Scout mines one out in seconds. Players never reach it.
+const verifyDepositAmount = verifyEnabled && params.has("titanium") ? Number(params.get("titanium")) : undefined;
 if (lightRender) {
   const badge = Object.assign(document.createElement("span"), { className: "render-mode", textContent: "Light render" });
   document.body.append(badge);
@@ -155,6 +158,9 @@ const loadMap = (seed: number) => {
     dispose: disposeWorld,
     create: (nextSeed) => {
       const map = generateMap(nextSeed, 6);
+      if (verifyDepositAmount !== undefined) {
+        for (const deposit of map.titaniumDeposits) deposit.amount = deposit.initialAmount = verifyDepositAmount;
+      }
       return { map, world: createWorld(map) };
     },
     add: (next) => scene.add(next),

@@ -13,15 +13,18 @@ selection panel shows what it carries.
 - `mine-haul` a full Scout leaves for the Command Center with no laser.
 - `mine-deliver` delivered cargo raises the Titanium counter.
 - `mine-interrupt` any new order switches the laser off.
+- `mine-out` a deposit whose amount reaches zero stays in place as its depleted
+  rock, all tan with no grey ore, and can still be selected.
 
 ## How to get to it (user POV)
 
-- Left-click the Scout Drone, then right-click a Titanium Deposit (the dark
-  rock outcrop near the player base).
+- Left-click the Scout Drone, then right-click a Titanium Deposit (the outcrop
+  of three rocks with grey, silver-veined ore, near the player base).
 
 ## Driving it with the tools/verify Playwright harness
 
-Proven in `tools/verify/specs/scout-mining.spec.ts`.
+Proven in `tools/verify/specs/scout-mining.spec.ts`, and `mine-out` in
+`tools/verify/specs/deposit-depletion.spec.ts`.
 
 - **Order.** `clickEntity(page, "scout-drone-1")`, then
   `clickWorld(page, deposit.x, deposit.z, { y, button: "right" })` with the
@@ -34,6 +37,9 @@ Proven in `tools/verify/specs/scout-mining.spec.ts`.
   and `cargoTitanium` is above zero.
 - **Interrupt.** Right-click open ground while the laser is on; `order`
   becomes `"move"` and `miningLaser` is gone.
+- **Mine out.** Open with `openGame(page, 77, { render: "full", titanium: 24 })`
+  and order the Scout as above. Its second trip empties the deposit: wait for
+  the deposit's `amount === 0` and `shown === "depleted"`, about 40 s.
 
 ## Gotchas
 
@@ -45,5 +51,7 @@ Proven in `tools/verify/specs/scout-mining.spec.ts`.
   about an eighth of its real speed. Judge the motion from the mining preview
   scene (`/tools/preview/?scene=mining&drones=3`), which steps time exactly;
   `bun run preview:capture --grep mining` captures it.
-- Rules such as depletion and a destroyed Scout are covered by
+- Rules such as when extraction stops and a destroyed Scout are covered by
   `tests/unitPresentation.test.ts` and `tests/harvesting.test.ts`, not here.
+- For stills of deposits alone, `bun tools/verify/capture-ore.mjs` captures
+  them at gameplay and close zoom; `--titanium 0` shows every one depleted.

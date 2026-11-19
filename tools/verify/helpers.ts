@@ -27,9 +27,15 @@ declare global {
  * Waits until simulation frames arrive AND model GLBs finish loading,
  * otherwise raycast picking silently misses buildings that have no presentation yet.
  * `light` draws no shadows, rocks, vegetation or antialiasing and shows a "Light render" tag
- * under the match bar; the verify-dune77 skill says when a spec needs `{ render: "full" }`. */
-export async function openGame(page: Page, seed = 77, { render = "light" }: { render?: "light" | "full" } = {}) {
-  await page.goto(`./?seed=${seed}&verify=1${render === "light" ? "&render=light" : ""}`);
+ * under the match bar; the verify-dune77 skill says when a spec needs `{ render: "full" }`.
+ * `titanium` starts every Titanium Deposit at that amount, so a spec can mine one out. */
+export async function openGame(
+  page: Page, seed = 77, { render = "light", titanium }: { render?: "light" | "full"; titanium?: number } = {},
+) {
+  const query = new URLSearchParams({ seed: String(seed), verify: "1" });
+  if (render === "light") query.set("render", "light");
+  if (titanium !== undefined) query.set("titanium", String(titanium));
+  await page.goto(`./?${query}`);
   await page.waitForFunction(() =>
     Boolean(window.__dune77?.inspect()?.units.length),
   );

@@ -1614,6 +1614,7 @@ export class UnitSystem {
       titanium: this.titanium,
       titaniumDeposits: [...this.currentDeposits.values()].map(deposit => ({
         ...deposit, x: deposit.position.x / POSITION_SCALE, z: deposit.position.z / POSITION_SCALE,
+        shown: this.ore.shownState(deposit.id),
       })),
       units: [...this.current].map(([id, frame]) => {
         const harvesting = this.presentations.get(id)?.harvesting;

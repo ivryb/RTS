@@ -1,8 +1,10 @@
 // Captures Titanium Deposits in the live game at gameplay and close zoom.
-// Usage: bun tools/verify/capture-ore.mjs --out <dir> [--model <glb>] [--seed 77] [--deposits 0,6,20] [--mine 0] [--base http://localhost:5173]
+// Usage: bun tools/verify/capture-ore.mjs --out <dir> [--model <glb>] [--titanium 0] [--seed 77] [--deposits 0,6,20] [--mine 0] [--base http://localhost:5173]
 // --model serves one candidate GLB in place of every production titanium model, without touching assets/.
+// --titanium starts every deposit at that amount; 0 shows them all depleted.
 // --mine sends the player's Scout Drone to that deposit through real clicks and captures it at work.
 // On seed 77, deposit 0 sits on sand beside the player's base, 6 among scree rocks and 20 in dry grass.
+// A deposit's variant is its index modulo three, so 0, 6 and 20 show two of the three; --model shows any.
 import { mkdirSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
@@ -12,6 +14,7 @@ const { values } = parseArgs({
   options: {
     out: { type: "string" },
     model: { type: "string" },
+    titanium: { type: "string" },
     seed: { type: "string", default: "77" },
     deposits: { type: "string", default: "0,6,20" },
     mine: { type: "string" },
@@ -28,8 +31,9 @@ try {
   const errors = [];
   const files = [];
   page.on("pageerror", error => errors.push(String(error)));
-  if (values.model) await page.route(/titanium-[a-z-]+\.glb/, route => route.fulfill({ path: values.model, contentType: "model/gltf-binary" }));
-  await page.goto(`${values.base}/?seed=${values.seed}&verify=1`, { timeout: 30_000 });
+  if (values.model) await page.route(/titanium-deposit-\d+\.glb/, route => route.fulfill({ path: values.model, contentType: "model/gltf-binary" }));
+  const amount = values.titanium === undefined ? "" : `&titanium=${values.titanium}`;
+  await page.goto(`${values.base}/?seed=${values.seed}&verify=1${amount}`, { timeout: 30_000 });
   await page.waitForFunction(() => Boolean(window.__dune77?.inspect()?.titaniumDeposits.length), undefined, { timeout: 60_000 });
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => window.__dune77.ready());
