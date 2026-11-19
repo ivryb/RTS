@@ -16,8 +16,8 @@ const CLOSE_VIEW_HEIGHT = 56 / 3.9;
 /** Pixels per metre of the game at default zoom in a 900 px tall window; film shots keep it. */
 const GAMEPLAY_PIXELS_PER_METRE = 900 / GAMEPLAY_VIEW_HEIGHT;
 const FILM_FPS = 30;
-/** `BUILDING_DESTRUCTION_SECONDS` in `src/unitSystem.ts`: how long a destroyed site's stump fades. */
-const STUMP_FADE_SECONDS = 0.8;
+/** A destroyed site's stump waits this long, then takes this long to sink: `demolish` in `src/deathEffects.ts`. */
+const STUMP_SINK = { after: 0.2, seconds: 1 };
 
 interface Panel {
   label: string;
@@ -30,6 +30,8 @@ interface Site {
   visualRoot: THREE.Group;
   handle: ConstructionSite;
   ground: number;
+  /** Metres from the ground to the top of the finished model. */
+  height: number;
   drone: THREE.Group;
   beam: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
 }
@@ -225,6 +227,7 @@ const createSite = async (kind: BuildingKind, x: number, z: number, rotation: nu
   root.rotation.y = rotation;
   scene.add(root);
   root.updateWorldMatrix(true, true);
+  const height = new THREE.Box3().setFromObject(root).max.y - ground;
 
   // The drone hovers toward the camera's right so its beam is never hidden behind the site.
   const reach = BUILDING_DEFINITIONS[kind].radius + 1.4;
@@ -249,16 +252,19 @@ const createSite = async (kind: BuildingKind, x: number, z: number, rotation: nu
   beam.renderOrder = 4;
   scene.add(beam);
 
-  return { kind, root, visualRoot, handle: construction.createSite(kind, root, visualRoot)!, ground, drone, beam };
+  return { kind, root, visualRoot, handle: construction.createSite(kind, root, visualRoot)!, ground, height, drone, beam };
 };
 
 const applyState = (site: Site, state: SiteState, seconds: number) => {
+  // The game's death effects sink what a destroyed site leaves standing, under dust this scene does not draw.
+  const sunk = state.lifecycle === "destroyed"
+    ? THREE.MathUtils.clamp((state.sinceLifecycleChange - STUMP_SINK.after) / STUMP_SINK.seconds, 0, 1) : 0;
+  const depth = sunk * sunk * (1.4 - 0.4 * sunk) * (site.height * state.progress + 0.6);
+  site.root.position.y = site.ground - depth;
+  site.handle.sinkStump(depth);
   site.handle.update(state, seconds);
-  // The game fades what a destroyed site leaves standing, as `updateBuildingDestruction` does.
-  const stump = state.lifecycle === "destroyed" ? 1 - state.sinceLifecycleChange / STUMP_FADE_SECONDS : 1;
-  site.handle.fadeStump(Math.max(0, stump));
-  // Once it has faded, the game removes the building.
-  site.root.visible = stump > 0;
+  // Once it is under, the game removes the building.
+  site.root.visible = sunk < 1;
   site.beam.visible = state.working && state.lifecycle === "constructing";
   site.drone.visible = site.beam.visible;
   if (!site.beam.visible) return;

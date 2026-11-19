@@ -10,9 +10,16 @@ import {
   BEHEMOTH_LAUNCH_OFFSETS,
   BEHEMOTH_ROCKET_COUNT,
 } from "./behemothBarrage";
-import { BEHEMOTH_DAMAGE_DELAY_SECONDS, behemothVolleySeed } from "./behemothAttack";
+import { BEHEMOTH_DAMAGE_DELAY_SECONDS, behemothVolleySeed, hashId } from "./behemothAttack";
 import { BUILDING_CATALOG } from "./buildingCatalog";
 import { ConstructionSites, type ConstructionSite, type ScaffoldKitLoader } from "./constructionSites";
+import {
+  createDeathEffects,
+  type BuildingCasualty,
+  type DeathEffects,
+  type UnitCasualty,
+  type WreckKitLoader,
+} from "./deathEffects";
 import { sampleHeight, type GeneratedMap } from "./map";
 import { disposeModel } from "./modelAssets";
 import { createLocalMatchSession, type MatchFrame, type MatchSession } from "./matchSession";
@@ -174,6 +181,10 @@ interface HealthBarPresentation {
 interface UnitPresentation {
   root: THREE.Group;
   visualRoot: THREE.Group;
+  /** The loaded model inside `visualRoot`. */
+  model: THREE.Object3D;
+  /** Metres from the ground to the middle and to the top of the hull. */
+  body: { centre: number; top: number };
   mixer?: THREE.AnimationMixer;
   actions?: Record<"idle" | "move" | "attack", THREE.AnimationAction> & {
     death?: THREE.AnimationAction;
@@ -204,13 +215,8 @@ interface UnitPresentation {
   healthBar: HealthBarPresentation;
   constructionBeam?: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   harvesting?: ScoutHarvestPresentation;
+  /** From `death` on, the death effects pose the root, and hide it once its wreck is laid. */
   state: "idle" | "move" | "attack" | "death";
-  death?: {
-    elapsed: number;
-    fadeStart: number;
-    hideAt: number;
-    materials?: { material: THREE.Material; opacity: number }[];
-  };
   turnResponsiveness: number;
   terrainAlignment: number;
   terrainRadius: number;
@@ -227,6 +233,8 @@ interface UnitPresentation {
 interface BuildingPresentation {
   root: THREE.Group;
   visualRoot: THREE.Group;
+  /** Metres from the ground to the top of the finished model. */
+  height: number;
   selectionRing: THREE.Mesh;
   healthBar: HealthBarPresentation;
   rangeIndicator?: THREE.Group;
@@ -247,11 +255,11 @@ interface BuildingPresentation {
     /** Seconds since the site completed or was destroyed. */
     ended: number;
   };
-  destruction?: {
-    elapsed: number;
-    initialScaleY: number;
-    materials: { material: THREE.Material; opacity: number }[];
-  };
+  /**
+   * Set once the building is destroyed: the death effects pose the root until the ruin has taken
+   * its place, then release it. `groundY` is where the root stood.
+   */
+  destroyed?: { groundY: number };
 }
 
 interface PendingDirectShot {
@@ -268,11 +276,6 @@ interface PendingGroundShot {
   seed: number;
 }
 
-const DEATH_ANIMATION_TIME_SCALE = 1.3;
-const CORPSE_LINGER_SECONDS = 4;
-const CORPSE_FADE_SECONDS = 2;
-const CORPSE_START_OPACITY = 0.95;
-const BUILDING_DESTRUCTION_SECONDS = 0.8;
 const RECENT_COMBAT_TICKS = Math.round(3 / SIMULATION_TICK_SECONDS);
 
 const toFrame = (unit: UnitState): UnitFrame => ({
@@ -419,30 +422,6 @@ const disposeEntityOverlays = ({
     child.geometry.dispose();
     (child.material as THREE.Material).dispose();
   }
-};
-
-/**
- * Gives a model its own see-through copies of its materials, so it can fade while every other
- * model of its kind keeps the shared originals. Returns each copy with its starting opacity.
- */
-const useFadeMaterials = (root: THREE.Object3D, startOpacity = 1) => {
-  const copies = new Map<THREE.Material, THREE.Material>();
-  const copy = (material: THREE.Material) => {
-    let faded = copies.get(material);
-    if (!faded) {
-      faded = material.clone();
-      faded.transparent = true;
-      faded.depthWrite = false;
-      faded.opacity *= startOpacity;
-      copies.set(material, faded);
-    }
-    return faded;
-  };
-  root.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.material = Array.isArray(object.material) ? object.material.map(copy) : copy(object.material);
-  });
-  return [...copies.values()].map((material) => ({ material, opacity: material.opacity }));
 };
 
 const sampleTerrainNormal = (
@@ -753,6 +732,9 @@ export class UnitSystem {
   private groundFeedbackGrace = 0;
   private readonly constructionPreview = createConstructionPreview();
   private readonly constructionSites: ConstructionSites;
+  private readonly deathEffects: DeathEffects;
+  private readonly unitCasualty: UnitCasualty;
+  private readonly buildingCasualty: BuildingCasualty;
   private readonly combinedRangeIndicator = new THREE.Group();
   private readonly selectedIds = new Set<string>();
   private selectedUnitFrames: readonly UnitFrame[] = [];
@@ -803,7 +785,6 @@ export class UnitSystem {
   private readonly turretOrigin = new THREE.Vector3();
   private readonly turretTarget = new THREE.Vector3();
   private readonly targetBounds = new THREE.Box3();
-  private readonly preparedFadeMaterials = new Set<THREE.Material>();
   private frameVersion = 0;
   private frameTick = 0;
   private interpolationAge = SIMULATION_TICK_SECONDS;
@@ -823,9 +804,17 @@ export class UnitSystem {
     private readonly createUnitPresentation?: UnitPresentationFactory,
     loadOreModels?: OreModelLoader,
     loadScaffoldKit?: ScaffoldKitLoader,
+    loadWreckKit?: WreckKitLoader,
   ) {
     this.behemothBarrage = new BehemothBarrage(world, map);
     this.constructionSites = new ConstructionSites(world, loadScaffoldKit);
+    this.deathEffects = createDeathEffects(world, map, (root) => this.releaseCasualty(root), loadWreckKit);
+    // Reused for every death, so reporting one allocates nothing.
+    this.unitCasualty = {
+      kind: "scout-drone", root: world, visual: world, model: world,
+      velocityX: 0, velocityZ: 0, centreY: 0, topY: 0, seed: 0,
+    };
+    this.buildingCasualty = { kind: "turret", root: world, visual: world, height: 0, built: 1, seed: 0 };
     for (const deposit of map.titaniumDeposits ?? []) this.currentDeposits.set(deposit.id, deposit);
     this.ore = new OrePresentation(world, map, [...this.currentDeposits.values()], loadOreModels);
     this.miningLasers = new MiningLasers(world);
@@ -925,7 +914,7 @@ export class UnitSystem {
   async prepareRendering(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
     await this.oreReady;
     await Promise.allSettled([...this.pendingUnits.values(), ...this.pendingBuildings.values()]);
-    await this.constructionSites.load();
+    await Promise.all([this.constructionSites.load(), this.deathEffects.load()]);
     if (this.disposed) return;
     const warmup = new THREE.Group();
     warmup.name = "Prepared combat materials";
@@ -941,24 +930,8 @@ export class UnitSystem {
       healthBar.visible = true;
       warmup.add(healthBar);
     }
-    // Keep these material variants alive for later deaths. They share geometry
-    // and textures with the models; only the fading material is different.
     for (const presentation of [...this.presentations.values(), ...this.buildingById.values()]) {
       warmup.add(presentation.visualRoot.clone(true));
-      const faded = presentation.visualRoot.clone(true);
-      faded.traverse((object) => {
-        if (!(object instanceof THREE.Mesh)) return;
-        const fade = (material: THREE.Material) => {
-          const copy = material.clone();
-          copy.transparent = true;
-          copy.depthWrite = false;
-          this.preparedFadeMaterials.add(copy);
-          return copy;
-        };
-        object.material = Array.isArray(object.material)
-          ? object.material.map(fade) : fade(object.material);
-      });
-      warmup.add(faded);
     }
     this.world.add(warmup);
     // The first site a player places must not stop to compile its scaffold, cut and effects.
@@ -970,6 +943,8 @@ export class UnitSystem {
     const releaseSites = [...siteModels].map(([kind, model]) =>
       this.constructionSites.prepareRendering(kind, model));
     this.constructionSites.flush(this.presentationTime);
+    // Nor may the first death stop to compile its wrecks, fire and smoke.
+    const releaseDeaths = this.deathEffects.prepareRendering();
     // Drivers can defer pipeline setup until the first draw. Prepare each light
     // count in one startup task, submitting effect/model variants below the terrain.
     // No animation frame can observe a partially prepared lighting configuration.
@@ -993,6 +968,7 @@ export class UnitSystem {
       for (const [object, frustumCulled] of culling) object.frustumCulled = frustumCulled;
       warmup.removeFromParent();
       for (const release of releaseSites) release();
+      releaseDeaths();
     }
   }
 
@@ -1030,7 +1006,6 @@ export class UnitSystem {
     if (death) {
       death.setLoop(THREE.LoopOnce, 1);
       death.clampWhenFinished = true;
-      death.setEffectiveTimeScale(DEATH_ANIMATION_TIME_SCALE);
     }
     idle.play();
     this.attachUnit(id, root, options, {
@@ -1142,6 +1117,7 @@ export class UnitSystem {
   ) {
     const visualRoot = new THREE.Group();
     visualRoot.name = `${root.name || id} Terrain Tilt`;
+    const model = root.children[0] ?? visualRoot;
     for (const child of [...root.children]) visualRoot.add(child);
     root.add(visualRoot);
     const unit = this.current.get(id);
@@ -1165,9 +1141,13 @@ export class UnitSystem {
     root.userData.selectionCenterY = options.selectionHitbox.offset.y;
     if (unit?.facing !== undefined) root.rotation.y = unit.facing;
     this.selectables.push(root);
+    const { offset, height } = options.selectionHitbox;
     this.presentations.set(id, {
       root,
       visualRoot,
+      model,
+      // The click volume is fitted to the hull, hover height included.
+      body: { centre: offset.y, top: offset.y + height / 2 },
       ...behavior,
       rangeIndicator,
       selectionRing,
@@ -1179,8 +1159,9 @@ export class UnitSystem {
       terrainRadius: options.selectionRing.radius,
     });
     if (unit && unit.ownerId !== LOCAL_PLAYER_ID) this.attackables.push(root);
-    if (unit?.health === 0) this.presentUnitDeath(id);
     this.renderUnit(id, 1, 0);
+    // After it is placed: a unit that died while its model loaded dies where it stood.
+    if (unit?.health === 0) this.presentUnitDeath(id);
     this.refreshEntityOverlays(id);
   }
 
@@ -1253,6 +1234,7 @@ export class UnitSystem {
     this.buildingById.set(id, {
       root,
       visualRoot,
+      height,
       selectionRing,
       healthBar,
       rangeIndicator,
@@ -1691,23 +1673,20 @@ export class UnitSystem {
     this.resolvePendingCommandResults();
     const alpha = Math.min(1, this.interpolationAge / SIMULATION_TICK_SECONDS);
     this.presentationTime += deltaSeconds;
-    // Sites come first: a builder's beam ends at the height its site has reached.
+    // Deaths come first: a destroyed site's cut follows its building down.
+    this.deathEffects.update(deltaSeconds);
+    // Then sites: a builder's beam ends at the height its site has reached.
     for (const [id, presentation] of this.buildingById) {
       this.updateConstruction(id, presentation, alpha, deltaSeconds);
     }
     this.miningLasers.begin(deltaSeconds);
     for (const [id, presentation] of this.presentations) {
-      if (!presentation.root.visible) continue;
+      if (!presentation.root.visible || presentation.state === "death") continue;
       this.renderUnit(id, alpha, deltaSeconds);
       presentation.mixer?.update(deltaSeconds);
-      this.updateUnitDeath(presentation, deltaSeconds);
     }
     for (const [id, presentation] of this.buildingById) {
-      if (presentation.destruction) {
-        this.updateBuildingDestruction(id, presentation, deltaSeconds);
-      } else {
-        this.updateTurretHead(id, presentation, deltaSeconds);
-      }
+      if (!presentation.destroyed) this.updateTurretHead(id, presentation, deltaSeconds);
     }
     this.constructionSites.flush(this.presentationTime);
     for (const [id, death] of this.deferredGroundDeaths) {
@@ -1795,10 +1774,11 @@ export class UnitSystem {
       }
     }
     for (const presentation of this.buildingById.values()) {
-      if (!presentation.destruction) disposeEntityOverlays(presentation);
+      if (!presentation.destroyed) disposeEntityOverlays(presentation);
       this.endConstruction(presentation);
     }
     this.constructionSites.dispose();
+    this.deathEffects.dispose();
     for (const projectile of this.laserProjectiles) projectile.mesh.removeFromParent();
     this.laserProjectiles.length = 0;
     for (const flash of this.muzzleFlashes) {
@@ -1813,8 +1793,6 @@ export class UnitSystem {
     this.laserGeometry.dispose();
     this.laserMaterial.dispose();
     this.glowTexture.dispose();
-    for (const material of this.preparedFadeMaterials) material.dispose();
-    this.preparedFadeMaterials.clear();
     this.behemothBarrage.dispose();
   }
 
@@ -2395,7 +2373,8 @@ export class UnitSystem {
   }
 
   private removeBuildingPresentation(id: string, animate = false) {
-    const halfBuilt = this.currentBuildings.get(id)?.lifecycle === "constructing";
+    const building = this.currentBuildings.get(id);
+    const halfBuilt = building?.lifecycle === "constructing";
     this.currentBuildings.delete(id);
     this.pendingDirectShots.delete(id);
     this.recentCombatUntil.delete(id);
@@ -2410,45 +2389,41 @@ export class UnitSystem {
     disposeEntityOverlays(presentation);
     // A building destroyed while its scaffold is still leaving collapses like any finished one.
     if (!(animate && halfBuilt)) this.endConstruction(presentation);
-    if (animate) {
-      presentation.selectionRing.visible = false;
-      presentation.healthBar.root.visible = false;
-      if (presentation.rangeIndicator) presentation.rangeIndicator.visible = false;
-      presentation.destruction = {
-        elapsed: 0,
-        initialScaleY: presentation.visualRoot.scale.y,
-        // A half-built site keeps its cut and its deck, and fades through its construction site.
-        materials: presentation.construction ? [] : useFadeMaterials(presentation.visualRoot),
-      };
+    if (!animate || !building) {
+      this.releaseBuilding(id, presentation);
       return wasSelected;
     }
-    this.releaseBuilding(id, presentation);
+    presentation.selectionRing.visible = false;
+    presentation.healthBar.root.visible = false;
+    if (presentation.rangeIndicator) presentation.rangeIndicator.visible = false;
+    presentation.destroyed = { groundY: root.position.y };
+    const built = presentation.construction?.progress ?? 1;
+    const casualty = this.buildingCasualty;
+    casualty.kind = building.kind;
+    casualty.root = root;
+    casualty.visual = presentation.visualRoot;
+    casualty.height = presentation.height * built;
+    casualty.built = built;
+    casualty.thrown = presentation.turretHead?.object;
+    casualty.seed = hashId(id);
+    this.deathEffects.buildingDestroyed(casualty);
     return wasSelected;
   }
 
   private releaseBuilding(id: string, presentation: BuildingPresentation) {
-    for (const { material } of presentation.destruction?.materials ?? []) material.dispose();
     if (presentation.ownsModel) disposeModel(presentation.visualRoot);
     presentation.root.removeFromParent();
     this.buildingById.delete(id);
   }
 
-  private updateBuildingDestruction(
-    id: string,
-    presentation: BuildingPresentation,
-    deltaSeconds: number,
-  ) {
-    const destruction = presentation.destruction;
-    if (!destruction) return;
-    destruction.elapsed += deltaSeconds;
-    const progress = Math.min(1, destruction.elapsed / BUILDING_DESTRUCTION_SECONDS);
-    // A half-built site drops its scaffold and fades as it stands; only a finished building collapses.
-    if (presentation.construction) presentation.construction.site.fadeStump(1 - progress);
-    else presentation.visualRoot.scale.y = destruction.initialScaleY * (1 - progress * 0.85);
-    for (const entry of destruction.materials) {
-      entry.material.opacity = entry.opacity * (1 - progress);
-    }
-    if (progress < 1) return;
+  /**
+   * The death effects are done with a casualty's root. A unit's root just stays hidden; a
+   * destroyed building is let go of.
+   */
+  private releaseCasualty(root: THREE.Object3D) {
+    const id = root.userData.buildingId as string | undefined;
+    const presentation = id === undefined ? undefined : this.buildingById.get(id);
+    if (!id || !presentation?.destroyed) return;
     this.endConstruction(presentation);
     this.releaseBuilding(id, presentation);
   }
@@ -2470,6 +2445,10 @@ export class UnitSystem {
     // This is the health `stepConstruction` in the simulation has granted by this progress,
     // floor included: without it every undamaged site looked damaged for its first ticks.
     const builtHealth = 1 + Math.floor(construction.progress * ((building?.maxHealth ?? 1) - 1));
+    // A destroyed site keeps its cut and its deck, which sink with the rest of it.
+    if (presentation.destroyed) {
+      construction.site.sinkStump(presentation.destroyed.groundY - presentation.root.position.y);
+    }
     const showing = construction.site.update({
       // Progress arrives ten times a second; blending it keeps the cut rising smoothly.
       progress: THREE.MathUtils.lerp(construction.previousProgress, construction.progress, alpha),
@@ -2502,29 +2481,34 @@ export class UnitSystem {
     if (!visible && index >= 0) this.attackables.splice(index, 1);
   }
 
+  /** Hands a dead unit to the death effects, which pose it from here on. */
   private presentUnitDeath(id: string) {
     const presentation = this.presentations.get(id);
-    if (!presentation) return;
+    const unit = this.current.get(id);
+    if (!presentation || !unit) return;
     if (presentation.state === "death") return;
     this.setUnitVisible(id, false);
     const selectableIndex = this.selectables.indexOf(presentation.root);
     if (selectableIndex >= 0) this.selectables.splice(selectableIndex, 1);
-    const actions = presentation.actions;
-    const death = actions?.death;
-    if (!actions || !death) return;
-    const old = actions[presentation.state];
-    old.fadeOut(0.1);
-    death.reset().fadeIn(0.1).play();
+    presentation.actions?.[presentation.state].fadeOut(0.12);
     presentation.state = "death";
-    const fadeStart = death.getClip().duration / DEATH_ANIMATION_TIME_SCALE
-      + CORPSE_LINGER_SECONDS;
-    presentation.death = {
-      elapsed: 0,
-      fadeStart,
-      hideAt: fadeStart + CORPSE_FADE_SECONDS,
-      materials: useFadeMaterials(presentation.visualRoot, CORPSE_START_OPACITY),
-    };
     presentation.root.visible = true;
+    // A unit killed on the move carries its momentum into its death, along the way it faced.
+    const speed = this.previous.get(id)?.moving ? unit.speed : 0;
+    const heading = presentation.root.rotation.y;
+    const casualty = this.unitCasualty;
+    casualty.kind = unit.kind;
+    casualty.root = presentation.root;
+    casualty.visual = presentation.visualRoot;
+    casualty.model = presentation.model;
+    casualty.mixer = presentation.mixer;
+    casualty.death = presentation.actions?.death;
+    casualty.velocityX = Math.sin(heading) * speed;
+    casualty.velocityZ = Math.cos(heading) * speed;
+    casualty.centreY = presentation.body.centre;
+    casualty.topY = presentation.body.top;
+    casualty.seed = hashId(id);
+    this.deathEffects.unitDied(casualty);
   }
 
   private deferGroundDeath(id: string, attackerId: string) {
@@ -2545,19 +2529,6 @@ export class UnitSystem {
         death.delay = BEHEMOTH_DAMAGE_DELAY_SECONDS;
       }
     }
-  }
-
-  private updateUnitDeath(presentation: UnitPresentation, deltaSeconds: number) {
-    const death = presentation.death;
-    if (!death) return;
-    death.elapsed += deltaSeconds;
-    if (death.elapsed < death.fadeStart) return;
-    const opacity = Math.max(0, 1 - (death.elapsed - death.fadeStart) / CORPSE_FADE_SECONDS);
-    for (const entry of death.materials ?? []) entry.material.opacity = entry.opacity * opacity;
-    if (death.elapsed < death.hideAt) return;
-    presentation.root.visible = false;
-    for (const entry of death.materials ?? []) entry.material.dispose();
-    presentation.death = undefined;
   }
 
   private renderUnit(id: string, alpha: number, deltaSeconds: number) {

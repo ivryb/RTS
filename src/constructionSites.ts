@@ -53,10 +53,10 @@ export interface ConstructionSite {
    */
   update(state: SiteState, time: number): boolean;
   /**
-   * Fades what a destroyed site leaves standing, the cut building and its deck, from 1 to 0.
-   * D77-6 replaces this with its own treatment of that stump.
+   * Lowers the cut and its deck by `metres`, for the next `update`. The death effects sink what a
+   * destroyed site leaves standing into the ground; this keeps the cut level with the building.
    */
-  fadeStump(opacity: number): void;
+  sinkStump(metres: number): void;
   dispose(): void;
 }
 
@@ -249,6 +249,7 @@ export class ConstructionSites {
     };
 
     let beamTargetY = ground;
+    let sunk = 0;
     return {
       get beamTargetY() {
         return beamTargetY;
@@ -275,8 +276,8 @@ export class ConstructionSites {
         // Nothing is welded at 0%. The first layer then spreads out from under the beam.
         const spread = 1 - (1 - Math.min(1, progress / firstLayer)) ** 2;
         const reach = spread < 1 ? widest * spread : WHOLE_HULL;
-        reveal.set(cut, band, welding ? flicker : 0, reach);
-        if (spread) deck.set(progress, Math.max(cut, ground + DECK_FLOOR), welding ? flicker : 0, reach);
+        reveal.set(cut - sunk, band, welding ? flicker : 0, reach);
+        if (spread) deck.set(progress, Math.max(cut, ground + DECK_FLOOR) - sunk, welding ? flicker : 0, reach);
         else deck.hide();
         cage?.set(constructing ? 0 : Math.min(1, since / COLLAPSE_SECONDS) ** 2, health);
         if (!constructing) {
@@ -288,9 +289,8 @@ export class ConstructionSites {
         addSmoke();
         return true;
       },
-      fadeStump(opacity) {
-        reveal.setOpacity(opacity);
-        deck.setOpacity(opacity);
+      sinkStump(metres) {
+        sunk = metres;
       },
       dispose() {
         disposed = true;
@@ -304,7 +304,7 @@ export class ConstructionSites {
 
   /**
    * Stands two throwaway sites of `kind` far below the terrain, one being welded and one
-   * fading after its destruction, so that a render compiles every shader a site ever needs
+   * just destroyed, so that a render compiles every shader a site ever needs
    * before the first one is placed. `model` is a loaded building's visual root. Call `flush`,
    * render, then call the returned function. The sites' cut materials are kept until `dispose`:
    * the renderer drops a shader program as soon as the last material using it is disposed.
@@ -328,7 +328,6 @@ export class ConstructionSites {
         this.preparedReveals.push(reveal);
       });
       site?.update(state, 0);
-      if (state.lifecycle === "destroyed") site?.fadeStump(0.5);
       return { root, site };
     });
     this.scaffolding?.cull(false);
