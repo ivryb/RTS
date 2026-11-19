@@ -51,8 +51,12 @@ Preconditions:
 - **Right-click attack.** Select combat units and
   `await clickWorld(page, enemy.x, enemy.z, { y: 2, button: "right" })` on an
   enemy unit's position — units engage without arming a target mode.
-- **Death proof.** After any engagement, the killed entity disappears from
-  `inspect().units` / `.buildings` while a death effect plays.
+- **Death proof.** A killed unit stays in `inspect().units` with `health: 0`
+  while it falls or burns out and leaves a wreck; a destroyed building leaves
+  `.buildings` while it collapses into a ruin. `specs/death-effects.spec.ts`
+  drives the first unit death of the opening fight and checks that no shader
+  compiled for it. The look of every death is in the preview scene that
+  `docs/death_effects.md` lists.
 - **Guard hold.** Move a friendly unit near `enemy-ghostrunner-1` and back out
   of its range — enemy guards keep `moving: false` throughout; they never
   chase beyond their post.

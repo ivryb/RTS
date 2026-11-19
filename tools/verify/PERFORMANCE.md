@@ -24,7 +24,7 @@ overhead, so use it for attribution rather than headline frame timings.
 
 The first-combat regression came from muzzle flashes changing the number of point
 lights in Three.js shader variants. Startup now compiles and draws all nine supported
-flash-light counts (zero through eight), including effect and death-fade materials.
+flash-light counts (zero through eight), including effect, wreck and death-effect materials.
 Inactive flash lights are hidden, so they do not add per-pixel lighting work during
 play. Eight flashes may illuminate surfaces simultaneously; all projectiles and
 flash sprites still render. Preparing these variants costs startup time and shader

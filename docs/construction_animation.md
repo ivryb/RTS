@@ -14,7 +14,7 @@ A physical scaffold stands around the site from the moment it is placed. The rea
 | Drone working | The finished model is shown up to a horizontal cut at `progress × height`. The newest band under the cut is bare steel. A dark ribbed deck closes the cut, glowing only near its rim, which carries a hot seam, and weld arcs with falling sparks hop around the hull at that height. The drone's beam ends at the cut. In the first 0.9 s of work the first layer spreads out from under the beam as a growing disc. |
 | Paused, no drone working | Arcs, seam and glow go out, the deck turns dark steel, and the lamps blink. Nothing moves except the lamps, whose glow is never drawn smaller than 24 px across, so the state reads at default zoom. |
 | Damaged before completion | Rails and braces hang or go missing in proportion to lost health, and dark smoke rises where they broke, from more places as health falls. Posts, feet and the pad always stand. The game's health bar still carries the exact value. |
-| Destroyed before completion | The scaffold drops into the ground in 0.24 s with a skirt of dust. The building stays cut at the height it had reached, with its deck, and fades out with its shadow over the 0.8 s every destroyed building takes. D77-6 owns what happens to that stump. |
+| Destroyed before completion | The scaffold drops into the ground in 0.24 s with a skirt of dust. The building stays cut at the height it had reached, with its deck, and sinks into pale dust over 1 s, leaving a heap of rubble: [destruction and death effects](death_effects.md) stage that. |
 | Completion | The building is the untouched model from the first frame. The scaffold's walls and feet drop into the pad, the pad and its kerbs sink after them, all within 0.5 s, and the dust is gone 1 s after completion, when nothing of the site is left. |
 
 The scaffold is ochre bronze with graphite braces, from the Aged desert palette, so it never reads as part of the ivory building. It casts a shadow. The cut building casts only the shadow of its built part.
@@ -96,9 +96,9 @@ At 15% a site is still mostly a deck. The approved sketch's deck glowed across i
 
 ## Shared with D77-6, destruction and death effects
 
-- A site destroyed before completion keeps its cut material and deck, so the unbuilt part never pops back in. `ConstructionSite.fadeStump` is the stand-in for what D77-6 does with that stump.
-- `ConstructionSites.effects` is one `GlowEffects`: one instanced set of quads for sparks, lamp glows, dust and smoke, drawn in one call for the whole world. Any owner can ask it for its own list of glows, so destruction effects can add dust and smoke without another draw call.
-- The scaffold's drop takes one 0-to-1 value (`Cage.set`) and could become falling debris on destruction.
+- A site destroyed before completion keeps its cut material and deck, so the unbuilt part never pops back in. The death effects sink that stump into the ground, and `ConstructionSite.sinkStump` lowers the cut and the deck with it. `Reveal.setOpacity` and `Deck.setOpacity`, which faded the stump before, are no longer called.
+- `ConstructionSites.effects` is one `GlowEffects`: one instanced set of quads for sparks, lamp glows, dust and smoke, drawn in one call for the whole world. The death effects do not use it: it is rebuilt on the CPU every frame, and a fight's thousands of particles are scheduled once and then need none.
+- The scaffold drops on destruction as it always did (`Cage.set`), and the death effects throw their own loose beams around it.
 
 ## Not verified
 
