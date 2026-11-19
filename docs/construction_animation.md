@@ -99,7 +99,7 @@ At 15% a site is still mostly a deck. The approved sketch's deck glowed across i
 
 ## Shared with D77-6, destruction and death effects
 
-- A site destroyed before completion keeps its cut material and deck, so the unbuilt part never pops back in. The death effects sink that stump into the ground, and `ConstructionSite.sinkStump` lowers the cut and the deck with it. `Reveal.setOpacity` and `Deck.setOpacity`, which faded the stump before, are no longer called.
+- A site destroyed before completion keeps its cut material and deck, so the unbuilt part never pops back in. The death effects sink that stump into the ground, and `ConstructionSite.sinkStump` lowers the cut and the deck with it.
 - `ConstructionSites.effects` is one `GlowEffects`: one instanced set of quads for arcs, sparks, dust and smoke, drawn in one call for the whole world. The death effects do not use it: it is rebuilt on the CPU every frame, and a fight's thousands of particles are scheduled once and then need none.
 - The scaffold drops on destruction as it always did (`Cage.set`), and the death effects throw their own loose beams around it.
 

@@ -144,7 +144,6 @@ One scene takes two to four minutes on Boat.
 - Unit wrecks are laid upright, turned only about the vertical, so on a steep slope a wreck can rest with one end in the air. Ruins lie along the slope.
 - Thrown scrap is near-black, because its baked metal has no sky to reflect. It is small and gone in 20 s.
 - The barrage's scorch marks (`src/behemothBarrage.ts`) and these use two implementations of the same idea. Moving the barrage onto `GroundMarks` would change its look, so it was left.
-- `Reveal.setOpacity` and `Deck.setOpacity` in `src/construction/` faded the stump before and are no longer called. They were left in place while other construction work was in flight.
 
 ## Not verified
 

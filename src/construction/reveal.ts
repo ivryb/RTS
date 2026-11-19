@@ -16,8 +16,6 @@ export interface Reveal {
    * under the drone's beam.
    */
   set(cut: number, band: number, work: number, reach: number): void;
-  /** Fades the cut building out as one solid, from 1 (opaque) to 0. */
-  setOpacity(opacity: number): void;
   /** Hands the meshes back their own materials, so the building renders as it always does. */
   finish(): void;
   dispose(): void;
@@ -123,7 +121,6 @@ export const createReveal = (root: THREE.Object3D, visual: THREE.Object3D): Reve
   const uniforms = {
     uSiteCut: { value: 0 },
     uSiteBand: { value: 0 },
-    uSiteOpacity: { value: 1 },
     uSiteWork: { value: 0 },
     uSiteReach: { value: 0 },
     uSiteFrame: {
@@ -136,21 +133,14 @@ export const createReveal = (root: THREE.Object3D, visual: THREE.Object3D): Reve
     },
   };
 
-  // The shadow pass uses the same cut, so a half-built site casts a half-height shadow. A
-  // fading site's shadow thins out with it, one scattered texel at a time, or the shadow
-  // would outlast the building and vanish in one frame.
+  // The shadow pass uses the same cut, so a half-built site casts a half-height shadow.
   const depth = new THREE.MeshDepthMaterial({ name: "Construction cut shadow" });
   depth.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     trackPosition(shader);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nuniform float uSiteOpacity;\n${clipGlsl}`)
-      .replace(
-        "#include <clipping_planes_fragment>",
-        `#include <clipping_planes_fragment>
-siteClip();
-if (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) >= uSiteOpacity) discard;`,
-      );
+      .replace("#include <common>", `#include <common>\n${clipGlsl}`)
+      .replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\nsiteClip();");
   };
   depth.customProgramCacheKey = () => `${PROGRAM_KEY}-depth`;
 
@@ -162,8 +152,6 @@ if (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))
     material.name = "Construction cut";
     material.side = THREE.DoubleSide;
     material.shadowSide = source.shadowSide ?? THREE.BackSide;
-    // Fading keeps writing depth, so the hull fades as one solid and needs no second pass.
-    material.forceSinglePass = true;
     material.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
       trackPosition(shader);
@@ -217,15 +205,6 @@ if (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))
       uniforms.uSiteWork.value = work;
       uniforms.uSiteReach.value = reach;
       apply(true);
-    },
-    setOpacity(opacity) {
-      uniforms.uSiteOpacity.value = opacity;
-      for (const material of cutMaterials.values()) {
-        // Blending is a different shader program, so the material has to be rebuilt once.
-        if (material.transparent !== opacity < 1) material.needsUpdate = true;
-        material.transparent = opacity < 1;
-        material.opacity = opacity;
-      }
     },
     finish: () => apply(false),
     dispose() {
