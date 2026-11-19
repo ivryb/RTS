@@ -50,6 +50,8 @@ Generated PBR maps, editable Blender assemblies, and the appendable material lib
 
 The main game uses three locally authored compositions: **three knuckles**, **split lens**, and **eroded window**. `tools/assets/build_titanium_ore.py` builds their fractured shapes and bakes one PBR material per asset. The source Cliff Side color, normal, and roughness maps and CC0 provenance live under `assets/source/polyhaven/titanium/`; exported model details are recorded in `assets/models/titanium-manifest.json`. Workbench renders compare source and reimported GLBs, while the main game verifies their scale beside Scout Drones and Command Centers.
 
+An approved redesign, not yet in the game, replaces all three with seeds of one Three knuckles generator and adds a depleted state: see [Titanium Deposit](titanium_deposit.md).
+
 ## Terrain textures
 
 The source files under `assets/source/polyhaven/` came from Poly Haven under CC0. Their README records the asset pages and authors. Runtime conversions live under `assets/textures/terrain/`. See [`TEXTURES.md`](../TEXTURES.md) for current roles and rejected experiments.
