@@ -31,8 +31,6 @@ const loose: Partial<Record<PieceName, "hangs" | "falls">> = { Rail: "hangs", Br
 const onTheGround: ReadonlySet<PieceName> = new Set(["Pad", "PadCut", "Curb"]);
 
 export interface Cage {
-  /** World positions of the lamp lenses, one on every corner. */
-  lamps: readonly THREE.Vector3[];
   /** World positions where members have been knocked loose, for the health last set. */
   breaks: readonly THREE.Vector3[];
   /**
@@ -358,8 +356,6 @@ export class Scaffolding {
       wallPart,
       { weld: pad, depth: PAD_DEPTH, placed: new THREE.Matrix4(), shown: false, ...this.add(pad.geometry) },
     ];
-    const lamps = members.filter(({ piece }) => piece === "Beacon")
-      .map(({ matrix }) => new THREE.Vector3(0, 0.14, 0).applyMatrix4(matrix).add(origin));
     const breaks: THREE.Vector3[] = [];
 
     // What the player sees is what a click hits: both parts as they currently stand. The
@@ -387,7 +383,6 @@ export class Scaffolding {
     let appliedDrop = -1;
     let appliedDamage = -1;
     return {
-      lamps,
       breaks,
       set: (drop, health) => {
         // Twenty damage steps: members fail one at a time without rewelding every frame.
