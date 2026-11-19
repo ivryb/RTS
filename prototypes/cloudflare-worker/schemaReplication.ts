@@ -45,7 +45,6 @@ export const ReplicatedBuilding = schema({
   radius: "uint16",
   health: "uint16",
   maxHealth: "uint16",
-  builderId: "string",
   weaponRange: "uint16",
   attackDamage: "uint16",
   attackIntervalTicks: "uint16",
@@ -125,7 +124,6 @@ export class SchemaReplication {
       target.radius = building.radius;
       target.health = building.health;
       target.maxHealth = building.maxHealth;
-      target.builderId = building.builderId ?? "";
       target.weaponRange = building.weapon?.range ?? 0;
       target.attackDamage = building.weapon?.damage ?? 0;
       target.attackIntervalTicks = building.weapon?.intervalTicks ?? 0;

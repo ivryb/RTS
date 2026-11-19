@@ -33,6 +33,7 @@ import {
   BUILDING_DEFINITIONS,
   TURRET_TURN_RESPONSIVENESS,
   constructionPlacementIsValid,
+  isWorkingOn,
 } from "./sim/construction";
 import {
   canQueueTraining,
@@ -171,6 +172,8 @@ type SelectedUnitGroup = UnitPresentationDefinition & {
 export type SelectedBuilding = BuildingState & {
   name: string;
   friendly: boolean;
+  /** At least one Scout Drone is building this site right now. */
+  working: boolean;
 };
 
 interface HealthBarPresentation {
@@ -1808,6 +1811,7 @@ export class UnitSystem {
         ...structuredClone(building),
         name: BUILDING_CATALOG[building.kind].name,
         friendly: building.ownerId === LOCAL_PLAYER_ID,
+        working: this.isBeingBuilt(id),
       }] : [];
     });
     this.selectionRevision += 1;
@@ -2440,7 +2444,6 @@ export class UnitSystem {
     const building = this.currentBuildings.get(id);
     const lifecycle = building?.lifecycle ?? "destroyed";
     if (lifecycle !== "constructing") construction.ended += deltaSeconds;
-    const builder = building?.builderId ? this.current.get(building.builderId) : undefined;
     // A site's health grows as it is built, so damage is what the part built so far is missing.
     // This is the health `stepConstruction` in the simulation has granted by this progress,
     // floor included: without it every undamaged site looked damaged for its first ticks.
@@ -2452,14 +2455,17 @@ export class UnitSystem {
     const showing = construction.site.update({
       // Progress arrives ten times a second; blending it keeps the cut rising smoothly.
       progress: THREE.MathUtils.lerp(construction.previousProgress, construction.progress, alpha),
-      // The same test that shows the builder's beam.
-      working: lifecycle === "constructing" && builder?.order === "build" && !builder.moving
-        && builder.constructionTargetId === id,
+      working: lifecycle === "constructing" && this.isBeingBuilt(id),
       health: THREE.MathUtils.clamp((building?.health ?? 0) / builtHealth, 0, 1),
       lifecycle,
       sinceLifecycleChange: construction.ended,
     }, this.presentationTime);
     if (!showing) this.endConstruction(presentation);
+  }
+
+  private isBeingBuilt(siteId: string) {
+    for (const unit of this.current.values()) if (isWorkingOn(unit, siteId)) return true;
+    return false;
   }
 
   /** Hands the building back its own materials; call before its model is disposed. */

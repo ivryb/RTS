@@ -680,7 +680,6 @@ describe("unit presentation timing", () => {
       ownerId: "local-player",
       health: 1,
       maxHealth: 900,
-      builderId: scout.id,
       position: { x: 3 * POSITION_SCALE, z: 0 },
       weapon: {
         range: 18 * POSITION_SCALE,
@@ -733,7 +732,7 @@ describe("unit presentation timing", () => {
     expect(system.selectedBuildings()[0]).toMatchObject({
       lifecycle: "constructing",
       constructionProgress: 0.35,
-      builderId: scout.id,
+      working: true,
     });
     system.select([scout.id]);
     expect(system.resumeConstructionSelected(site.id)).toBe(true);
@@ -747,7 +746,6 @@ describe("unit presentation timing", () => {
     completed.lifecycle = "active";
     completed.constructionProgress = 1;
     completed.health = completed.maxHealth;
-    completed.builderId = undefined;
     session.frames.push(frame(5, scout, completed));
     system.update(0);
     // Complete: the untouched model from the first frame, while the scaffold is still leaving.
