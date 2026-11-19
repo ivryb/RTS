@@ -2182,12 +2182,16 @@ export class LocalUnitSimulation implements GameSimulation {
 
   // Age of Empires II's rule: n working drones finish a site that takes one drone T ticks in
   // 3T / (n + 2), so each added drone helps less than the one before. Work is counted in thirds
-  // of a tick so every rate stays a whole number.
+  // of a tick so every rate stays a whole number. Runs after every drone's stepConstruction this
+  // tick, which stops or re-paths drones that cannot work, so isWorkingOn alone is enough here.
   private stepConstructionSites() {
     const builders = new Map<string, UnitState[]>();
     for (const unit of this.units.values()) {
       const siteId = unit.constructionTargetId;
-      if (siteId && isWorkingOn(unit, siteId)) builders.set(siteId, [...builders.get(siteId) ?? [], unit]);
+      if (!siteId || !isWorkingOn(unit, siteId)) continue;
+      const siteBuilders = builders.get(siteId);
+      if (siteBuilders) siteBuilders.push(unit);
+      else builders.set(siteId, [unit]);
     }
     for (const [siteId, siteBuilders] of builders) {
       const site = this.buildings.get(siteId)!;

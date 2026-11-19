@@ -2445,7 +2445,7 @@ export class UnitSystem {
     const lifecycle = building?.lifecycle ?? "destroyed";
     if (lifecycle !== "constructing") construction.ended += deltaSeconds;
     // A site's health grows as it is built, so damage is what the part built so far is missing.
-    // This is the health `stepConstruction` in the simulation has granted by this progress,
+    // This is the health `stepConstructionSites` in the simulation has granted by this progress,
     // floor included: without it every undamaged site looked damaged for its first ticks.
     const builtHealth = 1 + Math.floor(construction.progress * ((building?.maxHealth ?? 1) - 1));
     // A destroyed site keeps its cut and its deck, which sink with the rest of it.
