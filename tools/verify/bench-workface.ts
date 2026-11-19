@@ -7,8 +7,10 @@ const map = { size: 100, segments: 1, heights: new Float32Array(4) };
 const deposit = { id: "ore-1", position: { x: 0, z: 0 }, radius: 3000, amount: 40, initialAmount: 40 };
 const geometry = new THREE.IcosahedronGeometry(4, 21).translate(0, 1.5, 0);
 console.log("triangles", geometry.getAttribute("position").count / 3);
-const ore = new OrePresentation(new THREE.Group(), map, [deposit], async () =>
-  [new THREE.Group().add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()))]);
+const ore = new OrePresentation(new THREE.Group(), map, [deposit], async () => {
+  const rock = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+  return [{ full: rock, depleted: rock.clone() }];
+});
 await ore.ready;
 const face = new Workface();
 /** As many rays as a workface has samples. */

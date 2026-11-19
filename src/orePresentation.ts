@@ -42,13 +42,20 @@ const WORKFACE_LEAST_PITCH_RANGE = 0.35;
 /** The sweep stops this fraction short of the rock's crest, so the glow stays on the face. */
 const WORKFACE_CREST_INSET = 0.06;
 
+// The three variants, seeds of one generator (docs/titanium_deposit.md). A deposit's variant is its index modulo three.
 const modelUrls = [
-  new URL("../assets/models/titanium-three-knuckles.glb", import.meta.url),
-  new URL("../assets/models/titanium-split-lens.glb", import.meta.url),
-  new URL("../assets/models/titanium-eroded-window.glb", import.meta.url),
+  new URL("../assets/models/titanium-deposit-5.glb", import.meta.url),
+  new URL("../assets/models/titanium-deposit-1.glb", import.meta.url),
+  new URL("../assets/models/titanium-deposit-3.glb", import.meta.url),
 ];
 
-export type OreModelLoader = () => Promise<readonly THREE.Group[]>;
+/** One variant: the same outcrop with its ore, and mined out. The two share a material and its textures. */
+export interface OreModel {
+  full: THREE.Object3D;
+  depleted: THREE.Object3D;
+}
+
+export type OreModelLoader = () => Promise<readonly OreModel[]>;
 
 /** The strip of rock face that a beam from one spot can sweep, as points from bottom to top. */
 export class Workface {
@@ -74,13 +81,39 @@ export class Workface {
 
 const loadOreModels: OreModelLoader = async () => {
   const loader = new GLTFLoader();
-  return Promise.all(modelUrls.map(async url => (await loader.loadAsync(url.href)).scene));
+  return Promise.all(modelUrls.map(async url => {
+    const { scene } = await loader.loadAsync(url.href);
+    const state = (name: string) => {
+      const mesh = scene.getObjectByName(name);
+      if (!mesh) throw new Error(`${url.pathname} has no "${name}" mesh`);
+      return mesh;
+    };
+    return { full: state("full"), depleted: state("depleted") };
+  }));
 };
 
-interface OreDeposit {
+/** The furthest a model reaches from its vertical axis. */
+const horizontalReach = (model: THREE.Object3D) => {
+  model.updateMatrixWorld(true);
+  const point = new THREE.Vector3();
+  let reach = 0;
+  model.traverse(object => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const positions = object.geometry.getAttribute("position");
+    for (let i = 0; i < positions.count; i++) {
+      point.fromBufferAttribute(positions, i).applyMatrix4(object.matrixWorld);
+      reach = Math.max(reach, Math.hypot(point.x, point.z));
+    }
+  });
+  return reach;
+};
+
+interface OreDeposit extends OreModel {
   root: THREE.Group;
-  visual: THREE.Object3D;
+  /** Holds whichever of `full` and `depleted` the deposit shows now. */
+  visual: THREE.Group;
   ring: THREE.Mesh;
+  /** The meshes of the state shown, which workfaces are traced on. */
   meshes: THREE.Mesh[];
   /** Footprint radius in world units; the model is scaled to fit inside it. */
   radius: number;
@@ -91,7 +124,7 @@ export class OrePresentation {
   readonly selectables: THREE.Object3D[] = [];
   readonly ready: Promise<void>;
   private readonly root = new THREE.Group();
-  private readonly models: THREE.Group[] = [];
+  private readonly models: OreModel[] = [];
   private readonly deposits = new Map<string, OreDeposit>();
   // Scratch for tracing workfaces, reused from one trace to the next.
   private readonly candidate = new Workface();
@@ -120,28 +153,21 @@ export class OrePresentation {
       this.disposeModels();
       return;
     }
-    const normalizations = sources.map(source => {
-      source.updateMatrixWorld(true);
-      const point = new THREE.Vector3();
-      let radius = 0;
-      source.traverse(object => {
+    for (const source of sources) {
+      for (const state of [source.full, source.depleted]) state.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;
         object.castShadow = true;
         object.receiveShadow = true;
-        const positions = object.geometry.getAttribute("position");
-        for (let i = 0; i < positions.count; i++) {
-          point.fromBufferAttribute(positions, i).applyMatrix4(object.matrixWorld);
-          radius = Math.max(radius, Math.hypot(point.x, point.z));
-        }
       });
-      return radius;
-    });
+    }
+    // Both states take the full outcrop's scale, so a deposit that runs out stays the size it was.
+    const reaches = sources.map(source => horizontalReach(source.full));
     deposits.forEach((deposit, index) => {
       const variant = index % sources.length;
-      const visual = sources[variant]!.clone(true);
+      const source = sources[variant]!;
       const radius = deposit.radius / POSITION_SCALE;
-      const scale = radius / normalizations[variant]!;
-      visual.scale.setScalar(scale);
+      const visual = new THREE.Group();
+      visual.scale.setScalar(radius / reaches[variant]!);
       visual.position.y = -0.05;
       const root = new THREE.Group();
       root.name = "Titanium deposit";
@@ -161,11 +187,11 @@ export class OrePresentation {
       this.root.add(root);
       root.updateMatrixWorld(true);
       placeGroundGeometry(ring.geometry, 0);
-      const meshes: THREE.Mesh[] = [];
-      visual.traverse(object => {
-        if (object instanceof THREE.Mesh) meshes.push(object);
-      });
-      this.deposits.set(deposit.id, { root, visual, ring, meshes, radius });
+      const presentation: OreDeposit = {
+        root, visual, ring, meshes: [], radius, full: source.full.clone(true), depleted: source.depleted.clone(true),
+      };
+      this.show(presentation, deposit.amount > 0 ? presentation.full : presentation.depleted);
+      this.deposits.set(deposit.id, presentation);
       this.selectables.push(root);
     });
   }
@@ -175,7 +201,25 @@ export class OrePresentation {
       const presentation = this.deposits.get(deposit.id);
       if (!presentation) continue;
       presentation.ring.visible = selected.has(deposit.id);
+      const state = deposit.amount > 0 ? presentation.full : presentation.depleted;
+      if (state.parent !== presentation.visual) this.show(presentation, state);
     }
+  }
+
+  // Only the state shown is in the scene, so the other is neither drawn nor picked.
+  private show(deposit: OreDeposit, state: THREE.Object3D) {
+    deposit.visual.clear().add(state);
+    deposit.visual.updateMatrixWorld(true);
+    deposit.meshes.length = 0;
+    state.traverse(object => {
+      if (object instanceof THREE.Mesh) deposit.meshes.push(object);
+    });
+  }
+
+  /** Which state of its model a deposit shows, once the model has loaded. For diagnostics. */
+  shownState(id: string) {
+    const deposit = this.deposits.get(id);
+    return deposit && (deposit.depleted.parent ? "depleted" : "full");
   }
 
   /**
@@ -369,7 +413,7 @@ export class OrePresentation {
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     const textures = new Set<THREE.Texture>();
-    for (const source of this.models) source.traverse(object => {
+    for (const source of this.models.flatMap(model => [model.full, model.depleted])) source.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       geometries.add(object.geometry);
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
