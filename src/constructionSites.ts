@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Decks } from "./construction/deck";
 import { Glow, GlowEffects } from "./construction/glowEffects";
-import { measureOutline, type Outline } from "./construction/outline";
+import { DIRECTIONS, measureOutline, SLICES, type Outline } from "./construction/outline";
 import { createReveal, type Reveal } from "./construction/reveal";
 import { loadScaffoldKit, MOST_BREAKS, Scaffolding, type Cage, type ScaffoldKitLoader } from "./construction/scaffold";
 import { BUILDING_DEFINITIONS } from "./sim/construction";
@@ -35,6 +35,38 @@ const ARC_SECONDS = 0.2;
 const HEAT_SECONDS = 0.4;
 /** Seconds it takes to cool once the drone stops: hot steel goes dark more slowly than it lights. */
 const COOL_SECONDS = 0.8;
+/**
+ * A Scout Drone's laser works the edge of the deck on the drone's own side: its line sweeps a
+ * band this many metres deep, in from the rim. Ivan asked for this after seeing the lines reach
+ * across the whole deck: "they should work on the outside edge of building".
+ */
+const EDGE_DEPTH = 1.5;
+/** The band starts at this share of the way from the middle to the rim, where a round deck is still wide enough to hold a line. */
+const BAND_START = 0.88;
+/** Metres the line reaches to each side for every metre it lies from the drone: the fan opens about 75 degrees at the nozzle. */
+const FAN_SPREAD = 0.75;
+/** Metres the line reaches to each side, at most. */
+const WIDEST_SCAN = 1.5;
+/** Seconds the line takes to cross the band once. */
+const PASS_SECONDS = 1;
+/** Metres along the ground the line keeps from the drone: nearer, and the fan of light closes to a sliver. */
+const NEAREST_SCAN = 1.2;
+/**
+ * Metres from the building's axis that the scan covers at least, and the same as a share of the
+ * drone's distance from that axis, which keeps the fan about 25 degrees wide as the drone sees
+ * it. Where the deck is smaller, as on a Command Center's upper tiers and dish, the line reaches
+ * past it, or the fan would close to a single beam that hardly moves.
+ */
+const SMALLEST_SCAN = 0.9;
+const NARROWEST_FAN = 0.22;
+/** How round the sweep turns at the end of a pass: at 1 it would reverse on the spot. */
+const SCAN_TURN = 0.985;
+/** The scan stays inside this share of the way from the middle to the rim. */
+const SCAN_REACH = 0.94;
+/** Radians the line rocks to each side as it sweeps, so the deck is scanned from a different angle on every pass. */
+const SCAN_ROCK = 0.45;
+/** Passes one rock to and fro takes. Not a whole number, so the scan never repeats. */
+const SCAN_ROCK_PASSES = 3.3;
 
 /** Everything the presentation knows about one site on one frame. */
 export interface SiteState {
@@ -50,8 +82,21 @@ export interface SiteState {
 }
 
 export interface ConstructionSite {
-  /** World height at which the building is being built: where a Scout Drone's beam ends. */
-  readonly beamTargetY: number;
+  /**
+   * Sets `start` and `end` to the ends of the line that the scanning laser of a Scout Drone
+   * standing at `from` draws on the site at `time`: a line across the deck that closes the cut,
+   * sweeping to and fro over it. `seed`, from 0 to 1, keeps drones on one site from scanning in
+   * step. All in world space.
+   */
+  scanLine(from: THREE.Vector3, time: number, seed: number, start: THREE.Vector3, end: THREE.Vector3): void;
+  /**
+   * Sets `out` to the point on the building's outside edge that a Scout Drone standing at `from`
+   * works on. Where the deck that closes the cut comes within `reach` metres of the drone along
+   * the ground, that is the deck's rim on the drone's side. Where the building has grown narrower
+   * than that, it is the top edge of the highest tier below that the drone does reach. `along`
+   * moves the point that many metres to the drone's left along the edge. All in world space.
+   */
+  workPoint(from: THREE.Vector3, reach: number, along: number, out: THREE.Vector3): THREE.Vector3;
   /**
    * Sets every visual from `state` and `time`. Only the weld is carried over from the last
    * call: its arcs and glow come up and die down over the time that passed since then, so
@@ -69,6 +114,7 @@ export interface ConstructionSite {
 }
 
 const point = new THREE.Vector3();
+const neighbour = new THREE.Vector3();
 const outward = new THREE.Vector3();
 const velocity = new THREE.Vector3();
 const { clamp, smoothstep } = THREE.MathUtils;
@@ -254,21 +300,86 @@ export class ConstructionSites {
       });
     };
 
-    let beamTargetY = ground;
+    let builtY = ground;
     let sunk = 0;
     // The weld, from 0 (out, cold) to 1: how strongly its arcs burn and how hot its steel is,
     // and when both were last moved. The first update finds it settled, lit or cold.
     let arcing = 0;
     let heat = 0;
     let weldedAt = -Infinity;
+    const toSite = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    const step = Math.PI * 2 / DIRECTIONS;
+    /** The rim of the cut toward `angle`, in the building's frame, blended between the outline's directions. */
+    const rimAt = (angle: number, out: THREE.Vector3, built = (builtY - ground) / height) => {
+      const turn = angle / step;
+      const before = Math.floor(turn);
+      outline.surface(built, before * step, out);
+      outline.surface(built, (before + 1) * step, neighbour);
+      return out.lerp(neighbour, turn - before).setY(0);
+    };
+    /**
+     * Sets `out` to the world point on the deck `off` metres from the building's axis along the
+     * unit direction (x, z) and `across` metres to its left, pulled inside the rim where the hull
+     * is narrower than a circle, but no nearer the axis than `least`.
+     */
+    const onDeck = (x: number, z: number, off: number, across: number, least: number, out: THREE.Vector3) => {
+      const pointX = x * off - z * across;
+      const pointZ = z * off + x * across;
+      const rim = Math.max(least, rimAt(Math.atan2(pointZ, pointX), out).length() * SCAN_REACH);
+      out.set(pointX, 0, pointZ)
+        .clampLength(0, rim)
+        .setY(Math.max(builtY, ground + DECK_FLOOR) - root.position.y)
+        .applyMatrix4(root.matrixWorld);
+    };
     return {
-      get beamTargetY() {
-        return beamTargetY;
+      scanLine(from, time, drone, start, end) {
+        start.copy(from).applyMatrix4(toSite);
+        const toward = Math.atan2(start.z, start.x);
+        const distance = Math.hypot(start.x, start.z);
+        const least = Math.max(SMALLEST_SCAN, distance * NARROWEST_FAN);
+        const radius = Math.max(least, rimAt(toward, start).length() * SCAN_REACH);
+        // Steady passes with soft turns, as a scanner's bar moves: a pendulum's swing reads as idling.
+        const pass = time / PASS_SECONDS * (0.85 + 0.3 * ((drone * 7919.13) % 1)) + drone * 16;
+        const sweep = Math.asin(SCAN_TURN * Math.sin(pass * Math.PI)) / Math.asin(SCAN_TURN);
+        // The band of deck the line sweeps, along the drone's line of sight. On a deck too small
+        // for the whole band it ends seven tenths of the way to the rim beyond the middle.
+        const nearest = Math.min(radius * BAND_START, distance - NEAREST_SCAN);
+        const depth = clamp(nearest + radius * 0.7, 0, EDGE_DEPTH);
+        const middle = nearest - depth / 2;
+        // The line lies across the direction it sweeps in, and that direction rocks about the
+        // drone's line of sight.
+        const turned = SCAN_ROCK * Math.sin(pass * Math.PI * 2 / SCAN_ROCK_PASSES + drone * 40);
+        const x = Math.cos(toward + turned);
+        const z = Math.sin(toward + turned);
+        const limit = radius * 0.97;
+        const off = clamp(middle * Math.cos(turned) + sweep * depth / 2, -limit, limit);
+        // The line is as long as the fan is wide where it meets the deck, and no longer than a
+        // round deck is wide there; `onDeck` trims it for other shapes.
+        const reach = Math.min(
+          WIDEST_SCAN, FAN_SPREAD * (distance * Math.cos(turned) - off), Math.sqrt(radius * radius - off * off),
+        );
+        const side = -middle * Math.sin(turned);
+        onDeck(x, z, off, side - reach, least, start);
+        onDeck(x, z, off, side + reach, least, end);
+      },
+      workPoint(from, reach, along, out) {
+        out.copy(from).applyMatrix4(toSite);
+        const toward = Math.atan2(out.z, out.x);
+        const within = Math.hypot(out.x, out.z) - reach;
+        // From the slice being built down to the first whose hull the drone reaches.
+        const top = Math.min(SLICES - 1, Math.floor((builtY - ground) / height * SLICES));
+        let slice = top;
+        while (slice > 0 && rimAt(toward, out, (slice + 0.5) / SLICES).length() < within) slice -= 1;
+        const radius = rimAt(toward, out, (slice + 0.5) / SLICES).length();
+        const edge = slice === top ? Math.max(builtY, ground + DECK_FLOOR) : ground + height * (slice + 1) / SLICES;
+        return rimAt(toward + along / Math.max(radius, 0.5), out, (slice + 0.5) / SLICES)
+          .setY(edge - root.position.y)
+          .applyMatrix4(root.matrixWorld);
       },
       update({ progress, working, health, lifecycle, sinceLifecycleChange: since }, time) {
         glows.clear();
         const cut = ground + height * progress;
-        beamTargetY = cut;
+        builtY = cut;
         if (lifecycle === "active") {
           // The finished building is the untouched model from the first frame; only the
           // scaffold and its dust are still leaving.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import * as THREE from "three";
+import { ARM_PARTS } from "../src/construction/scoutArms";
 import { sampleHeight, type GeneratedMap } from "../src/map";
 import type { MatchFrame, MatchSession } from "../src/matchSession";
 import {
@@ -125,6 +126,18 @@ const leftovers = (world: THREE.Object3D, name: string) => {
 const play = (system: UnitSystem, seconds: number) => {
   for (let elapsed = 0; elapsed < seconds - 1e-6; elapsed += 0.1) system.update(0.1);
 };
+
+/** Attaches a Scout Drone as its real model hangs: 1 m up inside its root, its nose (-x) turned to the root's forward. */
+const attachHoveringScout = (system: UnitSystem, id: string) => {
+  const root = new THREE.Group();
+  const visual = new THREE.Group();
+  visual.position.y = 1;
+  visual.rotation.y = Math.PI / 2;
+  root.add(visual);
+  system.attachScoutDrone(id, root, visual, options);
+  return { root, visual };
+};
+
 /** Resolves once a site placed in this turn has been given its scaffold. */
 const kitLoaded = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -260,15 +273,7 @@ const miningScene = async (scoutCount = 1, facing = true) => {
   const system = new UnitSystem(
     world, { ...map, titaniumDeposits: [deposit] } as GeneratedMap, [], [], session, undefined, undefined, boxRock,
   );
-  for (const scout of scouts) {
-    // As the real model hangs: 1 m up inside its root, its nose (-x) turned to the root's forward.
-    const root = new THREE.Group();
-    const visual = new THREE.Group();
-    visual.position.y = 1;
-    visual.rotation.y = Math.PI / 2;
-    root.add(visual);
-    system.attachScoutDrone(scout.id, root, visual, options);
-  }
+  for (const scout of scouts) attachHoveringScout(system, scout.id);
   await new Promise(resolve => setTimeout(resolve));
   if (facing) system.update(0.1);
   let version = 1;
@@ -340,6 +345,220 @@ test("drones mining one deposit do not sweep in step", async () => {
   system.dispose();
 });
 
+/**
+ * Scouts that have arrived to build one Turret site at the origin: a box 2 m square and 3 m tall,
+ * half built, so its deck lies 1.5 m up. They stand 3 m out along +x, +z, -x and -z in turn.
+ */
+const buildingScene = async (scoutCount = 1) => {
+  const site = activeBuilding("turret-site", "turret", {
+    lifecycle: "constructing", constructionProgress: 0.5, ownerId: "local-player", health: 450, maxHealth: 900,
+    position: toSimPoint(0, 0), rotation: 0,
+  });
+  const scouts = Array.from({ length: scoutCount }, (_, index) => {
+    const position = toSimPoint(Math.round(Math.cos(index * Math.PI / 2)) * 3, Math.round(Math.sin(index * Math.PI / 2)) * 3);
+    return {
+      ...unit("scout-drone"), id: `scout-drone-${index + 1}`, attacking: false, attackTargetId: undefined,
+      // A Scout Drone's own size: it builds from 0.55 m outside the site's 2 m footprint.
+      radius: 0.5 * POSITION_SCALE,
+      order: "build" as const, position, target: position, constructionTargetId: site.id,
+    } satisfies UnitState as UnitState;
+  });
+  const session = new TestSession(frame(1, scouts, site));
+  const world = new THREE.Group();
+  const system = new UnitSystem(world, map, [], [], session, () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2).translate(0, 1.5, 0), new THREE.MeshStandardMaterial()));
+    return root;
+  }, undefined, undefined, scaffoldKit);
+  const drones = scouts.map((scout) => attachHoveringScout(system, scout.id));
+  // As in the game, where a unit's model stands in the world it is clicked in.
+  for (const { root } of drones) world.add(root);
+  await kitLoaded();
+  let version = 1;
+  return {
+    site, scouts, drones, session, system, world,
+    work: (id = "scout-drone-1") => system.inspect().units.find(candidate => candidate.id === id)?.buildingWork,
+    arms: () => world.getObjectByName("Scout tool arms") as THREE.InstancedMesh,
+    /** Delivers the scouts and site as they now stand, as the next simulation frame. */
+    advance: (seconds = 0.1) => {
+      version += 1;
+      session.frames.push(frame(version, scouts, site));
+      system.update(seconds);
+    },
+    run: (seconds: number) => {
+      for (let elapsed = 0; elapsed < seconds; elapsed += 0.05) system.update(0.05);
+    },
+  };
+};
+
+/** Where the tool of arm `index` ends: the far end of the last of an arm's parts. */
+const toolTip = (arms: THREE.InstancedMesh, index: number) => {
+  const part = new THREE.Matrix4().fromArray(arms.instanceMatrix.array, (index * ARM_PARTS + ARM_PARTS - 1) * 16);
+  return new THREE.Vector3(0, 1, 0).applyMatrix4(part);
+};
+
+test("a building Scout turns to its site, rises to the edge being built and welds it with two arms, holding off", async () => {
+  const { system, world, drones, work, arms, run } = await buildingScene();
+  const { root } = drones[0]!;
+  // It flew in facing +z; the site lies along -x.
+  expect(root.rotation.y).toBe(0);
+  expect(work()).toBeUndefined();
+  // It turns to the site first: part way round, its tools are still in.
+  system.update(0.02);
+  expect(root.rotation.y).toBeLessThan(-0.5);
+  expect(work()).toBeUndefined();
+  expect(arms().visible).toBe(false);
+  run(1.5);
+  // At work it looks at the stretch of edge between its two tools.
+  const { from, to } = work()!;
+  expect(Math.abs(root.rotation.y - Math.atan2(to[0] - 3, to[2]))).toBeLessThan(0.15);
+  // The half-built hull's edge is 1 m from the site's middle and 1.5 m up. The drone has risen
+  // to hover over it, and its nose stays 0.7 m off: it does not touch what it builds.
+  expect(to[0]).toBeCloseTo(1, 2);
+  expect(to[1]).toBeCloseTo(1.5, 2);
+  expect(from[0] - to[0]).toBeGreaterThan(0.6);
+  expect(from[0] - to[0]).toBeLessThan(0.8);
+  expect(from[1]).toBeGreaterThan(1.85);
+  expect(from[1]).toBeLessThan(2.15);
+  // The raised drone is clicked where it is seen, not where it hovered before.
+  const levelWith = (height: number) => clicked(system, world, new THREE.Vector3(3, height, 30), new THREE.Vector3(3, height, 0));
+  expect(levelWith(1.6)).toBe("scout-drone-1");
+  expect(levelWith(0.3)).toBeUndefined();
+  // Two arms. Each tool comes down on the edge on its own side of the nose,
+  // and lifts off it on the way to its next spot.
+  expect(arms().count).toBe(2 * ARM_PARTS);
+  for (const [arm, side] of [[0, 1], [1, -1]] as const) {
+    let nearest = Infinity;
+    let highest = -Infinity;
+    for (let step = 0; step < 80; step += 1) {
+      system.update(0.05);
+      const tip = toolTip(arms(), arm);
+      expect(tip.z * side).toBeGreaterThan(0);
+      nearest = Math.min(nearest, Math.hypot(tip.x - 1, tip.y - 1.5));
+      highest = Math.max(highest, tip.y);
+    }
+    expect(nearest).toBeLessThan(0.02);
+    expect(highest).toBeGreaterThan(1.6);
+  }
+  system.dispose();
+});
+
+test("a Scout flying in to build starts to rise before it arrives, and brings its tools out only once there", async () => {
+  const { scouts, drones, work, advance, run } = await buildingScene();
+  // Still on its way, 4 m from the site's middle, which is 2 m from its footprint.
+  Object.assign(scouts[0]!, { moving: true, position: toSimPoint(4, 0), target: toSimPoint(3, 0) });
+  advance();
+  run(1);
+  expect(drones[0]!.visual.position.y).toBeGreaterThan(1.6);
+  expect(work()).toBeUndefined();
+  Object.assign(scouts[0]!, { moving: false, position: toSimPoint(3, 0) });
+  advance();
+  run(0.5);
+  expect(work()).toBeDefined();
+});
+
+test("every Scout building one site has its own tools, all in one draw, and they do not work in step", async () => {
+  const { system, work, arms, run } = await buildingScene(4);
+  run(1.5);
+  expect(arms().count).toBe(4 * 2 * ARM_PARTS);
+  // Mirrored through the site's middle, drones on opposite sides would move as one if they kept step.
+  let widestGap = 0;
+  for (let step = 0; step < 60; step += 1) {
+    system.update(0.05);
+    widestGap = Math.max(widestGap, Math.abs(work("scout-drone-1")!.to[2] + work("scout-drone-3")!.to[2]));
+  }
+  expect(widestGap).toBeGreaterThan(0.1);
+  system.dispose();
+});
+
+test("a building Scout's arms go back in when it stops, and the Scout sinks back to its hover height", async () => {
+  const { system, scouts, drones, work, arms, advance, run } = await buildingScene();
+  run(1.5);
+  const span = () => toolTip(arms(), 0).distanceTo(new THREE.Vector3().setFromMatrixPosition(
+    new THREE.Matrix4().fromArray(arms().instanceMatrix.array, 0),
+  ));
+  const reach = span();
+  expect(reach).toBeGreaterThan(0.8);
+  expect(drones[0]!.visual.position.y).toBeGreaterThan(1.6);
+  Object.assign(scouts[0]!, { order: "idle", constructionTargetId: undefined });
+  advance(0.1);
+  system.update(0.25);
+  // Part way in they are shorter, not gone.
+  expect(arms().count).toBe(2 * ARM_PARTS);
+  expect(span()).toBeGreaterThan(0.1);
+  expect(span()).toBeLessThan(reach - 0.1);
+  run(0.4);
+  expect(work()).toBeUndefined();
+  expect(arms().visible).toBe(false);
+  run(2);
+  // Within its hover's 7 cm bob.
+  expect(Math.abs(drones[0]!.visual.position.y - 1)).toBeLessThan(0.08);
+  // Resuming brings both back.
+  Object.assign(scouts[0]!, { order: "build", constructionTargetId: "turret-site" });
+  advance(0.1);
+  run(1.5);
+  expect(span()).toBeCloseTo(reach, 0);
+  expect(drones[0]!.visual.position.y).toBeGreaterThan(1.6);
+  system.dispose();
+});
+
+test("a building Scout keeps working while it trails a building that rises faster than it follows", async () => {
+  const { system, site, work, arms, advance, run } = await buildingScene();
+  run(1.5);
+  const shoulder = new THREE.Vector3();
+  const span = () => toolTip(arms(), 0).distanceTo(shoulder.setFromMatrixPosition(new THREE.Matrix4().fromArray(arms().instanceMatrix.array, 0)));
+  const reach = span();
+  // The deck rises 0.8 m a second for 1.4 s. The drone's rise settles a quarter of a metre
+  // behind it, so its nose is nearer the deck than the 0.3 m it needs to start work.
+  for (let step = 0; step < 14; step += 1) {
+    site.constructionProgress += 0.08 / 3;
+    advance(0.1);
+    expect(work()).toBeDefined();
+  }
+  expect(span()).toBeGreaterThan(reach - 0.3);
+  system.dispose();
+});
+
+test("a welding Scout sent away takes its arms along as they fold, and does not reach back for the site", async () => {
+  const { system, scouts, drones, work, arms, advance, run } = await buildingScene();
+  run(1.5);
+  const { root } = drones[0]!;
+  // How far its nose is ahead of where it stands: more when it leans in.
+  const noseAhead = () => Math.hypot(work()!.from[0] - root.position.x, work()!.from[2] - root.position.z);
+  const leaning = noseAhead();
+  let folding = 0;
+  for (let step = 1; step <= 8 && (step === 1 || arms().visible); step += 1) {
+    // Flying off at 5 m a second, straight away from the site, which is soon behind it.
+    Object.assign(scouts[0]!, {
+      order: "move", moving: true, constructionTargetId: undefined, position: toSimPoint(3 + step * 0.5, 0), target: toSimPoint(9, 0),
+    });
+    advance(0.1);
+    if (!arms().visible) break;
+    folding += 1;
+    root.updateWorldMatrix(true, false);
+    for (const arm of [0, 1]) expect(root.worldToLocal(toolTip(arms(), arm)).z).toBeGreaterThan(0);
+    // It straightens up as it goes: it does not lean after the site it is leaving.
+    expect(noseAhead()).toBeLessThan(leaning + 0.01);
+  }
+  expect(folding).toBeGreaterThan(2);
+  system.dispose();
+});
+
+test("a Scout sent straight to a neighbouring site takes its tools off the first before it starts on the second", async () => {
+  const { system, session, site, scouts, work, run } = await buildingScene();
+  run(1.5);
+  // A second site right behind the drone, already within its reach: it does not have to move.
+  const neighbour = { ...structuredClone(site), id: "second-site", position: toSimPoint(5.5, 0) };
+  session.frames.push(frame(100, [{ ...scouts[0]!, constructionTargetId: neighbour.id }], [site, neighbour]));
+  system.update(0.05);
+  await kitLoaded();
+  // The tools stay on the first site while they go in, then come out over the second.
+  expect(work()!.to[0]).toBeLessThan(1.001);
+  run(1.5);
+  expect(work()!.to[0]).toBeGreaterThan(4.5);
+  system.dispose();
+});
+
 describe("the mining laser stops when", () => {
   const endings: Record<string, (scene: Awaited<ReturnType<typeof miningScene>>) => void> = {
     "the cargo is full": ({ scouts, deposit }) => Object.assign(scouts[0]!, {
@@ -385,7 +604,7 @@ test("authoritative mining and hauling report the carried and delivered Titanium
   system.select([scout.id]);
   system.update(0.1);
   expect(system.selectedUnits()[0]?.harvest?.phase).toBe("extracting");
-  expect(world.getObjectByName("Construction beam")?.visible).toBe(false);
+  expect(system.inspect().units[0]?.buildingWork).toBeUndefined();
   expect(system.selectedGroups()[0]?.cargoTitanium).toBe(2);
   scout.cargoTitanium = 20;
   scout.moving = true;
@@ -659,8 +878,7 @@ describe("unit presentation timing", () => {
       undefined,
       scaffoldKit,
     );
-    const scoutRoot = new THREE.Group();
-    system.attachScoutDrone(scout.id, scoutRoot, new THREE.Group(), options);
+    attachHoveringScout(system, scout.id);
     system.select([scout.id]);
 
     expect(system.previewConstruction("turret", 0, 0)).toBe(false);
@@ -700,9 +918,9 @@ describe("unit presentation timing", () => {
     await kitLoaded();
     system.update(0);
     const model = world.getObjectByName("turret construction")!.getObjectByName("Building model mesh") as THREE.Mesh;
-    const beam = world.getObjectByName("Construction beam") as THREE.Line;
+    const work = () => system.inspect().units[0]!.buildingWork;
     // Nothing is built yet, so the site is clicked through its scaffold and pad alone.
-    expect(beam.visible).toBe(false);
+    expect(work()).toBeUndefined();
     expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);
     expect(clickedFromAbove(system, world, 9, 0.4)).toBeUndefined();
 
@@ -710,17 +928,17 @@ describe("unit presentation timing", () => {
     workingScout.moving = false;
     const quarterBuilt = { ...structuredClone(site), constructionProgress: 0.25, health: 225 };
     session.frames.push(frame(3, workingScout, quarterBuilt));
-    system.update(0);
+    // A second for the drone to turn to the site, rise to its deck and bring its tools out.
+    for (let step = 0; step < 20; step += 1) system.update(0.05);
     session.frames.push(frame(4, workingScout, { ...quarterBuilt, constructionProgress: 0.35, health: 315 }));
     system.update(0);
-    // The model is never stretched: it is cut off at the height built so far, where the beam ends.
+    // The model is never stretched: it is cut off at the height built so far, where the drone works.
     expect(model.parent!.scale.y).toBe(1);
     expect(model.material).not.toBe(finished);
-    expect(beam.visible).toBe(true);
-    expect(beam.geometry.getAttribute("position").getY(1)).toBeCloseTo(0.75);
+    expect(work()!.to[1]).toBeCloseTo(0.75);
     // Between two simulation ticks the cut keeps rising.
     system.update(0.05);
-    expect(beam.geometry.getAttribute("position").getY(1)).toBeCloseTo(0.9);
+    expect(work()!.to[1]).toBeCloseTo(0.9);
     expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);
     // The model is clicked only where it is built: below the cut at 0.9 m, not above it.
     const levelWith = (height: number) =>
@@ -750,9 +968,9 @@ describe("unit presentation timing", () => {
     system.update(0);
     // Complete: the untouched model from the first frame, while the scaffold is still leaving.
     expect(model.material).toBe(finished);
-    expect(beam.visible).toBe(false);
     expect(clickedFromAbove(system, world, 4.08, 0.4)).toBe(site.id);
     system.update(1);
+    expect(work()).toBeUndefined();
     // A second later nothing of the site is left around the building.
     expect(clickedFromAbove(system, world, 4.08, 0.4)).toBeUndefined();
     expect(clickedFromAbove(system, world, 3.3, 0.4)).toBe(site.id);

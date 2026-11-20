@@ -1,12 +1,11 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { hashId } from "./behemothAttack";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import { sampleHeight } from "./map";
 import type { TerrainSurface } from "./terrainWalkability";
 import type { TitaniumDepositState } from "./sim/harvesting";
 import { POSITION_SCALE } from "./sim/simulationConstants";
-import { MINING_TRAIL_SECONDS, type MiningLasers } from "./miningLaser";
+import { LASER_TRAIL_SECONDS, laserSeed, type ScoutLasers } from "./scoutLaser";
 import { UI_SELECTION_COLOR } from "./uiColors";
 
 const WORKFACE_SAMPLES = 32;
@@ -431,15 +430,6 @@ export class OrePresentation {
 
 const SWEEP_SECONDS = 1.9;
 
-/** A stable random number from 0 to 1 per unit. */
-const unitSeed = (id: string) => {
-  let hash = hashId(id);
-  // Ids that differ only in their last digit hash next to each other until the bits are mixed.
-  hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
-  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
-  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
-};
-
 /** A Scout's extraction made visible: a cutting laser from its nozzle onto the rock face. */
 export class ScoutHarvestPresentation {
   /** Whether the laser was drawn in the latest update. */
@@ -457,13 +447,13 @@ export class ScoutHarvestPresentation {
   constructor(
     private readonly nozzle: THREE.Object3D,
     private readonly ore: OrePresentation,
-    private readonly lasers: MiningLasers,
+    private readonly lasers: ScoutLasers,
     unitId: string,
   ) {
     // Drones on one deposit must not sweep in step, so each gets its own phase, tempo and wander.
     // The three come from different bits of the seed: two drones whose phases happen to match
     // still drift apart.
-    this.seed = unitSeed(unitId);
+    this.seed = laserSeed(unitId);
     this.sweepSeconds = SWEEP_SECONDS * (0.7 + 0.6 * ((this.seed * 7919.13) % 1));
     this.wander = 0.37 + 0.3 * ((this.seed * 131.7) % 1);
   }
@@ -482,7 +472,7 @@ export class ScoutHarvestPresentation {
     this.lasers.fire(
       this.emitter,
       this.face.at(this.sweep(this.lasers.time), this.contact),
-      this.face.at(this.sweep(this.lasers.time - MINING_TRAIL_SECONDS), this.trail),
+      this.face.at(this.sweep(this.lasers.time - LASER_TRAIL_SECONDS), this.trail),
       this.seed,
     );
     this.firing = true;

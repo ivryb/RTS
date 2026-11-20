@@ -1,12 +1,25 @@
 import * as THREE from "three";
+import { BuilderWork } from "../../../src/construction/builderWork";
 import { ConstructionSites, type ConstructionSite, type SiteState } from "../../../src/constructionSites";
 import { createEnvironmentProps } from "../../../src/environmentProps";
 import { generateMap, sampleHeight } from "../../../src/map";
+import { LocalMatchSession } from "../../../src/matchSession";
 import { createModelLibrary, demoAssets, loadDemoAsset } from "../../../src/modelAssets";
+import { scanLook } from "../../../src/construction/scanLook";
+import { ScoutArms } from "../../../src/construction/scoutArms";
+import { drill } from "../../../src/construction/work/drill";
+import { hammer } from "../../../src/construction/work/hammer";
+import { scanWith } from "../../../src/construction/work/scan";
+import type { WorkStyle } from "../../../src/construction/work/style";
+import { weld } from "../../../src/construction/work/weld";
+import { attachLaserNozzle, ScoutLasers } from "../../../src/scoutLaser";
 import { BUILDING_DEFINITIONS } from "../../../src/sim/construction";
-import type { BuildingKind } from "../../../src/sim/units";
+import { initializeNavigation } from "../../../src/sim/navigation";
+import { createTrainedUnitState } from "../../../src/sim/production";
+import { UNIT_DEFINITIONS } from "../../../src/sim/unitDefinitions";
+import { LocalUnitSimulation, toSimPoint, type BuildingKind } from "../../../src/sim/units";
 import { createTerrain } from "../../../src/terrain";
-import { UI_SELECTION_COLOR } from "../../../src/uiColors";
+import { LIFT_SHORTFALL, UnitSystem } from "../../../src/unitSystem";
 import { findSceneCenter } from "../demoModels";
 
 /** The game's default framing: `VIEW_HEIGHT / DEFAULT_ZOOM` in `src/camera.ts`. */
@@ -20,6 +33,8 @@ const FILM_FPS = 30;
 const STUMP_SINK = { after: 0.2, seconds: 1 };
 /** Seconds a still gives a site in its state before the picture, so its weld is fully lit or fully cold. */
 const SETTLE_SECONDS = 10;
+/** Long enough for a drone's work to finish coming on or going out: a still shows it settled. */
+const LASER_SETTLE_SECONDS = 1;
 
 interface Panel {
   label: string;
@@ -34,8 +49,7 @@ interface Site {
   ground: number;
   /** Metres from the ground to the top of the finished model. */
   height: number;
-  drone: THREE.Group;
-  beam: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  drones: { model: THREE.Group; body: THREE.Group; ground: number; work: BuilderWork }[];
 }
 
 export interface PerfReport {
@@ -52,6 +66,12 @@ export interface PerfReport {
   createSiteMs: number[];
   /** Mean milliseconds per frame spent in every site's `update` plus `flush`, over 600 frames. */
   updateMsPerFrame: number;
+  /**
+   * What working drones' arms, arcs and sparks add to a frame, by the number of drones: draw
+   * calls, triangles, and the mean milliseconds spent placing them, over 600 frames. The draw
+   * calls must not grow with the drones.
+   */
+  builders: Record<string, { calls: number; triangles: number; updateMsPerFrame: number }>;
   /** Shader programs compiled for the at-rest scene, then added by sites under construction. */
   programsAtRest: number;
   programsAddedByConstruction: number;
@@ -221,6 +241,17 @@ scene.add(sun, sun.target);
 
 const construction = new ConstructionSites(scene);
 await construction.load();
+const lasers = new ScoutLasers(scene, scanLook);
+const arms = new ScoutArms(scene);
+// The game builds with `weld`. `?work=scan`, `hammer` or `drill` poses this scene's own drones in
+// one of the styles kept for other uses. The builder films run the game, so they always weld.
+const kept: Record<string, WorkStyle> = { scan: scanWith(lasers), hammer, drill };
+const workStyle = kept[params.get("work") ?? ""] ?? weld;
+/** Before each frame's drones are posed: nothing is left of the last frame's lasers and arms. */
+const beginWork = (deltaSeconds: number) => {
+  lasers.begin(deltaSeconds);
+  arms.begin();
+};
 
 // As in the game, every building of a kind is a clone of one loaded model.
 const models = createModelLibrary();
@@ -230,7 +261,8 @@ scoutDrone.model.traverse((object) => {
 });
 const groundAt = (x: number, z: number) => sampleHeight(map, x, z);
 
-const createSite = async (kind: BuildingKind, x: number, z: number, rotation: number): Promise<Site> => {
+/** `droneCount` Scout Drones stand evenly around the site, the first toward the camera's right. */
+const createSite = async (kind: BuildingKind, x: number, z: number, rotation: number, droneCount = 1): Promise<Site> => {
   const root = await models.building(kind);
   const visualRoot = new THREE.Group();
   visualRoot.name = "Building visual";
@@ -243,33 +275,33 @@ const createSite = async (kind: BuildingKind, x: number, z: number, rotation: nu
   root.updateWorldMatrix(true, true);
   const height = new THREE.Box3().setFromObject(root).max.y - ground;
 
-  // The drone hovers toward the camera's right so its beam is never hidden behind the site.
-  const reach = BUILDING_DEFINITIONS[kind].radius + 1.4;
-  const droneX = x + reach * 0.5;
-  const droneZ = z + reach * 0.87;
-  const drone = scoutDrone.instance.clone(true);
-  drone.position.set(droneX, groundAt(droneX, droneZ), droneZ);
-  drone.rotation.y = Math.atan2(x - droneX, z - droneZ);
-  scene.add(drone);
+  // Where the simulation lets a drone work from: just clear of the footprint.
+  const reach = BUILDING_DEFINITIONS[kind].radius + UNIT_DEFINITIONS["scout-drone"].radius + 0.55;
+  const drones = Array.from({ length: droneCount }, (_, index) => {
+    const angle = Math.PI / 6 + index / droneCount * Math.PI * 2;
+    const droneX = x + reach * Math.sin(angle);
+    const droneZ = z + reach * Math.cos(angle);
+    const model = new THREE.Group();
+    // As in the game, the drone's model hangs in a group of its own, which its work may lean or shake.
+    const body = scoutDrone.instance.clone(true);
+    model.add(body);
+    model.position.set(droneX, groundAt(droneX, droneZ), droneZ);
+    model.rotation.y = Math.atan2(x - droneX, z - droneZ);
+    scene.add(model);
+    const work = new BuilderWork(
+      attachLaserNozzle(body.children[0]!), construction.effects.createList(24), arms, `${kind}-${x}-${z}-${index}`, workStyle,
+    );
+    return { model, body, ground: model.position.y, work };
+  });
 
-  const beam = new THREE.Line(
-    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(6, 3)),
-    new THREE.LineBasicMaterial({
-      color: UI_SELECTION_COLOR,
-      depthWrite: false,
-      opacity: 0.85,
-      transparent: true,
-    }),
-  );
-  beam.name = "Construction beam";
-  beam.frustumCulled = false;
-  beam.renderOrder = 4;
-  scene.add(beam);
-
-  return { kind, root, visualRoot, handle: construction.createSite(kind, root, visualRoot)!, ground, height, drone, beam };
+  return { kind, root, visualRoot, handle: construction.createSite(kind, root, visualRoot)!, ground, height, drones };
 };
 
-const applyState = (site: Site, state: SiteState, seconds: number) => {
+/**
+ * Shows `site` in `state`. Call `beginWork` first, once per frame. `deltaSeconds` is the time
+ * since the last frame in a film; a still leaves it out and gets the drones' work settled.
+ */
+const applyState = (site: Site, state: SiteState, seconds: number, deltaSeconds = LASER_SETTLE_SECONDS) => {
   // The game's death effects sink what a destroyed site leaves standing, under dust this scene does not draw.
   const sunk = state.lifecycle === "destroyed"
     ? THREE.MathUtils.clamp((state.sinceLifecycleChange - STUMP_SINK.after) / STUMP_SINK.seconds, 0, 1) : 0;
@@ -279,14 +311,15 @@ const applyState = (site: Site, state: SiteState, seconds: number) => {
   site.handle.update(state, seconds);
   // Once it is under, the game removes the building.
   site.root.visible = sunk < 1;
-  site.beam.visible = state.working && state.lifecycle === "constructing";
-  site.drone.visible = site.beam.visible;
-  if (!site.beam.visible) return;
-  const positions = site.beam.geometry.getAttribute("position");
-  const { x, z } = site.root.position;
-  positions.setXYZ(0, site.drone.position.x, site.drone.position.y + 1.05, site.drone.position.z);
-  positions.setXYZ(1, x, site.handle.beamTargetY, z);
-  positions.needsUpdate = true;
+  const working = state.working && state.lifecycle === "constructing";
+  for (const drone of site.drones) {
+    drone.model.visible = working;
+    // As in the game, a working drone hovers over the height built so far. Here it stands
+    // there from the first frame; the builder films show it rise and sink.
+    drone.model.position.y = drone.ground
+      + Math.max(0, drone.work.workHeight(site.handle, drone.model.position) - LIFT_SHORTFALL - drone.ground);
+    drone.work.update(working ? site.handle : undefined, drone.model.position, seconds, deltaSeconds, drone.body);
+  }
 };
 
 /** For a strip, whose panels share their sites: the site once it has been in `state` for a while, not caught mid-fade. */
@@ -351,6 +384,7 @@ const renderStrip = (
   aimSun(target);
   renderer.setScissorTest(true);
   panels.forEach((panel, index) => {
+    beginWork(index ? 0 : time);
     for (const site of sites) applySettled(site, panel.state, time);
     construction.flush(time);
     const x = Math.round(index * panelWidth);
@@ -451,6 +485,7 @@ if (shot in stripShots) {
   const target = row(2);
   const camera = cameraFor({ x: target.x + 3, z: target.z + 3 }, 40, innerWidth / innerHeight);
   aimSun(target);
+  beginWork(time);
   sites.forEach((site, index) => applyState(site, constructing(0.45, index % 4 < 2), time));
   construction.flush(time);
   renderer.render(scene, camera);
@@ -500,7 +535,8 @@ if (shot in stripShots) {
   window.__constructionFrame = (index) => {
     const seconds = index / FILM_FPS;
     const state = stateAt(seconds);
-    for (const site of sites) applyState(site, state, seconds);
+    beginWork(1 / FILM_FPS);
+    for (const site of sites) applyState(site, state, seconds, 1 / FILM_FPS);
     construction.flush(seconds);
     renderer.render(scene, camera);
     showLabels([state.lifecycle === "active"
@@ -508,6 +544,114 @@ if (shot in stripShots) {
       : state.lifecycle === "destroyed"
         ? "Destroyed"
         : `${percent(state.progress)} · ${state.working ? "drone working" : state.progress ? "paused, no drone" : "just placed"}${state.health < 1 ? ` · ${percent(state.health)} health` : ""}`]);
+  };
+  window.__constructionFrame(0);
+} else if (shot === "crowd") {
+  // Several drones on one site, each at work on its own side of it.
+  const sites = [
+    await createSite("command-center", commandCenterAt.x, commandCenterAt.z, Math.PI / 4, 6),
+    await createSite("turret", turretAt.x, turretAt.z, 0, 3),
+  ];
+  sceneName.textContent = "Construction · 6 drones on a Command Center, 3 on a Turret";
+  renderStrip(
+    sites,
+    [0.15, 0.5, 0.85].map((progress) => ({ label: percent(progress), state: constructing(progress) })),
+    focusPoint("both"),
+    30,
+  );
+} else if (shot.startsWith("builder")) {
+  // The game's own UnitSystem and simulation, given the orders a player gives: a Scout Drone is
+  // told to build, flies in, turns to its site, rises with it and welds it, is sent away and
+  // called back. Nothing here poses the drone or its tools. In `builder-team` three drones are
+  // told to build one Command Center together.
+  const team = shot === "builder-team";
+  const kind: BuildingKind = team || shot.endsWith("command-center") ? "command-center" : "turret";
+  const at = kind === "turret" ? turretAt : commandCenterAt;
+  const world = new THREE.Group();
+  scene.add(world);
+  // The game runs its simulation in a worker. Here it runs in step with the film's frames.
+  await initializeNavigation();
+  const starts = team ? [[10, 5], [-5, 13], [13, -7]] as const : [[10, 5]] as const;
+  const scouts = starts.map(([x, z], index) => createTrainedUnitState({
+    id: `scout-drone-${index + 1}`, kind: "scout-drone", ownerId: "local-player", position: toSimPoint(at.x + x, at.z + z), facing: 0,
+  }));
+  const scoutIds = scouts.map((scout) => scout.id);
+  const system = new UnitSystem(
+    world,
+    map,
+    [],
+    [],
+    new LocalMatchSession("local-player", new LocalUnitSimulation(scouts, [], map)),
+    ({ kind: building }) => models.building(building),
+    models.unit,
+  );
+  await system.prepareRendering(renderer, scene, new THREE.OrthographicCamera());
+  const site = () => system.inspect().buildings[0];
+  /** Gives the drones an order as a player does, with them selected for just that moment. */
+  const order = (give: () => boolean) => () => {
+    system.select(scoutIds);
+    if (!give()) throw new Error(`The simulation refused an order in "${shot}"`);
+    system.select();
+  };
+  // Simulation seconds at which the player's orders are given.
+  const orders: [number, () => void][] = team
+    ? [[0.5, order(() => system.buildSelected(kind, at.x, at.z))]]
+    : kind === "turret" ? [
+      [0.5, order(() => system.buildSelected(kind, at.x, at.z))],
+      [5.5, order(() => system.stopSelected())],
+      // A short hop along the site's edge leaves the drone facing away, so resuming shows it turn.
+      [6.2, order(() => {
+        const drone = system.inspect().units[0]!;
+        return system.moveSelected(drone.x - (drone.z - at.z) * 0.6, drone.z + (drone.x - at.x) * 0.6);
+      })],
+      [7.4, order(() => system.resumeConstructionSelected(site()!.id))],
+    ]
+    : [
+      [0.5, order(() => system.buildSelected(kind, at.x, at.z))],
+      [26.5, order(() => system.moveSelected(at.x + 13, at.z + 2))],
+      [28, order(() => system.resumeConstructionSelected(site()!.id))],
+    ];
+  // The Turret's 10 s build is filmed whole. The Command Center's build, 60 s for one drone and
+  // 36 s for three, is cut twice: film seconds at which the simulation runs on unseen for a while.
+  const cuts: [number, number][] = team ? [[7, 12], [13, 9]] : kind === "turret" ? [] : [[5, 20], [11.5, 28]];
+  const length = team ? 19 : kind === "turret" ? 15.5 : 18;
+  const panels = [
+    { label: "Default zoom", viewHeight: innerHeight / GAMEPLAY_PIXELS_PER_METRE },
+    { label: "Close", viewHeight: kind === "turret" ? CLOSE_VIEW_HEIGHT * innerHeight / 900 : 19 },
+  ];
+  const panelWidth = innerWidth / panels.length;
+  const target = { x: at.x + 1.6, z: at.z + 1.6 };
+  const cameras = panels.map((panel) => cameraFor(target, panel.viewHeight, panelWidth / innerHeight));
+  aimSun(target);
+  sceneName.textContent = "Construction · a Scout Drone builds, in the game's own simulation";
+  let simulated = 0;
+  window.__constructionFrameCount = Math.round(length * FILM_FPS);
+  window.__constructionFrame = (index) => {
+    const seconds = index / FILM_FPS;
+    const until = seconds + cuts.reduce((skipped, [from, skip]) => skipped + (seconds >= from ? skip : 0), 0);
+    while (simulated < until - 1e-9) {
+      while (orders[0] && orders[0][0] <= simulated) orders.shift()![1]();
+      system.update(1 / 60);
+      simulated += 1 / 60;
+    }
+    renderer.setScissorTest(true);
+    cameras.forEach((camera, panel) => {
+      const x = Math.round(panel * panelWidth);
+      renderer.setViewport(x, 0, Math.round(panelWidth), innerHeight);
+      renderer.setScissor(x, 0, Math.round(panelWidth), innerHeight);
+      renderer.render(scene, camera);
+    });
+    const [scout, ...others] = system.inspect().units;
+    const building = site();
+    const welding = [scout!, ...others].filter((unit) => unit.buildingWork).length;
+    const doing = team
+      ? `${welding} of ${scouts.length} welding`
+      : welding ? "welding" : scout!.moving ? "flying" : scout!.order === "build" ? "arriving" : "stopped";
+    const progress = building ? building.lifecycle === "active" ? "complete" : percent(building.constructionProgress) : "no site yet";
+    const cut = cuts.find(([from]) => seconds >= from && seconds < from + 1);
+    showLabels(panels.map((panel, panelIndex) => panelIndex
+      ? `${panel.label} · ${progress} · ${team ? "drones" : "drone"} ${doing}`
+      : `${panel.label}${cut ? ` · ${cut[1]} s later` : ""}`));
   };
   window.__constructionFrame(0);
 } else if (shot === "perf") {
@@ -540,6 +684,7 @@ if (shot in stripShots) {
     sites.push(site);
   }
   const frame = (state: (index: number) => SiteState, seconds: number) => {
+    beginWork(1 / 60);
     sites.forEach((site, index) => applyState(site, state(index), seconds));
     construction.flush(seconds);
   };
@@ -558,6 +703,33 @@ if (shot in stripShots) {
   const underConstructionWithoutMultiDraw = measureFrame(camera);
   renderer.extensions.get = get;
   sceneName.textContent = "Construction · 10 sites under construction";
+  // A builder's work needs no drone model, only the frame its nose sits in: 40 of them, four to a
+  // site, each standing where the simulation lets a drone work from and facing its site.
+  const crowd = Array.from({ length: 40 }, (_, index) => {
+    const site = sites[index % sites.length]!;
+    const angle = Math.PI / 6 + Math.floor(index / sites.length) * Math.PI / 2;
+    const distance = BUILDING_DEFINITIONS[site.kind].radius + UNIT_DEFINITIONS["scout-drone"].radius + 0.55;
+    const root = new THREE.Group();
+    root.position.set(site.root.position.x + distance * Math.sin(angle), site.ground, site.root.position.z + distance * Math.cos(angle));
+    root.rotation.y = angle + Math.PI;
+    const body = new THREE.Group();
+    // The drone's model has its nose along its own -x, so it stands a quarter turn round in its group.
+    const hull = new THREE.Group();
+    hull.rotation.y = Math.PI / 2;
+    body.add(hull);
+    root.add(body);
+    scene.add(root);
+    const work = new BuilderWork(attachLaserNozzle(hull), construction.effects.createList(24), arms, `crowd-${index}`);
+    return { site, root, body, hull, work };
+  });
+  /** Puts `count` of the crowd to work and no others, for one frame `deltaSeconds` after the last. */
+  const workCrowd = (count: number, seconds: number, deltaSeconds: number) => {
+    for (const { site, root, body, hull, work } of crowd.slice(0, count)) {
+      // As in the game, the nose hovers half a metre above the edge it works on.
+      hull.position.y = work.workHeight(site.handle, root.position) + 0.5 - site.ground;
+      work.update(site.handle, root.position, seconds, deltaSeconds, body);
+    }
+  };
 
   window.__constructionPerf = () => {
     const frames = 600;
@@ -577,6 +749,26 @@ if (shot in stripShots) {
         picks[`${site.kind} ${Math.round(progress * 100)}%`] = pickablePixels(site);
       }
     }
+    const builderCosts: PerfReport["builders"] = {};
+    for (const count of [4, 40]) {
+      const started = performance.now();
+      for (let index = 0; index < frames; index += 1) {
+        beginWork(1 / 60);
+        workCrowd(count, 1 + index / 60, 1 / 60);
+      }
+      const updateMsPerFrame = Number(((performance.now() - started) / frames).toFixed(4));
+      // What they add to the drawing: the same frame of ten welding sites, counted with and without them.
+      const drawn = (builders: number) => {
+        frame(() => constructing(0.5), 1);
+        workCrowd(builders, 1, LASER_SETTLE_SECONDS);
+        construction.flush(1);
+        return measureFrame(camera);
+      };
+      const lit = drawn(count);
+      for (const { work } of crowd) work.hide();
+      const dark = drawn(0);
+      builderCosts[`${count} drones`] = { calls: lit.calls - dark.calls, triangles: lit.triangles - dark.triangles, updateMsPerFrame };
+    }
     frame(building, 1);
     renderer.render(scene, camera);
     return {
@@ -588,6 +780,7 @@ if (shot in stripShots) {
       measureMs,
       createSiteMs,
       updateMsPerFrame,
+      builders: builderCosts,
       programsAtRest,
       programsAddedByConstruction,
       pickablePixels: picks,

@@ -4,7 +4,9 @@ import { test, type Page } from "@playwright/test";
 
 // CONSTRUCTION_SHOTS narrows the run, e.g. "gameplay,perf".
 const only = process.env.CONSTRUCTION_SHOTS?.split(",");
-const outputDirectory = "art/workbench/renders/previews/construction";
+// CONSTRUCTION_WORK poses the drones in one of the ways of working kept for other uses, "scan", "hammer" or "drill"; its captures go to their own folder.
+const work = process.env.CONSTRUCTION_WORK;
+const outputDirectory = `art/workbench/renders/previews/construction${work ? `-${work}` : ""}`;
 
 mkdirSync(outputDirectory, { recursive: true });
 
@@ -14,7 +16,7 @@ const open = async (page: Page, shot: string, width: number, height: number) => 
   page.on("console", (message) => {
     if (message.type() === "error" || message.type() === "warning") console.log(`page ${message.type()}: ${message.text()}`);
   });
-  await page.goto(`/tools/preview/construction/?shot=${shot}`);
+  await page.goto(`/tools/preview/construction/?shot=${shot}${work ? `&work=${work}` : ""}`);
   await page.waitForFunction(() => window.__constructionReady === true, undefined, { timeout: 300_000 });
 };
 
@@ -46,6 +48,7 @@ const stills: Record<string, number> = {
   barrels: 3240,
   fit: 2400,
   slope: 3240,
+  crowd: 3240,
 };
 
 for (const [shot, width] of Object.entries(stills)) {
@@ -59,6 +62,7 @@ for (const [shot, width] of Object.entries(stills)) {
 const films = [
   "film", "film-turret", "film-command-center", "film-opening-command-center", "film-loss", "film-loss-turret",
   "film-pause", "film-pause-turret",
+  "builder-turret", "builder-command-center", "builder-team",
 ];
 for (const shot of films) {
   if (only && !only.includes(shot)) continue;

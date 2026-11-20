@@ -265,7 +265,8 @@ const HARVEST_REACH = 1.5 * POSITION_SCALE;
  */
 export const HARVEST_APPROACH = 0.3 * POSITION_SCALE;
 const PATH_CLEARANCE = 0.15 * POSITION_SCALE;
-const MELEE_REACH = 0.55 * POSITION_SCALE;
+/** How far outside its target's footprint a unit without a ranged weapon stands to strike it, and a Scout to build it. */
+export const MELEE_REACH = 0.55 * POSITION_SCALE;
 const PATH_SAMPLES = 16;
 const MAX_ATTACK_SAMPLES = 64;
 const ATTACK_RETRY_TICKS = 5;

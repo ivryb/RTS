@@ -83,17 +83,29 @@ export async function clickWorld(
 }
 
 const ENTITY_CLICK_HEIGHTS = [1.1, 2.5, 4, 6, 8];
+/** Finer steps for a Scout Drone at work, which hovers over its site: a click that misses its hull selects the site beneath it. */
+const WORKING_DRONE_CLICK_HEIGHTS = [1.1, 1.8, 2.5, 3.2, 4, 4.8, 5.6, 6.4, 7.2, 8];
 
 /** Left-clicks an entity by id through the real canvas input path.
  * The ray must hit a unit's click cylinder or a building's visible model, and the
- * nearest hit wins, so it retries from low to tall and confirms via inspect().selected. */
+ * nearest hit wins, so it retries from low to tall and confirms via inspect().selected.
+ * A Scout Drone at work has risen over its site and leant in to it, so it is clicked
+ * where it is seen: 0.6 m behind its nose. */
 export async function clickEntity(page: Page, id: string) {
-  for (const y of ENTITY_CLICK_HEIGHTS) {
+  const working = await page.evaluate(
+    (entityId) => Boolean(window.__dune77!.inspect()!.units.find((unit) => unit.id === entityId)?.buildingWork),
+    id,
+  );
+  for (const y of working ? WORKING_DRONE_CLICK_HEIGHTS : ENTITY_CLICK_HEIGHTS) {
     const point = await page.evaluate(([entityId, height]) => {
       const snap = window.__dune77!.inspect()!;
-      const entity = snap.units.find((unit) => unit.id === entityId)
-        ?? snap.buildings.find((building) => building.id === entityId);
-      return entity ? window.__dune77!.project(entity.x, entity.z, height) : null;
+      const unit = snap.units.find((candidate) => candidate.id === entityId);
+      const entity = unit ?? snap.buildings.find((building) => building.id === entityId);
+      if (!entity) return null;
+      const nose = unit?.buildingWork?.from;
+      if (!nose) return window.__dune77!.project(entity.x, entity.z, height);
+      const back = 0.6 / (Math.hypot(entity.x - nose[0], entity.z - nose[2]) || 1);
+      return window.__dune77!.project(nose[0] + (entity.x - nose[0]) * back, nose[2] + (entity.z - nose[2]) * back, height);
     }, [id, y] as const);
     if (!point) throw new Error(`clickEntity: unknown entity ${id}`);
     await page.mouse.click(point.x, point.y);
