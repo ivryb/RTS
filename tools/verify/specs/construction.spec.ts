@@ -7,6 +7,7 @@ import {
   snapshot,
   waitForSnapshot,
   type BuildingSnapshot,
+  type MatchSnapshot,
 } from "../helpers";
 
 const evidenceDir = "art/workbench/verify/construction";
@@ -181,11 +182,23 @@ const build = async (page: Page, kind: Kind) => {
       await shoot(page, site, `${kind}-working-default`, frames, frameSize(kind, "default"));
     }
   }
+  // The working drone has turned its nose to the site, and leant in to its edge or backed off
+  // from it. Its tools work below its nose, on the edge being built, inside the building's footprint.
+  const scout = (snap: MatchSnapshot) => snap.units.find((unit) => unit.id === SCOUT)!;
+  const working = scout(await waitForSnapshot(page, (snap) => Boolean(scout(snap).buildingWork), 30_000));
+  const work = working.buildingWork!;
+  const reach = Math.hypot(site.x - working.x, site.z - working.z);
+  // Its nose is 0.63 m ahead of its middle, and it leans in by up to 1.2 m.
+  expect(Math.hypot(work.from[0] - working.x, work.from[2] - working.z)).toBeLessThan(2);
+  expect(Math.hypot(work.to[0] - site.x, work.to[2] - site.z)).toBeLessThan(reach - working.radius);
+  expect(work.from[1]).toBeGreaterThan(work.to[1]);
   // Every shader a site needs was compiled at startup, so no frame of the build stops for one.
   expect(await compiledSince()).toEqual([]);
   const away = await screenPoint(page, site.x + 9, site.z + 9);
   await page.mouse.click(away.x, away.y, { button: "right" });
-  await waitForSnapshot(page, (snap) => snap.units.find((unit) => unit.id === SCOUT)!.order !== "build");
+  await waitForSnapshot(page, (snap) => scout(snap).order !== "build");
+  // Ordered away, it puts its tools away.
+  await waitForSnapshot(page, (snap) => !scout(snap).buildingWork);
   const paused = await progressOf(page, site.id);
   expect(paused).toBeGreaterThan(0);
   expect(paused).toBeLessThan(1);

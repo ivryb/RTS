@@ -1,20 +1,52 @@
 import * as THREE from "three";
+import { hashId } from "./behemothAttack";
 
 /** The cut glows this long behind the contact; `fire` wants the contact's place that long ago. */
-export const MINING_TRAIL_SECONDS = 0.22;
+export const LASER_TRAIL_SECONDS = 0.22;
 const SPARKS = 6;
-const FLOATS_PER_LASER = 10;
+const FLOATS_PER_LASER = 11;
 const INITIAL_CAPACITY = 32;
 /** The shader clock wraps here so its hashes keep their precision in long matches. */
 const SHADER_CLOCK_SECONDS = 512;
+/** A stable random number from 0 to 1 per unit, so no two drones' lasers move or flicker alike. */
+export const laserSeed = (unitId: string) => {
+  let hash = hashId(unitId);
+  // Ids that differ only in their last digit hash next to each other until the bits are mixed.
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
+};
+
+/**
+ * Adds the point a Scout Drone's laser leaves from to `visual`, its model: the front face of
+ * the tool head. The model's nose points along -x in its own space.
+ */
+export const attachLaserNozzle = (visual: THREE.Object3D) => {
+  const nozzle = new THREE.Object3D();
+  nozzle.name = "ScoutLaserNozzle";
+  nozzle.position.set(-0.5, 0, 0);
+  visual.add(nozzle);
+  return nozzle;
+};
+
 // Half the width of the beam's ribbon, in metres. Only its middle is bright: the rest is halo.
 const beamHalfWidth = `const float BEAM_HALF_WIDTH = 0.13;`;
 
-// One laser is a handful of camera-facing quads. Each vertex carries its quad corner in x and y
-// (-1 to 1) and its part in z: 0 cut trail, 1 beam, 2 contact bloom, 3 contact glow, 4 emitter
-// glow, 5+ sparks.
-const createQuads = () => {
-  const parts = 5 + SPARKS;
+/**
+ * How one kind of laser is drawn. A laser is `parts` quads, and each vertex carries its quad
+ * corner in x and y (-1 to 1) and its part in z. The shaders place and paint them from a laser's
+ * three points, `beamStart`, `beamEnd` and `beamTrail.xyz`, its seed in `beamTrail.w`, its
+ * `beamPower`, and the `time` uniform. Their output is premultiplied: rgb is light added to the
+ * scene, alpha is how much of the scene behind is covered.
+ */
+export interface LaserLook {
+  name: string;
+  parts: number;
+  vertexShader: string;
+  fragmentShader: string;
+}
+
+const createQuads = (parts: number) => {
   const corners = new Float32Array(parts * 12);
   const indices = new Uint16Array(parts * 6);
   for (let part = 0; part < parts; part += 1) {
@@ -25,6 +57,7 @@ const createQuads = () => {
   return { corners, indices };
 };
 
+// The mining laser's parts: 0 cut trail, 1 beam, 2 contact bloom, 3 contact glow, 4 emitter glow, 5+ sparks.
 const vertexShader = /* glsl */ `
   ${beamHalfWidth}
   uniform float time;
@@ -32,7 +65,9 @@ const vertexShader = /* glsl */ `
   attribute vec3 beamEnd;
   // xyz: where the contact was TRAIL_SECONDS ago; w: a per-drone random number.
   attribute vec4 beamTrail;
+  attribute float beamPower;
   varying vec2 vCorner;
+  varying float vPower;
   varying float vPart;
   varying float vSeed;
   varying float vLife;
@@ -42,7 +77,7 @@ const vertexShader = /* glsl */ `
   // from far away the beam thins to a wire.
   const float BEAM_LEAST_SCREEN = 0.005;
   const float TRAIL_HALF_WIDTH = 0.06;
-  const float TRAIL_SECONDS = ${MINING_TRAIL_SECONDS.toFixed(3)};
+  const float TRAIL_SECONDS = ${LASER_TRAIL_SECONDS.toFixed(3)};
   const float CONTACT_RADIUS = 0.24;
   const float BLOOM_RADIUS = 0.5;
   const float EMITTER_RADIUS = 0.15;
@@ -112,6 +147,7 @@ const vertexShader = /* glsl */ `
     vCorner = corner;
     vPart = part;
     vSeed = seed;
+    vPower = beamPower;
     gl_Position = projectionMatrix * vec4(point, 1.0);
   }
 `;
@@ -127,6 +163,7 @@ const fragmentShader = /* glsl */ `
   varying float vSeed;
   varying float vLife;
   varying float vAlong;
+  varying float vPower;
 
   const vec3 BEAM = vec3(1.0, 0.07, 0.03);
   // Hot pink-white, not white: at the farthest zoom the core is all that is left of the beam, and
@@ -174,40 +211,46 @@ const fragmentShader = /* glsl */ `
       float body = across * across * (1.0 - abs(vCorner.y));
       light = mix(WHITE_HOT, MOLTEN, min(1.0, vLife * 1.6)) * body * (1.0 - vLife * vLife) * 1.6;
     }
-    gl_FragColor = vec4(light, cover);
+    gl_FragColor = vec4(light, cover) * vPower;
     #include <colorspace_fragment>
   }
 `;
 
+/** The mining laser: a steady red cutting beam, its contact glow, the glowing cut behind it, and sparks. */
+export const miningLook: LaserLook = { name: "Scout mining lasers", parts: 5 + SPARKS, vertexShader, fragmentShader };
+
 /**
- * Every Scout Drone's mining laser: beam, contact glow, glowing cut and sparks, all in one
- * instanced draw call with no lights.
+ * Every Scout Drone's laser of one look, all in one instanced draw call with no lights: the
+ * mining lasers are one of these, the scanning lasers of building drones another.
  *
- * It keeps nothing between frames. Call `begin` once a frame, then `fire` for each drone that is
- * mining in that frame; a drone that stops calling `fire` has no laser.
+ * It keeps nothing between frames. Call `begin` once a frame, then `fire` for each drone whose
+ * laser is on in that frame; a drone that stops calling `fire` has no laser.
  */
-export class MiningLasers {
+export class ScoutLasers {
   /** Seconds this effect has run; drones time their sweeps from it. */
   time = 0;
   private count = 0;
   private lasers = new Float32Array(INITIAL_CAPACITY * FLOATS_PER_LASER);
   private instances!: THREE.InstancedInterleavedBuffer;
-  private readonly material = new THREE.ShaderMaterial({
-    uniforms: { time: { value: 0 } },
-    vertexShader,
-    fragmentShader,
-    blending: THREE.CustomBlending,
-    blendSrc: THREE.OneFactor,
-    blendDst: THREE.OneMinusSrcAlphaFactor,
-    depthWrite: false,
-    // Each quad is turned to the camera in the shader, so its winding says nothing about facing.
-    side: THREE.DoubleSide,
-    transparent: true,
-  });
-  private readonly mesh = new THREE.Mesh(new THREE.InstancedBufferGeometry(), this.material);
+  private readonly material: THREE.ShaderMaterial;
+  private readonly mesh: THREE.Mesh<THREE.InstancedBufferGeometry, THREE.ShaderMaterial>;
 
-  constructor(world: THREE.Group) {
-    this.mesh.name = "Scout mining lasers";
+  /** `world` is the object the lasers are drawn under. */
+  constructor(world: THREE.Object3D, private readonly look: LaserLook) {
+    this.material = new THREE.ShaderMaterial({
+      uniforms: { time: { value: 0 } },
+      vertexShader: look.vertexShader,
+      fragmentShader: look.fragmentShader,
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
+      depthWrite: false,
+      // The quads are turned to the camera in the shader, so their winding says nothing about facing.
+      side: THREE.DoubleSide,
+      transparent: true,
+    });
+    this.mesh = new THREE.Mesh(new THREE.InstancedBufferGeometry(), this.material);
+    this.mesh.name = look.name;
     // The quads are placed in the shader, so the geometry's own bounds say nothing.
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 4;
@@ -224,11 +267,13 @@ export class MiningLasers {
   }
 
   /**
-   * Draws one laser this frame from `start` to `end`, a point on the rock, with the cut glowing
-   * back to `trail`, where that point was MINING_TRAIL_SECONDS ago. `seed`, from 0 to 1, keeps one
-   * drone's flicker and sparks unlike another's.
+   * Draws one laser this frame from `start`, where it leaves the drone. What `end` and `trail`
+   * are depends on the look. A mining laser ends at `end`, a point on the rock, with the cut
+   * glowing back to `trail`, where that point was LASER_TRAIL_SECONDS ago. A scanning laser
+   * fans out to the line from `end` to `trail`. `seed`, from 0 to 1, keeps one drone's flicker
+   * unlike another's. `power`, from 0 to 1, dims the whole laser, so it can fade on and off.
    */
-  fire(start: THREE.Vector3, end: THREE.Vector3, trail: THREE.Vector3, seed: number) {
+  fire(start: THREE.Vector3, end: THREE.Vector3, trail: THREE.Vector3, seed: number, power = 1) {
     if ((this.count + 1) * FLOATS_PER_LASER > this.lasers.length) this.grow();
     const offset = this.count * FLOATS_PER_LASER;
     const lasers = this.lasers;
@@ -242,13 +287,14 @@ export class MiningLasers {
     lasers[offset + 7] = trail.y;
     lasers[offset + 8] = trail.z;
     lasers[offset + 9] = seed;
+    lasers[offset + 10] = power;
     this.count += 1;
     this.mesh.geometry.instanceCount = this.count;
     this.mesh.visible = true;
     this.instances.needsUpdate = true;
   }
 
-  /** Fires one laser far below the terrain, so loading compiles the shader instead of the first mining run. */
+  /** Fires one laser far below the terrain, so loading compiles the shader instead of the first drone at work. */
   prepareRendering() {
     const buried = new THREE.Vector3(0, -10_000, 0);
     this.fire(buried, buried, buried, 0);
@@ -270,7 +316,7 @@ export class MiningLasers {
   }
 
   private allocate() {
-    const { corners, indices } = createQuads();
+    const { corners, indices } = createQuads(this.look.parts);
     const geometry = this.mesh.geometry;
     geometry.setAttribute("position", new THREE.BufferAttribute(corners, 3));
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
@@ -279,6 +325,7 @@ export class MiningLasers {
     geometry.setAttribute("beamStart", new THREE.InterleavedBufferAttribute(this.instances, 3, 0));
     geometry.setAttribute("beamEnd", new THREE.InterleavedBufferAttribute(this.instances, 3, 3));
     geometry.setAttribute("beamTrail", new THREE.InterleavedBufferAttribute(this.instances, 4, 6));
+    geometry.setAttribute("beamPower", new THREE.InterleavedBufferAttribute(this.instances, 1, 10));
     geometry.instanceCount = this.count;
   }
 }

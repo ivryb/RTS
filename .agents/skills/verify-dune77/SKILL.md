@@ -63,7 +63,7 @@ broke the first time — use them instead of raw Playwright calls:
 - `snapshot(page)` / `waitForSnapshot(page, predicate, timeout?)` — read-only
   match state from the `?verify=1` hook: `tick`, `outcome`, `units[]`
   (`id, kind, ownerId, x, z, health, order, moving, attacking, cargoTitanium,
-  harvest, miningLaser`),
+  harvest, miningLaser, buildingWork`),
   `buildings[]` (`id, kind, ownerId, lifecycle, constructionProgress, health,
   productionQueue`),
   `titaniumDeposits[]` (`id, x, z, radius, amount, shown` — `shown` is the

@@ -197,8 +197,9 @@ export class GlowEffects {
     }
     const { array } = this.buffer;
     let at = 0;
+    // Copied float by float: a view on the used part of each list would be a new object per list per frame.
     for (const { data, count } of this.lists) {
-      array.set(count * STRIDE === data.length ? data : data.subarray(0, count * STRIDE), at);
+      for (let index = 0; index < count * STRIDE; index += 1) array[at + index] = data[index]!;
       at += count * STRIDE;
     }
     this.buffer.clearUpdateRanges();

@@ -44,7 +44,11 @@ Preconditions:
 - **Place.** `await clickWorld(page, spot.x, spot.z)` (left button) — wait for
   a new `buildings[]` entry with `lifecycle: "constructing"`, then poll until
   `lifecycle: "active"` (a Turret takes ~10 s, a Command Center ~60 s). The
-  drone shows `constructionTargetId` while building. Screenshot the site
+  drone shows `constructionTargetId` while building, and `buildingWork` once
+  it has arrived, turned to the site and brought its two welding arms out:
+  `from` is its nose, `to` the point on the building's edge between its two
+  tools. It hovers above that edge and leans in to it, so it is drawn higher
+  and nearer the site than its `x, z` on the ground suggest. Screenshot the site
   mid-build and the finished turret.
 - **Progress proof.** Capture the same building twice: `health` /
   `constructionProgress` (reflected in `lifecycle`) must advance between

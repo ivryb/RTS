@@ -2,7 +2,7 @@ import { AttackAreaMarker } from "./attackAreaMarker";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import * as THREE from "three";
 import { OrderMarker } from "./orderMarker";
-import { MiningLasers } from "./miningLaser";
+import { attachLaserNozzle, miningLook, ScoutLasers } from "./scoutLaser";
 import { OrePresentation, ScoutHarvestPresentation, type OreModelLoader } from "./orePresentation";
 import { SCOUT_TITANIUM_CAPACITY, type TitaniumDepositState } from "./sim/harvesting";
 import {
@@ -12,6 +12,8 @@ import {
 } from "./behemothBarrage";
 import { BEHEMOTH_DAMAGE_DELAY_SECONDS, behemothVolleySeed, hashId } from "./behemothAttack";
 import { BUILDING_CATALOG } from "./buildingCatalog";
+import { BuilderWork } from "./construction/builderWork";
+import { ScoutArms } from "./construction/scoutArms";
 import { ConstructionSites, type ConstructionSite, type ScaffoldKitLoader } from "./constructionSites";
 import {
   createDeathEffects,
@@ -41,6 +43,7 @@ import {
 } from "./sim/production";
 import {
   ATTACK_FACING_TOLERANCE,
+  MELEE_REACH,
   POSITION_SCALE,
   SIMULATION_TICK_SECONDS,
   toSimPoint,
@@ -56,6 +59,14 @@ const LOCAL_PLAYER_ID = "local-player";
 const BEHEMOTH_TRACK_SCROLL_SCALE = 0.75;
 const MAX_TERRAIN_TILT = THREE.MathUtils.degToRad(20);
 const TERRAIN_TILT_RESPONSIVENESS = 10;
+/** How briskly a Scout Drone rises to its work and comes back down: a rise of a metre or two settles in about 0.8 s. */
+const LIFT_RESPONSIVENESS = 6;
+/** Metres lower a working drone hovers over the edge it builds than over the ground: near enough for its arms. */
+export const LIFT_SHORTFALL = 0.5;
+/** Metres from a site's footprint at which a drone flying in to build starts to rise: its last 0.8 s of flight. */
+const LIFT_APPROACH = 8;
+/** The farthest, in metres, from which the rise pulls at full strength: it caps the climb at about 4.5 m a second. */
+const LIFT_PULL = 1.5;
 const TURRET_IDLE_SWEEP_ANGLE = THREE.MathUtils.degToRad(32);
 const TURRET_IDLE_SWEEP_SPEED = 0.55;
 const TURRET_IDLE_TURN_RESPONSIVENESS = 4.5;
@@ -201,6 +212,8 @@ interface UnitPresentation {
     baseRotationZ: number;
     time: number;
     moveWobble?: { offset: number; tilt: number };
+    /** For a Scout Drone: metres it has risen above its hover height to work on a rising building, its climb rate, and the lean its health bar and click target have followed. */
+    lift?: { height: number; speed: number; lean: number };
   };
   tracks?: {
     maps: THREE.Texture[];
@@ -216,8 +229,8 @@ interface UnitPresentation {
   selectionRing: THREE.Mesh;
   selectionHitbox: THREE.Mesh;
   healthBar: HealthBarPresentation;
-  constructionBeam?: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   harvesting?: ScoutHarvestPresentation;
+  builderWork?: BuilderWork;
   /** From `death` on, the death effects pose the root, and hide it once its wreck is laid. */
   state: "idle" | "move" | "attack" | "death";
   turnResponsiveness: number;
@@ -468,28 +481,6 @@ const createSelectionHitbox = ({
   return hitbox;
 };
 
-const createConstructionBeam = () => {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute([
-    0, 0, 0,
-    0, 0, 0,
-  ], 3).setUsage(THREE.DynamicDrawUsage));
-  const beam = new THREE.Line(
-    geometry,
-    new THREE.LineBasicMaterial({
-      color: UI_SELECTION_COLOR,
-      depthWrite: false,
-      opacity: 0.85,
-      transparent: true,
-    }),
-  );
-  beam.name = "Construction beam";
-  beam.frustumCulled = false;
-  beam.renderOrder = 4;
-  beam.visible = false;
-  return beam;
-};
-
 const dashedRingAngles = (radius: number, dashLength: number, gapLength: number) => {
   const count = Math.max(8, Math.floor(Math.PI * 2 * radius / (dashLength + gapLength)));
   const step = Math.PI * 2 / count;
@@ -714,7 +705,8 @@ export class UnitSystem {
   private readonly session: MatchSession;
   private readonly ore: OrePresentation;
   private readonly oreReady: Promise<void>;
-  private readonly miningLasers: MiningLasers;
+  private readonly miningLasers: ScoutLasers;
+  private readonly scoutArms: ScoutArms;
   private readonly currentDeposits = new Map<string, TitaniumDepositState>();
   private playerTitanium: Readonly<Record<string, number>> = {};
   private readonly buildingById = new Map<string, BuildingPresentation>();
@@ -783,6 +775,7 @@ export class UnitSystem {
     () => new THREE.Vector3(),
   );
   private readonly laserStart = new THREE.Vector3();
+  private readonly workStand = new THREE.Vector3();
   private readonly laserEnd = new THREE.Vector3();
   private readonly laserDirection = new THREE.Vector3();
   private readonly turretOrigin = new THREE.Vector3();
@@ -820,7 +813,8 @@ export class UnitSystem {
     this.buildingCasualty = { kind: "turret", root: world, visual: world, height: 0, built: 1, seed: 0 };
     for (const deposit of map.titaniumDeposits ?? []) this.currentDeposits.set(deposit.id, deposit);
     this.ore = new OrePresentation(world, map, [...this.currentDeposits.values()], loadOreModels);
-    this.miningLasers = new MiningLasers(world);
+    this.miningLasers = new ScoutLasers(world, miningLook);
+    this.scoutArms = new ScoutArms(world);
     this.oreReady = this.ore.ready.then(() => {
       if (this.disposed) return;
       this.selectables.push(...this.ore.selectables);
@@ -927,6 +921,7 @@ export class UnitSystem {
     warmup.add(new THREE.Mesh(this.laserGeometry, this.laserMaterial), flash.sprite);
     warmup.add(this.behemothBarrage.prepareRendering());
     this.miningLasers.prepareRendering();
+    this.scoutArms.prepareRendering();
     const presentation = this.presentations.values().next().value;
     if (presentation) {
       const healthBar = presentation.healthBar.root.clone(true);
@@ -1024,13 +1019,7 @@ export class UnitSystem {
     visual: THREE.Object3D,
     options: UnitPresentationOptions,
   ) {
-    const constructionBeam = createConstructionBeam();
-    this.world.add(constructionBeam);
-    // The front face of the tool head, in the model's own space: its nose points along -x.
-    const nozzle = new THREE.Object3D();
-    nozzle.name = "ScoutLaserNozzle";
-    nozzle.position.set(-0.5, 0, 0);
-    visual.add(nozzle);
+    const nozzle = attachLaserNozzle(visual);
     this.attachUnit(id, root, options, {
       hover: {
         visual,
@@ -1040,10 +1029,11 @@ export class UnitSystem {
         baseRotationX: visual.rotation.x,
         baseRotationZ: visual.rotation.z,
         time: 0,
+        lift: { height: 0, speed: 0, lean: 0 },
       },
       attack: "none",
-      constructionBeam,
       harvesting: new ScoutHarvestPresentation(nozzle, this.ore, this.miningLasers, id),
+      builderWork: new BuilderWork(nozzle, this.constructionSites.effects.createList(16), this.scoutArms, id),
     });
   }
 
@@ -1115,7 +1105,7 @@ export class UnitSystem {
     behavior: Pick<
       UnitPresentation,
       "mixer" | "actions" | "hover" | "tracks" | "laser" | "barrage" | "attack"
-        | "constructionBeam" | "harvesting"
+        | "harvesting" | "builderWork"
     >,
   ) {
     const visualRoot = new THREE.Group();
@@ -1617,12 +1607,15 @@ export class UnitSystem {
         shown: this.ore.shownState(deposit.id),
       })),
       units: [...this.current].map(([id, frame]) => {
-        const harvesting = this.presentations.get(id)?.harvesting;
+        const { harvesting, builderWork } = this.presentations.get(id) ?? {};
         return {
           id,
           ...frame,
           miningLaser: harvesting?.firing
             ? { from: harvesting.emitter.toArray(), to: harvesting.contact.toArray() }
+            : undefined,
+          buildingWork: builderWork?.active
+            ? { from: builderWork.nose.toArray(), to: builderWork.contact.toArray() }
             : undefined,
         };
       }),
@@ -1679,11 +1672,12 @@ export class UnitSystem {
     this.presentationTime += deltaSeconds;
     // Deaths come first: a destroyed site's cut follows its building down.
     this.deathEffects.update(deltaSeconds);
-    // Then sites: a builder's beam ends at the height its site has reached.
+    // Then sites: a builder hovers above the height its site has reached, and its tools work on that edge.
     for (const [id, presentation] of this.buildingById) {
       this.updateConstruction(id, presentation, alpha, deltaSeconds);
     }
     this.miningLasers.begin(deltaSeconds);
+    this.scoutArms.begin();
     for (const [id, presentation] of this.presentations) {
       if (!presentation.root.visible || presentation.state === "death") continue;
       this.renderUnit(id, alpha, deltaSeconds);
@@ -1766,16 +1760,12 @@ export class UnitSystem {
     this.session.dispose?.();
     this.ore.dispose();
     this.miningLasers.dispose();
+    this.scoutArms.dispose();
     for (const presentation of this.presentations.values()) {
       presentation.mixer?.stopAllAction();
       disposeEntityOverlays(presentation);
       presentation.selectionHitbox.geometry.dispose();
       (presentation.selectionHitbox.material as THREE.Material).dispose();
-      if (presentation.constructionBeam) {
-        presentation.constructionBeam.geometry.dispose();
-        presentation.constructionBeam.material.dispose();
-        presentation.constructionBeam.removeFromParent();
-      }
     }
     for (const presentation of this.buildingById.values()) {
       if (!presentation.destroyed) disposeEntityOverlays(presentation);
@@ -2479,8 +2469,8 @@ export class UnitSystem {
     const presentation = this.presentations.get(id);
     if (!presentation) return;
     presentation.root.visible = visible;
-    if (!visible && presentation.constructionBeam) presentation.constructionBeam.visible = false;
     if (!visible) presentation.harvesting?.hide();
+    if (!visible) presentation.builderWork?.hide();
     const frame = this.current.get(id);
     if (frame?.ownerId === LOCAL_PLAYER_ID) return;
     const index = this.attackables.indexOf(presentation.root);
@@ -2494,6 +2484,9 @@ export class UnitSystem {
     const unit = this.current.get(id);
     if (!presentation || !unit) return;
     if (presentation.state === "death") return;
+    // A drone killed at work dies where it is seen: leant in to its site, and risen over it.
+    const lean = presentation.visualRoot.position.z;
+    const lift = presentation.hover?.lift?.height ?? 0;
     this.setUnitVisible(id, false);
     const selectableIndex = this.selectables.indexOf(presentation.root);
     if (selectableIndex >= 0) this.selectables.splice(selectableIndex, 1);
@@ -2503,6 +2496,8 @@ export class UnitSystem {
     // A unit killed on the move carries its momentum into its death, along the way it faced.
     const speed = this.previous.get(id)?.moving ? unit.speed : 0;
     const heading = presentation.root.rotation.y;
+    presentation.root.position.x += Math.sin(heading) * lean;
+    presentation.root.position.z += Math.cos(heading) * lean;
     const casualty = this.unitCasualty;
     casualty.kind = unit.kind;
     casualty.root = presentation.root;
@@ -2512,8 +2507,8 @@ export class UnitSystem {
     casualty.death = presentation.actions?.death;
     casualty.velocityX = Math.sin(heading) * speed;
     casualty.velocityZ = Math.cos(heading) * speed;
-    casualty.centreY = presentation.body.centre;
-    casualty.topY = presentation.body.top;
+    casualty.centreY = presentation.body.centre + lift;
+    casualty.topY = presentation.body.top + lift;
     casualty.seed = hashId(id);
     this.deathEffects.unitDied(casualty);
   }
@@ -2556,10 +2551,19 @@ export class UnitSystem {
     const turningToAttack = current.attacking || pendingShot !== undefined;
     const miningDeposit = current.harvest?.phase === "extracting"
       ? this.currentDeposits.get(current.harvest.depositId) : undefined;
+    const assigned = current.order === "build" && current.constructionTargetId
+      ? this.currentBuildings.get(current.constructionTargetId) : undefined;
+    // The site this drone was told to build, and the same site once it has arrived there.
+    const destination = assigned?.lifecycle === "constructing" ? assigned : undefined;
+    const constructionSite = current.moving ? undefined : destination;
+    // A drone at work looks at what it works on, however it happened to fly in.
+    const workplace = miningDeposit ?? constructionSite;
+    // Once its tools are out, a building drone looks at what they work on.
+    const worked = constructionSite && presentation.builderWork?.active ? presentation.builderWork.contact : undefined;
     let facingTarget = !turningToAttack;
-    if (current.moving || turningToAttack || miningDeposit) {
-      const targetX = miningDeposit ? miningDeposit.position.x / POSITION_SCALE : pendingShot?.targetX ?? current.targetX;
-      const targetZ = miningDeposit ? miningDeposit.position.z / POSITION_SCALE : pendingShot?.targetZ ?? current.targetZ;
+    if (current.moving || turningToAttack || workplace) {
+      const targetX = worked?.x ?? (workplace ? workplace.position.x / POSITION_SCALE : pendingShot?.targetX ?? current.targetX);
+      const targetZ = worked?.z ?? (workplace ? workplace.position.z / POSITION_SCALE : pendingShot?.targetZ ?? current.targetZ);
       const desired = Math.atan2(targetX - x, targetZ - z);
       const difference = Math.atan2(
         Math.sin(desired - presentation.root.rotation.y),
@@ -2589,25 +2593,7 @@ export class UnitSystem {
     }
     const { y, normal } = presentation.ground;
     presentation.root.position.set(x, y, z);
-    const constructionSite = current.constructionTargetId
-      ? this.currentBuildings.get(current.constructionTargetId)
-      : undefined;
-    if (presentation.constructionBeam) {
-      const beam = presentation.constructionBeam;
-      beam.visible = current.order === "build" && !current.moving
-        && constructionSite?.lifecycle === "constructing";
-      if (beam.visible && constructionSite) {
-        const positions = beam.geometry.getAttribute("position");
-        const siteX = constructionSite.position.x / POSITION_SCALE;
-        const siteZ = constructionSite.position.z / POSITION_SCALE;
-        positions.setXYZ(0, x, y + 1.05, z);
-        // The beam ends where the building is being built: at the rising cut.
-        const cutY = this.buildingById.get(constructionSite.id)?.construction?.site.beamTargetY
-          ?? sampleHeight(this.map, siteX, siteZ) + 0.8;
-        positions.setXYZ(1, siteX, cutY, siteZ);
-        positions.needsUpdate = true;
-      }
-    }
+    const site = destination ? this.buildingById.get(destination.id)?.construction?.site : undefined;
     localTerrainNormal.copy(normal).applyAxisAngle(WORLD_UP, -presentation.root.rotation.y);
     targetTilt.setFromUnitVectors(WORLD_UP, localTerrainNormal);
     presentation.visualRoot.quaternion.slerp(
@@ -2639,7 +2625,39 @@ export class UnitSystem {
     if (presentation.hover) {
       const hover = presentation.hover;
       hover.time += deltaSeconds;
-      hover.visual.position.y = hover.baseY + Math.sin(hover.time * 3.2) * 0.07;
+      if (hover.lift) {
+        const lift = hover.lift;
+        // A building drone hovers above the building, not the ground, so it works on the top deck
+        // from above. From the ground the hull itself hides the part being built.
+        // It starts to rise on its last metres to the site, so it arrives at the height it works at
+        // and its tools come out with the site's weld, not after it.
+        let target = 0;
+        if (site && destination && presentation.builderWork) {
+          const siteX = destination.position.x / POSITION_SCALE;
+          const siteZ = destination.position.z / POSITION_SCALE;
+          const away = Math.hypot(siteX - x, siteZ - z);
+          if (away < destination.radius / POSITION_SCALE + LIFT_APPROACH) {
+            // The height is that of the edge it reaches from where it will stand, not from where it still is.
+            const stand = Math.min(1, ((destination.radius + MELEE_REACH) / POSITION_SCALE + current.radius) / Math.max(away, 0.001));
+            this.workStand.set(siteX + (x - siteX) * stand, y, siteZ + (z - siteZ) * stand);
+            target = Math.max(0, presentation.builderWork.workHeight(site, this.workStand) - LIFT_SHORTFALL - y);
+          }
+        }
+        // A critically damped spring, solved exactly: it eases in and out and holds for any frame time.
+        // It pulls no harder than from LIFT_PULL away, so a drone leaving a tall roof glides down, not drops.
+        const decay = Math.exp(-LIFT_RESPONSIVENESS * deltaSeconds);
+        const away = THREE.MathUtils.clamp(lift.height - target, -LIFT_PULL, LIFT_PULL);
+        const drift = (lift.speed + LIFT_RESPONSIVENESS * away) * deltaSeconds;
+        const rise = (away + drift) * decay - away;
+        lift.speed = (lift.speed - LIFT_RESPONSIVENESS * drift) * decay;
+        lift.height += rise;
+        // The health bar and both ways of selecting it, a click and a box, rise with the drone.
+        // Its selection ring stays on the ground.
+        presentation.healthBar.root.position.y += rise;
+        presentation.selectionHitbox.position.y += rise;
+        presentation.root.userData.selectionCenterY += rise;
+      }
+      hover.visual.position.y = hover.baseY + (hover.lift?.height ?? 0) + Math.sin(hover.time * 3.2) * 0.07;
       const wobble = current.moving ? hover.moveWobble : undefined;
       const offset = wobble?.offset ?? 0;
       const tilt = wobble?.tilt ?? 0;
@@ -2670,6 +2688,21 @@ export class UnitSystem {
     }
     // The laser waits for the drone to face the rock, so it never leaves the nozzle sideways.
     presentation.harvesting?.update(current.health > 0 && facingTarget ? miningDeposit?.id : undefined);
+    // The same wait before a building drone's tools come out. After that the nose trails their work a little.
+    presentation.builderWork?.update(
+      current.health > 0 && constructionSite && (facingTarget || worked) ? site : undefined,
+      presentation.root.position,
+      this.presentationTime,
+      deltaSeconds,
+      presentation.visualRoot,
+    );
+    if (presentation.hover?.lift) {
+      // A drone leans in to its site by up to its own length. Its health bar and click target go with it.
+      const lean = presentation.visualRoot.position.z - presentation.hover.lift.lean;
+      presentation.hover.lift.lean += lean;
+      presentation.healthBar.root.position.z += lean;
+      presentation.selectionHitbox.position.z += lean;
+    }
     if (presentation.tracks) {
       const tracks = presentation.tracks;
       if (current.moving && tracks.lastX !== undefined && tracks.lastZ !== undefined) {
