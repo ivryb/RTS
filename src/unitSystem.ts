@@ -1201,7 +1201,7 @@ export class UnitSystem {
     const color = building.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
     // Buildings are picked by their visible model, with no invisible click helper: a helper
     // as wide as the footprint and as tall as the model covered units standing behind it.
-    const selectionRadius = (building.attackRadius ?? building.radius) / POSITION_SCALE;
+    const selectionRadius = (markerOption() ? building.radius : building.attackRadius ?? building.radius) / POSITION_SCALE;
     const selectionRing = createSelectionRing({
       radius: selectionRadius,
       offset: { x: 0, z: 0 },

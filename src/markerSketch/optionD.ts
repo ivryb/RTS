@@ -7,8 +7,9 @@ import { groundQuad } from "./stub";
 
 /**
  * Option D, "Octagon": every marker is the octagon of the Command Center and the construction
- * deck. A selection is a thin outline with heavier corners; a placement adds the building's
- * ghost and a band of hazard stripes inside the outline, quiet when valid and loud when blocked.
+ * deck. A selection is a thin outline with heavier corners. A placement adds the building's ghost,
+ * a faint fill and a fine inner rule; when it is blocked, hazard stripes fill the tray between
+ * the outline and that rule.
  */
 
 /** Metres between the radius a marker is given and its outline, so the outline never cuts the model. */
@@ -51,29 +52,33 @@ void main() {
   vec4 paint = vec4(0.0);
 
   if (pad > 0.5) {
-    paint = over(paint, color, cover(outside, blur) * mix(0.05, 0.12, blocked));
-    // The band narrows on a small pad, so a Turret's is not all stripes.
-    float width = min(mix(0.42, 0.62, blocked), apothem * 0.18);
+    paint = over(paint, color, cover(outside, blur) * mix(0.05, 0.1, blocked));
+    // A tray runs inside the outline, closed by a fine rule. It narrows on a small pad, so a
+    // Turret's is not all tray. "depth" is metres into the tray from its outer edge.
+    float width = min(0.62, apothem * 0.18);
     float depth = -outside - 0.18;
-    float band = cover(-depth, blur) * cover(depth - width, blur);
-    // A whole number of stripes per side, counted by angle, so they meet at every corner. Their
-    // lean flips from one quarter to the next, which mirrors the pattern left to right on screen;
-    // one lean all the way round lies flat along two of the sides under the tilted camera.
+    paint = over(paint, color, cover(abs(depth - width) - 0.02, blur) * 0.55);
+    // Hazard stripes fill the tray only when the placement is blocked. A whole number of stripes
+    // per side, counted by angle, so they meet at every corner. Their lean flips from one quarter
+    // to the next, which mirrors the pattern left to right on screen; one lean all the way round
+    // lies flat along two of the sides under the tilted camera.
+    float band = cover(-depth, blur) * cover(depth - width + 0.02, blur) * blocked;
     float count = max(1.0, floor(2.0 * halfSide / 0.6 + 0.5));
     float lean = 1.0 - mod(floor(atan(vWorld.y, vWorld.x) / (2.0 * EIGHTH) + 0.5), 2.0) * 2.0;
     float turns = lean * along / (2.0 * reach * HALF_SIDE) + depth / (2.0 * halfSide);
     float wave = abs(fract(count * turns) - 0.5) * 2.0;
-    float stripe = cover((wave - mix(0.36, 0.5, blocked)) * halfSide / count * 0.7, blur);
-    paint = over(paint, DARK, band * blocked * 0.8);
-    paint = over(paint, color, band * stripe * mix(0.38, 0.95, blocked));
+    float stripe = cover((wave - 0.5) * halfSide / count * 0.7, blur);
+    paint = over(paint, DARK, band * 0.8);
+    paint = over(paint, color, band * stripe * 0.95);
   }
 
-  // The outline thickens for a short tick either side of each corner.
-  float tick = clamp(halfSide * 0.3, 0.07, 0.6);
-  float corner = cover(halfSide - abs(along) - tick, blur);
-  float halfWidth = mix(0.04, 0.065, corner);
+  // The outline grows heavier for a short tick either side of each corner. On a small octagon a
+  // tick is only a dot, so its weight fades out as the side gets short: a unit's outline is plain.
+  float tick = min(halfSide * 0.3, 0.6);
+  float corner = cover(halfSide - abs(along) - tick, blur) * smoothstep(0.12, 0.4, tick);
+  float halfWidth = 0.04 + 0.04 * corner;
   paint = over(paint, DARK, cover(abs(outside) - halfWidth - 0.04, blur) * 0.3);
-  paint = over(paint, color, cover(abs(outside) - halfWidth, blur) * mix(0.85, 1.0, corner));
+  paint = over(paint, color, cover(abs(outside) - halfWidth, blur) * 0.9);
 
   if (paint.a < 0.004) discard;
   gl_FragColor = vec4(paint.rgb / paint.a, paint.a);
@@ -98,20 +103,30 @@ const octagon = (color: number, radius: number, pad: boolean) => {
 
 // The ghost is one translucent skin: a first pass fills the depth, so no inner wall shows through.
 const ghostDepth = new THREE.MeshBasicMaterial({ colorWrite: false, transparent: true });
-const ghostSkin = new THREE.ShaderMaterial({
-  uniforms: { color: { value: new THREE.Color() } },
+/** Shared by every ghost skin: the state's colour and how solid the ghost is. */
+const ghostLook = { tint: { value: new THREE.Color() }, opacity: { value: 0 } };
+
+/** The building in one colour: its own panels as light and dark, shaded by a fixed sun. */
+const ghostSkin = (map: THREE.Texture | null) => new THREE.ShaderMaterial({
+  uniforms: { map: { value: map }, ...ghostLook },
   vertexShader: /* glsl */ `
     varying vec3 vNormal;
+    varying vec2 vUv;
     void main() {
       vNormal = mat3(modelMatrix) * normal;
+      vUv = uv;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }`,
   fragmentShader: /* glsl */ `
-    uniform vec3 color;
+    uniform sampler2D map;
+    uniform vec3 tint;
+    uniform float opacity;
     varying vec3 vNormal;
+    varying vec2 vUv;
     void main() {
-      float light = 0.35 + 0.65 * max(dot(normalize(vNormal), normalize(vec3(0.35, 0.85, 0.4))), 0.0);
-      gl_FragColor = vec4(color * light, 0.5);
+      float panel = smoothstep(0.0, 0.35, dot(texture2D(map, vUv).rgb, vec3(0.2126, 0.7152, 0.0722)));
+      float light = 0.45 + 0.55 * max(dot(normalize(vNormal), normalize(vec3(0.35, 0.85, 0.4))), 0.0);
+      gl_FragColor = vec4(tint * light * mix(0.4, 1.0, panel), opacity);
       #include <colorspace_fragment>
     }`,
   transparent: true,
@@ -122,8 +137,12 @@ const ghostOf = (model: THREE.Object3D) => {
   model.traverse((child) => {
     if (child instanceof THREE.Mesh) meshes.push(child);
   });
+  const skins = new Map<THREE.Texture | null, THREE.ShaderMaterial>();
   for (const mesh of meshes) {
-    mesh.material = ghostSkin;
+    const map = mesh.material instanceof THREE.MeshStandardMaterial ? mesh.material.map : null;
+    let skin = skins.get(map);
+    if (!skin) skins.set(map, skin = ghostSkin(map));
+    mesh.material = skin;
     mesh.castShadow = false;
     mesh.renderOrder = 3;
     const depth = new THREE.Mesh(mesh.geometry, ghostDepth);
@@ -157,7 +176,10 @@ export const optionD: MarkerOption = {
         uniforms.apothem.value = radius + PAD;
         uniforms.blocked.value = valid ? 0 : 1;
         placeGroundGeometry(pad.geometry, groundY, extent(radius));
-        ghostSkin.uniforms.color.value.setHex(color);
+        // A blocked ghost keeps a little of the valid one's pale cast under its red, so the model's
+        // panels still read against the red pad.
+        ghostLook.tint.value.setHex(UI_SELECTION_COLOR).lerp(uniforms.color.value, 0.88);
+        ghostLook.opacity.value = valid ? 0.38 : 0.42;
         let current = ghosts.get(kind);
         if (!current) {
           current = new THREE.Group();
