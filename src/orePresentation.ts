@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import { sampleHeight } from "./map";
+import { markerOption } from "./markerSketch";
 import type { TerrainSurface } from "./terrainWalkability";
 import type { TitaniumDepositState } from "./sim/harvesting";
 import { POSITION_SCALE } from "./sim/simulationConstants";
@@ -177,10 +178,11 @@ export class OrePresentation {
       const z = deposit.position.z / POSITION_SCALE;
       const y = sampleHeight(map, x, z);
       root.position.set(x, y, z);
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(radius + 0.15, radius + 0.24, 64).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: UI_SELECTION_COLOR, depthWrite: false, transparent: true, opacity: 0.85 }),
-      );
+      const ring = markerOption()?.selection({ radius, color: UI_SELECTION_COLOR, target: "deposit", friendly: false })
+        ?? new THREE.Mesh(
+          new THREE.RingGeometry(radius + 0.15, radius + 0.24, 64).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: UI_SELECTION_COLOR, depthWrite: false, transparent: true, opacity: 0.85 }),
+        );
       ring.userData.selectionOverlay = true;
       ring.visible = false;
       prepareGroundOverlay(ring);

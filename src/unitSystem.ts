@@ -1,5 +1,6 @@
 import { AttackAreaMarker } from "./attackAreaMarker";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
+import { markerOption, type MarkerTarget } from "./markerSketch";
 import * as THREE from "three";
 import { OrderMarker } from "./orderMarker";
 import { attachLaserNozzle, miningLook, ScoutLasers } from "./scoutLaser";
@@ -351,7 +352,16 @@ const createGlowTexture = () => {
   return texture;
 };
 
-export const createSelectionRing = ({ radius, offset }: UnitPresentationOptions["selectionRing"], color = UI_SELECTION_COLOR) => {
+export const createSelectionRing = (
+  { radius, offset }: UnitPresentationOptions["selectionRing"],
+  color = UI_SELECTION_COLOR,
+  target: MarkerTarget = "unit",
+) => {
+  const sketch = markerOption()?.selection({ radius, color, target, friendly: color === UI_SELECTION_COLOR });
+  if (sketch) {
+    sketch.position.set(offset.x, 0, offset.z);
+    return sketch;
+  }
   const geometry = new THREE.RingGeometry(radius, radius + 0.10, 48);
   geometry.rotateX(-Math.PI / 2);
   const ring = new THREE.Mesh(
@@ -726,6 +736,11 @@ export class UnitSystem {
   private readonly attackGroundMarker = new AttackAreaMarker();
   private groundFeedbackGrace = 0;
   private readonly constructionPreview = createConstructionPreview();
+  private readonly sketchPlacement = markerOption()?.placement(async (kind) => {
+    const model = await this.createBuildingPresentation?.({ kind } as BuildingState);
+    if (!model) throw new Error(`No model for ${kind}`);
+    return model;
+  });
   private readonly constructionSites: ConstructionSites;
   private readonly deathEffects: DeathEffects;
   private readonly unitCasualty: UnitCasualty;
@@ -903,7 +918,9 @@ export class UnitSystem {
       this.attackGroundMarker,
       this.constructionPreview,
       this.combinedRangeIndicator,
+      ...(this.sketchPlacement ? [this.sketchPlacement.object] : []),
     );
+    if (this.sketchPlacement) this.sketchPlacement.object.visible = false;
     this.syncSessionFrame();
   }
 
@@ -1188,7 +1205,7 @@ export class UnitSystem {
     const selectionRing = createSelectionRing({
       radius: selectionRadius,
       offset: { x: 0, z: 0 },
-    }, color);
+    }, color, "building");
     const healthBar = createHealthBar(height + 0.65, Math.max(1.8, selectionRadius * 1.25));
     const weaponDefinition = BUILDING_DEFINITIONS[building.kind].weapon;
     const weaponRange = building.weapon?.range
@@ -1339,6 +1356,12 @@ export class UnitSystem {
     }
     const valid = this.constructionPlacementValid(kind, x, z);
     const definition = BUILDING_DEFINITIONS[kind];
+    if (this.sketchPlacement) {
+      this.sketchPlacement.object.position.set(x, 0, z);
+      this.sketchPlacement.show({ kind, groundY: sampleHeight(this.map, x, z), radius: definition.radius, valid });
+      this.sketchPlacement.object.visible = true;
+      return valid;
+    }
     this.constructionPreview.position.set(x, 0, z);
     this.constructionPreview.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -1358,6 +1381,7 @@ export class UnitSystem {
 
   hideConstructionPreview() {
     this.constructionPreview.visible = false;
+    if (this.sketchPlacement) this.sketchPlacement.object.visible = false;
   }
 
   buildSelected(
@@ -2085,7 +2109,7 @@ export class UnitSystem {
       this.attackFeedback.visible = false;
       this.attackGroundPreview.visible = false;
       this.attackGroundMarker.visible = false;
-      this.constructionPreview.visible = false;
+      this.hideConstructionPreview();
       for (const resolve of this.pendingCommandResults.values()) resolve(false);
       this.pendingCommandResults.clear();
     }
