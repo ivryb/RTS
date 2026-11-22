@@ -96,7 +96,8 @@ export const demoAssets: DemoAsset[] = [
     presentation: {
       terrainAlignment: 1,
       turnResponsiveness: 6,
-      selectionRing: { radius: 1.5969096, offset: { x: 0, z: 0 } },
+      // Wider than the hull's 1.75 m half-length: any less and the tracks lie on the marker's brackets.
+      selectionRing: { radius: 1.9, offset: { x: 0, z: 0 } },
       selectionHitbox: {
         radius: 1.5243228,
         height: 2.63952,
@@ -117,7 +118,9 @@ export const demoAssets: DemoAsset[] = [
     presentation: {
       terrainAlignment: 0,
       turnResponsiveness: 16,
-      selectionRing: { radius: 0.966, offset: { x: 0, z: 0 } },
+      // The ground a Hornet holds in a formation. Any smaller and its marker passes for the
+      // marker of a Ghostrunner standing under the hull.
+      selectionRing: { radius: 1.3, offset: { x: 0, z: 0 } },
       selectionHitbox: {
         radius: 1.694,
         height: 2.002,

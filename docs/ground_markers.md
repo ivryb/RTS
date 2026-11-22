@@ -6,6 +6,7 @@ Every marker on the ground (unit, building and Titanium Deposit selection, and t
 
 - **Selection** is a ring broken into four bracket arcs. The gaps face screen-up, screen-down, screen-left and screen-right, whichever way the unit or building faces, so every marker matches on screen. It is the round cousin of the attack-target brackets in `src/orderMarker.ts`.
 - **A unit shows only the two near brackets**, the ones on the camera's side, on its body radius, and each stops 52 degrees from screen-down instead of running on to the unit's side. The far two hide behind its body, and in a tight squad four brackets per unit join into a chain-link net. Run to the sides, the near two end about 0.1 m from the next unit's (Ghostrunners stand 1.2 m apart on a 0.56 m body radius) and a selected row reads as one scalloped line. Cut short, 0.32 m of sand separates neighbours, more than the 0.25 m gap between a unit's own two brackets, so each pair reads as one unit's.
+- **A unit's marker is wider than its hull**, or the hull lies on the brackets. A ground vehicle's radius clears the longer half of its hull: the Behemoth's hull is 3.5 m long, and on its old 1.6 m radius the tracks covered one bracket when it stood alone and both in an army. On 1.9 m the brackets pass round its nose, and two Behemoths side by side, 3.35 m apart, keep 0.36 m of sand between their markers. A hovering unit hides only the ground behind its marker, so its radius is the ground it holds in a formation: 1.3 m for the Hornet. On 0.97 m its marker spanned 1.5 m under a 3.7 m hull and, in an army, passed for the marker of the Ghostrunner standing under it. The radii are `selectionRing.radius` in `src/modelAssets.ts`, which also sets the width of the unit's health bar and the patch of ground a vehicle tilts to.
 - **One stroke** on every marker, never scaled by the radius, with a thin dark keyline under it so off-white holds on bright sand. On a building or deposit the brackets sit a fixed 0.1 m outside the footprint. The stroke is 0.09 m of ground, so the tilted camera draws it about 2 px wide where a bracket runs up the screen and about 1.6 px where it runs across. That is the same on every marker and is not a difference in weight.
 - **Buildings are marked at their real footprint** (`radius`, Command Center 5.58 m, Turret 1.8 m), not their attack radius, so the selection marker and the placement cursor outline the same ground.
 - **Colour means owner:** off-white (`UI_SELECTION_COLOR`) for the local player and for resources, red (`UI_ATTACK_COLOR`) for the enemy and for blocked placement.
@@ -15,7 +16,7 @@ Every marker on the ground (unit, building and Titanium Deposit selection, and t
 
 `src/groundMarkers.ts` owns all of it: `createSelectionMarker` for units, buildings and deposits, and `PlacementCursor` for placement. `tools/verify/specs/ground-markers.spec.ts` captures states 1 to 6 below to `art/workbench/verify/ground-markers/`; after any change to the markers, run it on `main` and on your branch and compare the two sets. State 7 has no capture; a test in `tests/unitPresentation.test.ts` checks that the cursor stays flat over ridges.
 
-Ivan approved the look from a sketch of four brackets on everything. Four things were decided while building it and wait for his review: units show two brackets instead of four, those two stop short of the unit's sides, they sit on the body radius with no pad, and the ghost's shading.
+Ivan approved the look from a sketch of four brackets on everything. Five things were decided while building it and wait for his review: units show two brackets instead of four, those two stop short of the unit's sides, they sit on the body radius with no pad, the Behemoth's and the Hornet's wider markers (and with them wider health bars), and the ghost's shading.
 
 ## States
 
@@ -23,7 +24,7 @@ Ivan approved the look from a sketch of four brackets on everything. Four things
 2. Placement, blocked: Command Center and Turret.
 3. Selection of one of the player's buildings.
 4. Selection of a Titanium Deposit.
-5. Selection of one unit, of a close squad (three Ghostrunners and a Scout Drone), of 24 units in their tightest formation, and of an army with every unit size.
+5. Selection of one unit, of a close squad (three Ghostrunners and a Scout Drone), of 24 units in their tightest formation, of a Behemoth and a Hornet each alone, and of an army with every unit size.
 6. Selection of an enemy unit and building (red).
 7. Placement over a slope or rock edge.
 
