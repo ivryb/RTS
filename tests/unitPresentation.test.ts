@@ -11,6 +11,7 @@ import {
   type PlayerCommand,
   type UnitState,
 } from "../src/sim/units";
+import { BUILDING_DEFINITIONS } from "../src/sim/construction";
 import { pickSurface, selectableEntityId } from "../src/unitInput";
 import { UnitSystem, createHealthBar, updateHealthBar, type UnitPresentationOptions, type UnitSpawn } from "../src/unitSystem";
 import type { OreModelLoader } from "../src/orePresentation";
@@ -1186,8 +1187,8 @@ describe("unit presentation timing", () => {
       maxHealth: 2_500,
     })]);
     const buildingSelectionRing = buildingRoot.getObjectByName("Selection ring") as THREE.Mesh<
-      THREE.RingGeometry,
-      THREE.MeshBasicMaterial
+      THREE.BufferGeometry,
+      THREE.Material
     >;
     expect(buildingSelectionRing.visible).toBe(true);
     expect(buildingHealth.visible).toBe(true);
@@ -1200,7 +1201,7 @@ describe("unit presentation timing", () => {
     expect([healthBackground.renderOrder, healthFill.renderOrder]).toEqual(layerOrder);
     expect(healthFill.renderOrder).toBeGreaterThan(healthBackground.renderOrder);
     expect(healthFill.position.z).toBe(0);
-    expect(buildingSelectionRing.material.polygonOffset).toBe(true);
+    expect(buildingSelectionRing.material.depthTest).toBe(false);
     expect(unitHealth.visible).toBe(true);
     expect(buildingHealth.visible).toBe(false);
 
@@ -2125,7 +2126,7 @@ describe("unit presentation timing", () => {
 });
 
 
-test("construction preview stays planar over ridges for both building sizes and the blocked cross", () => {
+test("construction placement cursor stays flat over ridges and spans the footprint of both building sizes", () => {
   const scout = unit("scout-drone");
   const session = new TestSession(frame(1, scout, []));
   const world = new THREE.Group();
@@ -2139,7 +2140,7 @@ test("construction preview stays planar over ridges for both building sizes and 
     system.previewConstruction(kind, 0, 0);
     const preview = world.getObjectByName("Construction placement")!;
     preview.updateMatrixWorld(true);
-    let checked = 0;
+    const reach = new THREE.Box3();
     preview.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const positions = object.geometry.getAttribute("position");
@@ -2147,9 +2148,13 @@ test("construction preview stays planar over ridges for both building sizes and 
       for (let i = 0; i < positions.count; i++) {
         const point = object.localToWorld(new THREE.Vector3().fromBufferAttribute(positions, i));
         expect(point.y).toBeCloseTo(sampleHeight(terrain, 0, 0) + .1, 5);
-        checked++;
+        reach.expandByPoint(point);
       }
     });
-    expect(checked).toBeGreaterThan(100);
+    const footprint = BUILDING_DEFINITIONS[kind].radius;
+    expect(reach.min.x).toBeLessThan(-footprint);
+    expect(reach.max.x).toBeGreaterThan(footprint);
+    expect(reach.min.z).toBeLessThan(-footprint);
+    expect(reach.max.z).toBeGreaterThan(footprint);
   }
 });

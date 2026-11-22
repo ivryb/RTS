@@ -1,7 +1,8 @@
 import { AttackAreaMarker } from "../../src/attackAreaMarker";
 import { placeGroundGeometry } from "../../src/groundOverlay";
 import * as THREE from "three";
-import { createHealthBar, updateHealthBar, createRangeIndicator, createSelectionRing } from "../../src/unitSystem";
+import { createSelectionMarker } from "../../src/groundMarkers";
+import { createHealthBar, updateHealthBar, createRangeIndicator } from "../../src/unitSystem";
 import { OrderMarker } from "../../src/orderMarker";
 import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import type { UnitKind } from "../../src/sim/unitDefinitions";
@@ -243,8 +244,7 @@ if (previewScene === "units" && (requestedEffect === "orders-hill" || requestedE
   if (requestedEffect === "orders-mountain") {
     const scout = scene.getObjectByName("Scout Drone preview 1")!;
     scout.position.set(hillside.x, sampleHeight(map, hillside.x, hillside.z), hillside.z);
-    const ring = createSelectionRing({ radius: 1, offset: { x: 0, z: 0 } });
-    placeGroundGeometry(ring.geometry, 0);
+    const ring = createSelectionMarker("unit", 1);
     ring.visible = true;
     scout.add(ring);
   }

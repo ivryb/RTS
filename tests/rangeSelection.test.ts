@@ -107,7 +107,7 @@ test("range shape and dot dimensions remain stable at different mountain elevati
   }
 });
 
-test("Scout selection stays centered and circular on steep terrain while turning", () => {
+test("Scout selection stays flat on the ground and centered on steep terrain while turning", () => {
   const mountain = { ...map, heights: new Float32Array([0, 60, 20, 90]) };
   const units = [spawn("scout", "scout-drone", 8, 12)];
   const world = new THREE.Group();
@@ -122,14 +122,12 @@ test("Scout selection stays centered and circular on steep terrain while turning
     system.update(0);
     const ring = root.getObjectByName("Selection ring") as THREE.Mesh;
     expect(ring.visible).toBe(true);
+    root.updateWorldMatrix(true, true);
     const positions = ring.geometry.getAttribute("position");
     for (let i = 0; i < positions.count; i++) {
-      const radius = Math.hypot(positions.getX(i), positions.getZ(i));
-      expect(radius).toBeGreaterThan(.9999);
-      expect(radius).toBeLessThan(1.1001);
-      expect(positions.getY(i)).toBeCloseTo(.1, 5);
+      const point = ring.localToWorld(new THREE.Vector3().fromBufferAttribute(positions, i));
+      expect(point.y).toBeCloseTo(root.position.y + .1, 4);
     }
-    root.updateWorldMatrix(true, true);
     const center = new THREE.Box3().setFromObject(ring).getCenter(new THREE.Vector3());
     expect(center.x).toBeCloseTo(root.position.x, 4);
     expect(center.z).toBeCloseTo(root.position.z, 4);
