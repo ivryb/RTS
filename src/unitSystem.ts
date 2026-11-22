@@ -1,6 +1,6 @@
 import { AttackAreaMarker } from "./attackAreaMarker";
 import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
-import { markerOption, type MarkerTarget } from "./markerSketch";
+import { createSelectionMarker, PlacementCursor } from "./groundMarkers";
 import * as THREE from "three";
 import { OrderMarker } from "./orderMarker";
 import { attachLaserNozzle, miningLook, ScoutLasers } from "./scoutLaser";
@@ -111,7 +111,7 @@ export interface WorldBuilding {
  * buildings of its kind, so UnitSystem never edits or disposes them.
  */
 export type BuildingPresentationFactory = (
-  building: BuildingState,
+  building: Pick<BuildingState, "kind">,
 ) => THREE.Group | Promise<THREE.Group>;
 
 export type MatchOutcome = "victory" | "defeat" | "draw";
@@ -243,7 +243,6 @@ interface UnitPresentation {
     y: number;
     normal: THREE.Vector3;
   };
-  selectionGround?: { x: number; z: number; rotation: number };
   rangeGround?: { x: number; z: number };
 }
 
@@ -350,40 +349,6 @@ const createGlowTexture = () => {
   const texture = new THREE.DataTexture(data, size, size);
   texture.needsUpdate = true;
   return texture;
-};
-
-export const createSelectionRing = (
-  { radius, offset }: UnitPresentationOptions["selectionRing"],
-  color = UI_SELECTION_COLOR,
-  target: MarkerTarget = "unit",
-) => {
-  const sketch = markerOption()?.selection({ radius, color, target, friendly: color === UI_SELECTION_COLOR });
-  if (sketch) {
-    sketch.position.set(offset.x, 0, offset.z);
-    return sketch;
-  }
-  const geometry = new THREE.RingGeometry(radius, radius + 0.10, 48);
-  geometry.rotateX(-Math.PI / 2);
-  const ring = new THREE.Mesh(
-    geometry,
-    new THREE.MeshBasicMaterial({
-      color,
-      toneMapped: false,
-      depthWrite: false,
-      opacity: 0.9,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-      side: THREE.DoubleSide,
-      transparent: true,
-    }),
-  );
-  ring.position.set(offset.x, 0, offset.z);
-  ring.name = "Selection ring";
-  ring.userData.selectionOverlay = true;
-  prepareGroundOverlay(ring);
-  ring.visible = false;
-  return ring;
 };
 
 const healthBarMaterial = (color: number) => new THREE.SpriteMaterial({
@@ -589,21 +554,6 @@ export const createAttackGroundIndicator = () => {
   return marker;
 };
 
-const createConstructionPreview = () => {
-  const preview = createGroundDisc(1, 0.08, 0.8, UI_SELECTION_COLOR);
-  const blocked = new THREE.Group();
-  blocked.name = "Blocked placement";
-  for (const angle of [-Math.PI / 4, Math.PI / 4]) {
-    const geometry = new THREE.PlaneGeometry(.1, 1.3);
-    geometry.rotateX(-Math.PI / 2);
-    geometry.rotateY(angle);
-    const stroke = new THREE.Mesh(geometry, createRangeMaterial());
-    blocked.add(stroke);
-  }
-  preview.add(blocked);
-  return preview;
-};
-
 const RANGE_HALF_WIDTH = 0.075;
 const RANGE_DASH_LENGTH = 0.15;
 const RANGE_GAP_LENGTH = 1.05;
@@ -735,12 +685,7 @@ export class UnitSystem {
   private readonly attackGroundPreview = createAttackGroundIndicator();
   private readonly attackGroundMarker = new AttackAreaMarker();
   private groundFeedbackGrace = 0;
-  private readonly constructionPreview = createConstructionPreview();
-  private readonly sketchPlacement = markerOption()?.placement(async (kind) => {
-    const model = await this.createBuildingPresentation?.({ kind } as BuildingState);
-    if (!model) throw new Error(`No model for ${kind}`);
-    return model;
-  });
+  private readonly placementCursor = new PlacementCursor((kind) => this.createBuildingPresentation?.({ kind }));
   private readonly constructionSites: ConstructionSites;
   private readonly deathEffects: DeathEffects;
   private readonly unitCasualty: UnitCasualty;
@@ -907,7 +852,6 @@ export class UnitSystem {
     );
     this.combinedRangeIndicator.name = "Combined attack range";
     this.combinedRangeIndicator.visible = false;
-    this.constructionPreview.name = "Construction placement";
     this.attackGroundPreview.name = "Ground attack preview";
     this.rallyMarker.name = "Rally point";
     this.world.add(
@@ -916,11 +860,9 @@ export class UnitSystem {
       this.rallyMarker,
       this.attackGroundPreview,
       this.attackGroundMarker,
-      this.constructionPreview,
+      this.placementCursor,
       this.combinedRangeIndicator,
-      ...(this.sketchPlacement ? [this.sketchPlacement.object] : []),
     );
-    if (this.sketchPlacement) this.sketchPlacement.object.visible = false;
     this.syncSessionFrame();
   }
 
@@ -1132,7 +1074,8 @@ export class UnitSystem {
     root.add(visualRoot);
     const unit = this.current.get(id);
     const color = unit?.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
-    const selectionRing = createSelectionRing(options.selectionRing, color);
+    const selectionRing = createSelectionMarker("unit", options.selectionRing.radius, color);
+    selectionRing.position.set(options.selectionRing.offset.x, 0, options.selectionRing.offset.z);
     const healthBar = createHealthBar(
       options.selectionHitbox.offset.y + options.selectionHitbox.height / 2 + 0.3,
       Math.max(1, options.selectionRing.radius * 1.5),
@@ -1201,12 +1144,11 @@ export class UnitSystem {
     const color = building.ownerId === LOCAL_PLAYER_ID ? UI_SELECTION_COLOR : UI_ATTACK_COLOR;
     // Buildings are picked by their visible model, with no invisible click helper: a helper
     // as wide as the footprint and as tall as the model covered units standing behind it.
-    const selectionRadius = (markerOption() ? building.radius : building.attackRadius ?? building.radius) / POSITION_SCALE;
-    const selectionRing = createSelectionRing({
-      radius: selectionRadius,
-      offset: { x: 0, z: 0 },
-    }, color, "building");
-    const healthBar = createHealthBar(height + 0.65, Math.max(1.8, selectionRadius * 1.25));
+    const selectionRing = createSelectionMarker("footprint", building.radius / POSITION_SCALE, color);
+    const healthBar = createHealthBar(
+      height + 0.65,
+      Math.max(1.8, (building.attackRadius ?? building.radius) / POSITION_SCALE * 1.25),
+    );
     const weaponDefinition = BUILDING_DEFINITIONS[building.kind].weapon;
     const weaponRange = building.weapon?.range
       ?? (weaponDefinition ? weaponDefinition.range * POSITION_SCALE : undefined);
@@ -1355,33 +1297,12 @@ export class UnitSystem {
       return false;
     }
     const valid = this.constructionPlacementValid(kind, x, z);
-    const definition = BUILDING_DEFINITIONS[kind];
-    if (this.sketchPlacement) {
-      this.sketchPlacement.object.position.set(x, 0, z);
-      this.sketchPlacement.show({ kind, groundY: sampleHeight(this.map, x, z), radius: definition.radius, valid });
-      this.sketchPlacement.object.visible = true;
-      return valid;
-    }
-    this.constructionPreview.position.set(x, 0, z);
-    this.constructionPreview.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        prepareGroundOverlay(child);
-        placeGroundGeometry(child.geometry, sampleHeight(this.map, x, z), definition.radius);
-      }
-    });
-    for (const child of this.constructionPreview.children) {
-      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-        child.material.color.setHex(valid ? UI_SELECTION_COLOR : UI_ATTACK_COLOR);
-      }
-    }
-    this.constructionPreview.getObjectByName("Blocked placement")!.visible = !valid;
-    this.constructionPreview.visible = true;
+    this.placementCursor.show(kind, { x, y: sampleHeight(this.map, x, z), z }, valid);
     return valid;
   }
 
   hideConstructionPreview() {
-    this.constructionPreview.visible = false;
-    if (this.sketchPlacement) this.sketchPlacement.object.visible = false;
+    this.placementCursor.visible = false;
   }
 
   buildSelected(
@@ -2298,15 +2219,12 @@ export class UnitSystem {
     root.rotation.y = building.rotation;
     root.visible = building.health > 0;
     const presentation = this.buildingById.get(building.id);
-    if (presentation) {
-      placeGroundGeometry(presentation.selectionRing.geometry, 0);
-      if (presentation.rangeIndicator) {
-        placeGroundOverlay(
-          presentation.rangeIndicator,
-          this.map,
-          root.position,
-        );
-      }
+    if (presentation?.rangeIndicator) {
+      placeGroundOverlay(
+        presentation.rangeIndicator,
+        this.map,
+        root.position,
+      );
     }
     const attackableIndex = this.attackables.indexOf(root);
     const attackable = root.visible && building.ownerId !== LOCAL_PLAYER_ID;
@@ -2626,14 +2544,6 @@ export class UnitSystem {
         ? 1 - Math.exp(-deltaSeconds * TERRAIN_TILT_RESPONSIVENESS)
         : 1,
     );
-    if (presentation.selectionRing.visible) {
-      const rotation = presentation.root.rotation.y;
-      const previous = presentation.selectionGround;
-      if (!previous || previous.x !== x || previous.z !== z || previous.rotation !== rotation) {
-        placeGroundGeometry(presentation.selectionRing.geometry, 0);
-        presentation.selectionGround = { x, z, rotation };
-      }
-    }
     if (presentation.rangeIndicator?.visible) {
       presentation.rangeIndicator.rotation.y = -presentation.root.rotation.y;
       const previous = presentation.rangeGround;
