@@ -9,7 +9,7 @@ import {
  * in the full render: the placement cursor (valid and blocked, both buildings), and the selection
  * of a building, a Titanium Deposit, an enemy unit and building, a squad, a crowd of 24 in its
  * tightest formation, and an army with every unit size.
- * Writes art/workbench/verify/ground-markers/<state>.jpg. Compare them with the last accepted set.
+ * Writes art/workbench/verify/ground-markers/<state>.jpg. Run it on main and on a branch and compare.
  */
 const evidenceDir = "art/workbench/verify/ground-markers";
 const WIDE = { width: 900, height: 600 };
