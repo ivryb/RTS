@@ -8,12 +8,14 @@ import {
  * Regression capture of every ground marker in docs/ground_markers.md, at the default camera and
  * in the full render: the placement cursor (valid and blocked, both buildings), and the selection
  * of a building, a Titanium Deposit, an enemy unit and building, a squad, a crowd of 24 in its
- * tightest formation, and an army with every unit size.
+ * tightest formation, an army with every unit size, and each vehicle alone.
  * Writes art/workbench/verify/ground-markers/<state>.jpg. Run it on main and on a branch and compare.
  */
 const evidenceDir = "art/workbench/verify/ground-markers";
 const WIDE = { width: 900, height: 600 };
 const CLOSE = { width: 600, height: 400 };
+/** One vehicle and the sand around it. */
+const LONE = { width: 360, height: 240 };
 
 type Ground = { x: number; z: number };
 
@@ -47,13 +49,16 @@ const centreOf = (points: readonly Ground[]): Ground => ({
   z: points.reduce((sum, point) => sum + point.z, 0) / points.length,
 });
 
-/** Centres the camera on the units and box-selects them, failing at once if any is left out. */
+/**
+ * Centres the camera on the units and box-selects them, failing at once if any is left out.
+ * One unit is clicked: a box round a single unit is drawn at its feet and misses a hovering hull.
+ */
 const selectAll = async (page: Page, ids: string[]) => {
   const units = (await snapshot(page)).units.filter((unit) => ids.includes(unit.id));
   const centre = centreOf(units);
   await look(page, centre);
   await page.keyboard.press("Escape");
-  await dragSelectUnits(page, ids);
+  await (ids.length === 1 ? clickEntity(page, ids[0]!) : dragSelectUnits(page, ids));
   const { unitIds } = (await snapshot(page)).selected;
   const missed = ids.filter((id) => !unitIds.includes(id));
   if (missed.length) throw new Error(`selectAll: left out [${missed}]`);
@@ -151,4 +156,18 @@ test("ground-markers", async ({ page }) => {
   // Every unit size in one selection.
   const army = await train(["hornet", "behemoth"]);
   await shoot(page, "army", await gatherAt(page, army, field, 14), CLOSE);
+
+  // Each vehicle alone, on the open sand in front of the Command Center.
+  const gathered = (await snapshot(page)).units.filter((unit) => army.includes(unit.id));
+  for (const [kind, sand] of [
+    ["hornet", { x: base.x - 1, z: base.z + 19 }],
+    ["behemoth", { x: base.x + 10, z: base.z + 13 }],
+  ] as const) {
+    const vehicle = gathered.find((unit) => unit.kind === kind)!;
+    const stand = await gatherAt(page, [vehicle.id], sand, 2);
+    // The destination flag stays for 0.7 s of game time, 14 frames, which take Boat about 7 s:
+    // longer than these short trips.
+    await page.waitForTimeout(8000);
+    await shoot(page, kind, stand, LONE);
+  }
 });
