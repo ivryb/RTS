@@ -685,7 +685,7 @@ export class UnitSystem {
   private readonly attackGroundPreview = createAttackGroundIndicator();
   private readonly attackGroundMarker = new AttackAreaMarker();
   private groundFeedbackGrace = 0;
-  private readonly placementCursor = new PlacementCursor((kind) => this.createBuildingPresentation?.({ kind }));
+  private readonly placementCursor: PlacementCursor;
   private readonly constructionSites: ConstructionSites;
   private readonly deathEffects: DeathEffects;
   private readonly unitCasualty: UnitCasualty;
@@ -850,6 +850,7 @@ export class UnitSystem {
         ...(commandCenterPlayers.length > 1 ? { commandCenterElimination: commandCenterPlayers } : {}),
       },
     );
+    this.placementCursor = new PlacementCursor(createBuildingPresentation);
     this.combinedRangeIndicator.name = "Combined attack range";
     this.combinedRangeIndicator.visible = false;
     this.attackGroundPreview.name = "Ground attack preview";

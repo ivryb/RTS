@@ -4,6 +4,7 @@ import { placeGroundGeometry, prepareGroundOverlay } from "./groundOverlay";
 import { BUILDING_DEFINITIONS } from "./sim/construction";
 import type { BuildingKind } from "./sim/units";
 import { UI_ATTACK_COLOR, UI_SELECTION_COLOR } from "./uiColors";
+import type { BuildingPresentationFactory } from "./unitSystem";
 
 /**
  * The Reticle, the one language of every marker on the ground (docs/ground_markers.md): a ring
@@ -233,9 +234,6 @@ const dressAsGhost = (model: THREE.Object3D, look: ReturnType<typeof ghostLook>)
   return model;
 };
 
-/** Resolves to a model of the building that the cursor may dress as it likes, or nothing when the match has no models. */
-export type GhostModelLoader = (kind: BuildingKind) => THREE.Object3D | Promise<THREE.Object3D> | undefined;
-
 /**
  * The cursor that follows the pointer while the player places a building: its ghost, a measured
  * ring on the footprint the placement rules test, and the brackets that frame it. Blocked turns
@@ -248,7 +246,8 @@ export class PlacementCursor extends THREE.Group {
   private readonly ghostLook = ghostLook();
   private readonly ghosts = new Map<BuildingKind, THREE.Group>();
 
-  constructor(private readonly loadModel: GhostModelLoader) {
+  /** `loadModel` gives a fresh model of a building that the cursor may dress as it likes; without it there is no ghost. */
+  constructor(private readonly loadModel?: BuildingPresentationFactory) {
     super();
     this.name = "Construction placement";
     this.visible = false;
@@ -282,7 +281,7 @@ export class PlacementCursor extends THREE.Group {
     this.ghosts.set(kind, ghost);
     this.add(ghost);
     // A model that fails to load leaves the reticle alone, which still places the building.
-    void Promise.resolve(this.loadModel(kind)).then(
+    void Promise.resolve(this.loadModel?.({ kind })).then(
       (model) => { if (model) ghost.add(dressAsGhost(model, this.ghostLook)); },
       () => {},
     );

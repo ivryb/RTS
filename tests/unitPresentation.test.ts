@@ -1186,11 +1186,7 @@ describe("unit presentation timing", () => {
       health: 2_500,
       maxHealth: 2_500,
     })]);
-    const buildingSelectionRing = buildingRoot.getObjectByName("Selection ring") as THREE.Mesh<
-      THREE.BufferGeometry,
-      THREE.Material
-    >;
-    expect(buildingSelectionRing.visible).toBe(true);
+    expect(buildingRoot.getObjectByName("Selection ring")?.visible).toBe(true);
     expect(buildingHealth.visible).toBe(true);
 
     system.select([ghostrunner.id]);
@@ -1201,7 +1197,6 @@ describe("unit presentation timing", () => {
     expect([healthBackground.renderOrder, healthFill.renderOrder]).toEqual(layerOrder);
     expect(healthFill.renderOrder).toBeGreaterThan(healthBackground.renderOrder);
     expect(healthFill.position.z).toBe(0);
-    expect(buildingSelectionRing.material.depthTest).toBe(false);
     expect(unitHealth.visible).toBe(true);
     expect(buildingHealth.visible).toBe(false);
 

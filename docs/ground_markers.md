@@ -13,7 +13,7 @@ Every marker on the ground (unit, building and Titanium Deposit selection, and t
 - **Blocked placement** turns everything red, replaces the ticks with diagonal hatching across the footprint and darkens it, so the state differs in pattern and brightness as well as hue. The ghost turns pale red and more solid, so the building still reads over the hatching.
 - Health bars and rally flags are unchanged.
 
-`src/groundMarkers.ts` owns all of it: `createSelectionMarker` for units, buildings and deposits, and `PlacementCursor` for placement. `tools/verify/specs/ground-markers.spec.ts` captures states 1 to 6 below to `art/workbench/verify/ground-markers/`; run it after any change to the markers and compare with the last accepted set. State 7 has no capture; a test in `tests/unitPresentation.test.ts` checks that the cursor stays flat over ridges.
+`src/groundMarkers.ts` owns all of it: `createSelectionMarker` for units, buildings and deposits, and `PlacementCursor` for placement. `tools/verify/specs/ground-markers.spec.ts` captures states 1 to 6 below to `art/workbench/verify/ground-markers/`; after any change to the markers, run it on `main` and on your branch and compare the two sets. State 7 has no capture; a test in `tests/unitPresentation.test.ts` checks that the cursor stays flat over ridges.
 
 Ivan approved the look from a sketch of four brackets on everything. Three things were decided while building it and wait for his review: units show two brackets instead of four, their brackets sit on the body radius with no pad, and the ghost's shading.
 
