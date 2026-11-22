@@ -332,8 +332,8 @@ const cameras = viewHeights.map((viewHeight, index) => {
     0.1,
     360,
   );
-  const elevation = requestedEffect === "orders-hill" || requestedEffect === "attack-target"
-    || previewScene === "mining"
+  const elevation = requestedEffect === "orders-hill" || requestedEffect === "orders-mountain"
+    || requestedEffect === "attack-target" || previewScene === "mining"
     ? sampleHeight(map, target.x, target.z) + 1 : 0;
   camera.position.set(target.x + 46, 58 + elevation, target.z + 46);
   camera.lookAt(target.x, elevation, target.z);
