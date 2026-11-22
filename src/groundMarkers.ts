@@ -9,8 +9,8 @@ import type { BuildingPresentationFactory } from "./unitSystem";
 /**
  * The Reticle, the one language of every marker on the ground (docs/ground_markers.md): a ring
  * broken into four bracket arcs whose gaps face screen-up, -down, -left and -right. A selection
- * marker is the brackets alone, a unit's only the near two; the placement cursor adds the
- * building's ghost and a measured ring on its footprint.
+ * marker is the brackets alone, a unit's only the near two, cut short; the placement cursor adds
+ * the building's ghost and a measured ring on its footprint.
  */
 
 /**
@@ -31,7 +31,7 @@ const reticleLook = (color: number, radius: number, nearOnly = false) => ({
   color: { value: new THREE.Color(color) },
   /** Centre line of the brackets. */
   radius: { value: radius },
-  /** Draws only the two brackets on the camera's side. */
+  /** Draws only the two brackets on the camera's side, as far as NEAR from screen-down. */
   nearOnly: { value: nearOnly },
   /** The measured ring of a placement cursor; 0 on selection markers. */
   footprint: { value: 0 },
@@ -63,6 +63,7 @@ const reticleFragmentShader = /* glsl */ `
   const float FINE = 0.024;         // half-width of the measured ring, its ticks and the hatching
   const float KEYLINE = 0.05;       // dark edge that keeps off-white readable on bright sand
   const float ARC = 0.56;           // half-angle of a bracket, leaving gaps of about 26 degrees
+  const float NEAR = 0.9;           // how far from screen-down a unit's brackets reach, 52 degrees
   const float TICK_STEP = PI / 12.0;
   const float HATCH_STEP = 0.62;
   const vec3 DARK = vec3(0.012, 0.01, 0.008);
@@ -86,13 +87,15 @@ const reticleFragmentShader = /* glsl */ `
     float turnIn = min(0.14, radius * 0.03);
     float turn = max(abs(pastEnd + STROKE) - STROKE, max(radius - turnIn - r, r - radius));
     float d = min(stroke, turn);
-    // vGround.y grows away from the camera.
-    if (nearOnly) d = max(d, vGround.y);
+    // A unit's brackets stop NEAR from screen-down, short of its sides: any further and they
+    // come closer to the next unit's than to each other, and a selected row reads as one
+    // scalloped line. vGround.y grows away from the camera.
+    if (nearOnly) d = max(d, dot(vec2(abs(vGround.x), vGround.y), vec2(cos(NEAR), sin(NEAR))));
     return vec2(d, fwidth(d));
   }
 
   // Ticks every 15 degrees inside the footprint; the four on the screen axes reach out through
-  // the bracket gaps like a crosshair.
+  // the bracket gaps like a crosshair, by less on a Turret, where the full reach is a gunsight.
   vec2 ticks() {
     float index = floor(atan(vGround.y, vGround.x) / TICK_STEP + 0.5);
     float angle = index * TICK_STEP;
@@ -100,17 +103,21 @@ const reticleFragmentShader = /* glsl */ `
     vec2 side = vec2(-dir.y, dir.x);
     float along = dot(vGround, dir);
     float cardinal = step(abs(mod(index + 3.0, 6.0) - 3.0), 0.5);
-    float inner = footprint - mix(0.16, 0.34, cardinal);
-    float outer = mix(footprint, radius + 0.3, cardinal);
+    // 1 on a Command Center, about a third on a Turret.
+    float reach = min(1.0, footprint * 0.2);
+    float inner = footprint - mix(0.16, 0.16 + 0.18 * reach, cardinal);
+    float outer = mix(footprint, radius + 0.3 * reach, cardinal);
     float pixel = pixelAcross(side);
     return vec2(max(fine(dot(vGround, side), pixel), max(inner - along, along - outer)), pixel);
   }
 
-  // Diagonal lines across the footprint, stopping just short of its ring.
+  // Diagonal lines across the footprint, stopping just short of its ring, and closer together
+  // on a Turret, which would otherwise get five of them.
   vec2 hatching(float r) {
     float pixel = pixelAcross(vec2(0.7071));
     float across = (vGround.x + vGround.y) * 0.7071;
-    float d = fine(mod(across, HATCH_STEP) - HATCH_STEP * 0.5, pixel);
+    float gap = min(HATCH_STEP, footprint * 0.25);
+    float d = fine(mod(across, gap) - gap * 0.5, pixel);
     return vec2(max(d, r - footprint + 0.12), pixel);
   }
 
@@ -163,7 +170,8 @@ const reticleMesh = (extent: number, look: ReturnType<typeof reticleLook>) => {
  * resources, red for the enemy.
  *
  * A unit stands on its marker, so it gets only the two near brackets: the far two hide behind
- * its body and, in a squad, tangle with the unit behind.
+ * its body and, in a squad, tangle with the unit behind. The near two stop short of its sides,
+ * which leaves sand between the markers of units standing shoulder to shoulder.
  */
 export const createSelectionMarker = (target: "unit" | "footprint", radius: number, color = UI_SELECTION_COLOR) => {
   const brackets = target === "unit" ? radius : radius + PAD;
