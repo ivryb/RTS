@@ -25,6 +25,8 @@ Three.js owns presentation only. Projectiles, animations, health bars, selection
 
 `src/constructionSites.ts` owns how a building looks while it is under construction: a scaffold around the site, the model rising inside it behind a cut, and the scaffold dropping at completion. `UnitSystem` hands it each site's progress, health and whether a drone is working. [Construction animation](construction_animation.md) describes the look, its cost, and its preview scene.
 
+`src/groundMarkers.ts` owns the markers drawn on the ground: the selection marker of units, buildings and Titanium Deposits, and the cursor that follows the pointer while a building is placed. [Ground markers](ground_markers.md) describes their one visual language and its capture spec.
+
 `src/deathEffects.ts` owns how a unit dies and a building is destroyed, with its pooled parts in `src/death/`: `UnitSystem` hands it each casualty's model on the frame the simulation reports the death, and gets the root back hidden once a wreck has taken its place. [Destruction and death effects](death_effects.md) describes the look, what is left behind, its cost, and its preview scene.
 
 ## Terrain
