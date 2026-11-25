@@ -9,13 +9,13 @@ import type { BuildingPresentationFactory } from "./unitSystem";
 /**
  * The Reticle, the one language of every marker on the ground (docs/ground_markers.md): a ring
  * broken into four bracket arcs whose gaps face screen-up, -down, -left and -right. A selection
- * marker is the brackets alone, a unit's only the near two, cut short; the placement cursor adds
- * the building's ghost and a measured ring on its footprint.
+ * marker is the brackets alone; the placement cursor adds the building's ghost and a measured
+ * ring on its footprint.
  */
 
 /**
  * From a selected footprint to the centre line of its brackets. A unit's brackets sit on its body
- * radius with no pad: any wider and the brackets of a tight squad join into one wavy line.
+ * radius with no pad: in a tight squad they all but touch as it is, and any wider they overlap.
  */
 const PAD = 0.1;
 /**
@@ -27,12 +27,10 @@ const FRAME = 0.3;
 const SELECTION_MARGIN = 0.15;
 const PLACEMENT_MARGIN = 0.4;
 
-const reticleLook = (color: number, radius: number, nearOnly = false) => ({
+const reticleLook = (color: number, radius: number) => ({
   color: { value: new THREE.Color(color) },
   /** Centre line of the brackets. */
   radius: { value: radius },
-  /** Draws only the two brackets on the camera's side, as far as NEAR from screen-down. */
-  nearOnly: { value: nearOnly },
   /** The measured ring of a placement cursor; 0 on selection markers. */
   footprint: { value: 0 },
   blocked: { value: false },
@@ -53,7 +51,6 @@ const reticleVertexShader = /* glsl */ `
 const reticleFragmentShader = /* glsl */ `
   uniform vec3 color;
   uniform float radius;
-  uniform bool nearOnly;
   uniform float footprint;
   uniform bool blocked;
   varying vec2 vGround;
@@ -63,7 +60,6 @@ const reticleFragmentShader = /* glsl */ `
   const float FINE = 0.024;         // half-width of the measured ring, its ticks and the hatching
   const float KEYLINE = 0.05;       // dark edge that keeps off-white readable on bright sand
   const float ARC = 0.56;           // half-angle of a bracket, leaving gaps of about 26 degrees
-  const float NEAR = 0.9;           // how far from screen-down a unit's brackets reach, 52 degrees
   const float TICK_STEP = PI / 12.0;
   const float HATCH_STEP = 0.62;
   const vec3 DARK = vec3(0.012, 0.01, 0.008);
@@ -87,10 +83,6 @@ const reticleFragmentShader = /* glsl */ `
     float turnIn = min(0.14, radius * 0.03);
     float turn = max(abs(pastEnd + STROKE) - STROKE, max(radius - turnIn - r, r - radius));
     float d = min(stroke, turn);
-    // A unit's brackets stop NEAR from screen-down, short of its sides: any further and they
-    // come closer to the next unit's than to each other, and a selected row reads as one
-    // scalloped line. vGround.y grows away from the camera.
-    if (nearOnly) d = max(d, dot(vec2(abs(vGround.x), vGround.y), vec2(cos(NEAR), sin(NEAR))));
     return vec2(d, fwidth(d));
   }
 
@@ -167,15 +159,11 @@ const reticleMesh = (extent: number, look: ReturnType<typeof reticleLook>) => {
  * The marker of a selected unit, building or Titanium Deposit, hidden until it is selected. Add
  * it to the thing's root, which stands on the ground, and switch `visible`. `radius` is the
  * unit's body or the footprint, in metres; `color` is off-white for the local player and for
- * resources, red for the enemy.
- *
- * A unit stands on its marker, so it gets only the two near brackets: the far two hide behind
- * its body and, in a squad, tangle with the unit behind. The near two stop short of its sides,
- * which leaves sand between the markers of units standing shoulder to shoulder.
+ * resources, red for the enemy. A unit gets the same four brackets as a footprint, without PAD.
  */
 export const createSelectionMarker = (target: "unit" | "footprint", radius: number, color = UI_SELECTION_COLOR) => {
   const brackets = target === "unit" ? radius : radius + PAD;
-  const marker = reticleMesh(brackets + SELECTION_MARGIN, reticleLook(color, brackets, target === "unit"));
+  const marker = reticleMesh(brackets + SELECTION_MARGIN, reticleLook(color, brackets));
   marker.name = "Selection ring";
   marker.userData.selectionOverlay = true;
   marker.visible = false;
