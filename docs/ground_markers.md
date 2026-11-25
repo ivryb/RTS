@@ -5,7 +5,7 @@ Every marker on the ground (unit, building and Titanium Deposit selection, and t
 ## The language
 
 - **Selection** is a ring broken into four bracket arcs. The gaps face screen-up, screen-down, screen-left and screen-right, whichever way the unit or building faces, so every marker matches on screen. It is the round cousin of the attack-target brackets in `src/orderMarker.ts`.
-- **A unit shows only its two near brackets**, on its body radius, each stopping 52 degrees from screen-down. The far two hide behind the body, and longer brackets join a tight squad (Ghostrunners 1.2 m apart) into one scalloped line; cut short, neighbours keep 0.32 m of sand between them, more than the gap inside one unit's pair.
+- **A unit shows the same four brackets**, on its body radius. In a crowd at its tightest (Ghostrunners 1.2 m apart) neighbours' markers all but touch. Ivan chose that on 2026-11-25 over a near pair cut short of the unit's sides, which looked cropped, so keep crowds the same as lone units.
 - **A unit's marker is wider than its hull**, or the hull covers it. The radius is `selectionRing.radius` in `src/modelAssets.ts`: a ground vehicle's clears the longer half of its hull (Behemoth 1.9 m for a 3.5 m hull), a hovering unit's is the ground it holds in formation (Hornet 1.3 m). The same radius sets the unit's health bar width and the patch of ground a vehicle tilts to.
 - **One stroke** on every marker, never scaled by the radius, with a thin dark keyline under it so off-white holds on bright sand. On a building or deposit the brackets sit a fixed 0.1 m outside the footprint. The tilted camera draws the 0.09 m stroke about 2 px wide where a bracket runs up the screen and 1.6 px where it runs across, on every marker alike.
 - **Buildings are marked at their real footprint** (`radius`, Command Center 5.58 m, Turret 1.8 m), not their attack radius, so the selection marker and the placement cursor outline the same ground.
@@ -16,7 +16,7 @@ Every marker on the ground (unit, building and Titanium Deposit selection, and t
 
 `src/groundMarkers.ts` owns all of it: `createSelectionMarker` for units, buildings and deposits, and `PlacementCursor` for placement. `tools/verify/specs/ground-markers.spec.ts` captures states 1 to 6 below to `art/workbench/verify/ground-markers/`; after any change to the markers, run it on `main` and on your branch and compare the two sets. State 7 has no capture; a test in `tests/unitPresentation.test.ts` checks that the cursor stays flat over ridges.
 
-Ivan approved the look from a sketch of four brackets on everything. Five things were decided while building it and wait for his review: units show two brackets instead of four, those two stop short of the unit's sides, they sit on the body radius with no pad, the Behemoth's and the Hornet's wider markers (and with them wider health bars), and the ghost's shading.
+Ivan approved the look from a sketch of four brackets on everything. Three things were decided while building it and wait for his review: a unit's brackets sit on its body radius with no pad, the Behemoth's and the Hornet's wider markers (and with them wider health bars), and the ghost's shading.
 
 ## States
 
@@ -32,7 +32,7 @@ Ivan approved the look from a sketch of four brackets on everything. Five things
 
 There are two distances, and each has a reason:
 
-- 0.1 m from a selected footprint to its brackets, so they clear the model's walls. Units have none: at 0.1 m the brackets of Ghostrunners standing 1.2 m apart come within 0.17 m of each other, closer than a unit's own two, and read as one wavy line.
+- 0.1 m from a selected footprint to its brackets, so they clear the model's walls. Units have none: Ghostrunners stand 1.2 m apart and their markers are 1.12 m across, so 0.1 m more would overlap them.
 - 0.3 m from the placement cursor's footprint ring to its brackets. At 0.1 m the two lines are two pixels apart at the default camera and merge into one uneven ring.
 
 ## Motion
