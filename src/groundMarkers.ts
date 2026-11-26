@@ -196,10 +196,24 @@ const ghostFragmentShader = /* glsl */ `
   }`;
 
 /**
- * Writes only depth, before the ghost's skin draws: without it the far walls and the inside of
- * the model show through the near ones and the ghost reads as a tangle.
+ * A ghost mesh draws twice: first depth alone (`colorWrite` false), then its skin, which passes
+ * only where it meets that depth. Without the first pass the far walls and the inside of the
+ * model show through the near ones and the ghost reads as a tangle.
+ *
+ * Both passes come from this one function, so three compiles them into a single program: only
+ * the same program is sure to give the skin exactly the depth the first pass wrote. Keep
+ * `colorWrite` their only difference. When the depth pass used three's basic material (D77-18),
+ * its depth came out a rounding step off the skin's, and the skin lost the depth test in stripes
+ * and patches that changed with every move of the cursor.
  */
-const ghostDepthMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, transparent: true });
+const ghostMaterial = (uniforms: THREE.ShaderMaterialParameters["uniforms"], colorWrite: boolean) =>
+  new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: ghostVertexShader,
+    fragmentShader: ghostFragmentShader,
+    transparent: true,
+    colorWrite,
+  });
 
 /** The state's colour and how solid the ghost is, shared by every skin of one cursor. */
 const ghostLook = () => ({ tint: { value: new THREE.Color() }, opacity: { value: 0 } });
@@ -214,16 +228,12 @@ const dressAsGhost = (model: THREE.Object3D, look: ReturnType<typeof ghostLook>)
   });
   for (const mesh of meshes) {
     const map = mesh.material instanceof THREE.MeshStandardMaterial ? mesh.material.map : null;
-    mesh.material = new THREE.ShaderMaterial({
-      uniforms: { map: { value: map }, ...look },
-      vertexShader: ghostVertexShader,
-      fragmentShader: ghostFragmentShader,
-      transparent: true,
-    });
+    const uniforms = { map: { value: map }, ...look };
+    mesh.material = ghostMaterial(uniforms, true);
     mesh.castShadow = false;
     mesh.receiveShadow = false;
     mesh.renderOrder = 2;
-    const depth = new THREE.Mesh(mesh.geometry, ghostDepthMaterial);
+    const depth = new THREE.Mesh(mesh.geometry, ghostMaterial(uniforms, false));
     depth.renderOrder = 1;
     mesh.add(depth);
   }
