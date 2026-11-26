@@ -16,6 +16,8 @@ Every marker on the ground (unit, building and Titanium Deposit selection, and t
 
 `src/groundMarkers.ts` owns all of it: `createSelectionMarker` for units, buildings and deposits, and `PlacementCursor` for placement. `tools/verify/specs/ground-markers.spec.ts` captures states 1 to 6 below to `art/workbench/verify/ground-markers/`; after any change to the markers, run it on `main` and on your branch and compare the two sets. State 7 has no capture; a test in `tests/unitPresentation.test.ts` checks that the cursor stays flat over ridges.
 
+Boat's captures cannot show every fault in the ghost. Its two passes once disagreed on depth, and on Ivan's Mac the ghost broke into stripes that changed as the cursor moved (D77-18), while Boat's llvmpipe drew it whole. Chromium's own software renderer shows that fault: after a change to how the ghost is drawn, also run the placement states with the launch args `--use-angle=swiftshader --enable-unsafe-swiftshader` in place of the ones in `tools/chromium.ts`, in the light render mode, where it manages a frame every few seconds.
+
 Ivan approved the look from a sketch of four brackets on everything. Three things were decided while building it and wait for his review: a unit's brackets sit on its body radius with no pad, the Behemoth's and the Hornet's wider markers (and with them wider health bars), and the ghost's shading.
 
 ## States
